@@ -11,11 +11,7 @@ namespace CommonNetFuncs.DeepClone;
 /// </summary>
 public static class ExpressionTrees
 {
-	//private static readonly Lock IsStructTypeToDeepCopyDictionaryLocker = new();
 	private static readonly ConcurrentDictionary<Type, bool> IsStructTypeToDeepCopyDictionary = [];
-
-	//private static readonly Lock CompiledCopyFunctionsDictionaryLocker = new();
-
 	private static readonly Type ObjectType = typeof(object);
 	private static readonly Type ObjectDictionaryType = typeof(Dictionary<object, object>);
 	private static readonly ParameterExpression[] EmptyParameterExpressions = [];
@@ -86,7 +82,6 @@ public static class ExpressionTrees
 		if (typeof(Delegate).IsAssignableFrom(type))
 		{
 			throw new ArgumentException($"Type {type.FullName} is a delegate type which is unsupported.", nameof(original));
-			//return null;
 		}
 
 		if (!forceDeepCopy && !type.IsTypeToDeepCopy())
@@ -175,8 +170,7 @@ public static class ExpressionTrees
 
 	private static void MemberwiseCloneInputToOutputExpression(Type type, ParameterExpression inputParameter, ParameterExpression outputVariable, List<Expression> expressions)
 	{
-		// Intended code:
-		// var output = (<type>)input.MemberwiseClone();
+		// Intended code: var output = (<type>)input.MemberwiseClone();
 		MethodInfo memberwiseCloneMethod = ObjectType.GetMethod("MemberwiseClone", BindingFlags.NonPublic | BindingFlags.Instance)!;
 		BinaryExpression memberwiseCloneInputExpression = Expression.Assign(outputVariable, Expression.Convert(Expression.Call(inputParameter, memberwiseCloneMethod), type));
 		expressions.Add(memberwiseCloneInputExpression);
@@ -184,8 +178,7 @@ public static class ExpressionTrees
 
 	private static void StoreReferencesIntoDictionaryExpression(ParameterExpression inputParameter, ParameterExpression inputDictionary, ParameterExpression outputVariable, List<Expression> expressions)
 	{
-		// Intended code:
-		// inputDictionary[(Object)input] = (Object)output;
+		// Intended code: inputDictionary[(Object)input] = (Object)output;
 		BinaryExpression storeReferencesExpression = Expression.Assign(Expression.Property(inputDictionary, ObjectDictionaryType.GetProperty("Item")!, inputParameter), Expression.Convert(outputVariable, ObjectType));
 		expressions.Add(storeReferencesExpression);
 	}
@@ -221,8 +214,7 @@ public static class ExpressionTrees
 
 	private static List<ParameterExpression> GenerateIndices(int arrayRank)
 	{
-		// Intended code:
-		// int i1, i2, ..., in;
+		// Intended code: int i1, i2, ..., in;
 		List<ParameterExpression> indices = [];
 		for (int i = 0; i < arrayRank; i++)
 		{
@@ -347,8 +339,7 @@ public static class ExpressionTrees
 		// This option must be implemented by Reflection because of the following:
 		// https://visualstudio.uservoice.com/forums/121579-visual-studio-2015/suggestions/2727812-allow-expression-assign-to-set-readonly-struct-f
 
-		// Intended code:
-		// fieldInfo.SetValue(boxing, <fieldtype>null);
+		// Intended code: fieldInfo.SetValue(boxing, <fieldtype>null);
 		MethodCallExpression fieldToNullExpression = Expression.Call(Expression.Constant(field), SetValueMethod!, boxingVariable, Expression.Constant(null, field.FieldType));
 		expressions.Add(fieldToNullExpression);
 	}
@@ -380,8 +371,7 @@ public static class ExpressionTrees
 
 	private static void WritableFieldToNullExpression(FieldInfo field, ParameterExpression outputVariable, List<Expression> expressions)
 	{
-		// Intended code:
-		// output.<field> = (<type>)null;
+		// Intended code: output.<field> = (<type>)null;
 		MemberExpression fieldTo = Expression.Field(outputVariable, field);
 		BinaryExpression fieldToNullExpression = Expression.Assign(fieldTo, Expression.Constant(null, field.FieldType));
 		expressions.Add(fieldToNullExpression);
@@ -389,8 +379,7 @@ public static class ExpressionTrees
 
 	private static void WritableFieldCopyExpression(Type type, FieldInfo field, ParameterExpression inputParameter, ParameterExpression inputDictionary, ParameterExpression outputVariable, List<Expression> expressions, bool useCache)
 	{
-		// Intended code:
-		// output.<field> = (<fieldType>)DeepCopyByExpressionTreeObj((Object)((<type>)input).<field>);
+		// Intended code: output.<field> = (<fieldType>)DeepCopyByExpressionTreeObj((Object)((<type>)input).<field>);
 		MemberExpression fieldFrom = Expression.Field(Expression.Convert(inputParameter, type), field);
 		Type fieldType = field.FieldType;
 		MemberExpression fieldTo = Expression.Field(outputVariable, field);
@@ -451,15 +440,6 @@ public static class ExpressionTrees
 
 		// Use HashSet for deduplication and check for classes in single pass
 		HashSet<Type> distinctFieldTypes = new(allFields.Length);
-		// foreach (FieldInfo field in allFields)
-		// {
-		// 	Type fieldType = field.FieldType;
-		// 	if (!fieldType.IsValueType && fieldType != typeof(string))
-		// 	{
-		// 		return true;
-		// 	}
-		// 	distinctFieldTypes.Add(fieldType);
-		// }
 
 		foreach (Type fieldType in allFields.Select(x => x.FieldType))
 		{
@@ -471,8 +451,6 @@ public static class ExpressionTrees
 		}
 
 		// Check struct types that need deep inspection
-		// return distinctFieldTypes.Any(fieldType => fieldType.IsStructOtherThanBasicValueTypes() && !alreadyCheckedTypes.Contains(fieldType) && fieldType.HasInItsHierarchyFieldsWithClasses(alreadyCheckedTypes));
-
 #pragma warning disable S3267 // Loops should be simplified with "LINQ" expressions
 		foreach (Type fieldType in distinctFieldTypes)
 		{
