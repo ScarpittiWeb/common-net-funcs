@@ -406,7 +406,7 @@ public static partial class Collections
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static List<T> SingleToList<T>(this T? obj)
 	{
-		return obj != null! ? [obj!] : [];
+		return obj != null! ? [obj] : [];
 	}
 
 	/// <summary>
@@ -434,7 +434,6 @@ public static partial class Collections
 	public static T? GetObjectByPartial<T>(this IQueryable<T> queryable, T partialObject, bool ignoreDefaultValues = false, CancellationToken cancellationToken = default) where T : class
 	{
 		// Get the properties of the object using reflection
-		//PropertyInfo[] properties = typeof(TObj).GetProperties(BindingFlags.Public | BindingFlags.Instance);
 		PropertyInfo[] properties = GetOrAddPropertiesFromReflectionCache(typeof(T));
 
 		// Build the expression tree for the conditions
@@ -466,11 +465,6 @@ public static partial class Collections
 					continue;
 				}
 			}
-
-			//if (partialValue is DateTime dateTimeValue)
-			//{
-			//	partialValue = dateTimeValue.ToUniversalTime();
-			//}
 
 			// Only compare non-null (and potentially non-default) values since these are going to be the ones that matter
 			// Build the condition for this property
@@ -724,8 +718,7 @@ public static partial class Collections
 				Task<T?>? tmp = outstandingItem;
 
 				// note: passed in as "state", not captured, so not a foreach/capture bug
-				outstandingItem = new(Transform!, row);
-				//outstandingItem.Start();
+				outstandingItem = new(Transform, row);
 				outstandingItem.Start();
 
 				if (tmp?.Result != null)
@@ -789,14 +782,14 @@ public static partial class Collections
 		foreach ((DataColumn DataColumn, PropertyInfo PropertyInfo, bool IsShort) pair in map)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			object? value = row[pair.DataColumn!];
+			object? value = row[pair.DataColumn];
 
 			// Handle issue where DB returns Int16 for boolean values
 			if (value is not System.DBNull)
 			{
-				if (pair.IsShort && ((pair.PropertyInfo!.PropertyType == typeof(bool)) || (pair.PropertyInfo!.PropertyType == typeof(bool?))))
+				if (pair.IsShort && ((pair.PropertyInfo.PropertyType == typeof(bool)) || (pair.PropertyInfo!.PropertyType == typeof(bool?))))
 				{
-					pair.PropertyInfo!.SetValue(item, ToBoolean(value));
+					pair.PropertyInfo.SetValue(item, ToBoolean(value));
 				}
 				else
 				{
@@ -805,11 +798,11 @@ public static partial class Collections
 					{
 						if ((valueType == typeof(DateTime)) || (valueType == typeof(DateTime?)))
 						{
-							pair.PropertyInfo!.SetValue(item, DateOnly.FromDateTime((DateTime)value));
+							pair.PropertyInfo.SetValue(item, DateOnly.FromDateTime((DateTime)value));
 						}
 						else if (DateOnlyCompat.TryParse((string)value, CultureInfo.InvariantCulture, out DateOnly dateOnlyValue))
 						{
-							pair.PropertyInfo!.SetValue(item, dateOnlyValue);
+							pair.PropertyInfo.SetValue(item, dateOnlyValue);
 						}
 						else
 						{
@@ -820,11 +813,11 @@ public static partial class Collections
 					{
 						if ((valueType == typeof(DateOnly)) || (valueType == typeof(DateOnly?)))
 						{
-							pair.PropertyInfo!.SetValue(item, ((DateOnly)value).ToDateTime(TimeOnly.MinValue));
+							pair.PropertyInfo.SetValue(item, ((DateOnly)value).ToDateTime(TimeOnly.MinValue));
 						}
 						else if (DateTimeCompat.TryParse((string)value, CultureInfo.InvariantCulture, out DateTime dateTimeValue))
 						{
-							pair.PropertyInfo!.SetValue(item, dateTimeValue);
+							pair.PropertyInfo.SetValue(item, dateTimeValue);
 						}
 						else
 						{
@@ -833,13 +826,13 @@ public static partial class Collections
 					}
 					else
 					{
-						pair.PropertyInfo!.SetValue(item, value);
+						pair.PropertyInfo.SetValue(item, value);
 					}
 				}
 			}
 			else
 			{
-				pair.PropertyInfo!.SetValue(item, null);
+				pair.PropertyInfo.SetValue(item, null);
 			}
 		}
 		return item;
@@ -1160,49 +1153,41 @@ public static partial class Collections
 		PropertyInfo[] properties = GetOrAddPropertiesFromReflectionCache(typeof(T));
 		PropertyInfo[] groupingProperties = properties.Where(p => !propsToAgg.Contains(p.Name)).ToArray();
 
-		return !groupingProperties.AnyFast() || (propsToAgg.AsValueEnumerable().Intersect(properties.Select(x => x.Name)).Count() < propsToAgg.Count)
+		if (!parallel)
+		{
+			return !groupingProperties.AnyFast() || (propsToAgg.AsValueEnumerable().Intersect(properties.Select(x => x.Name)).Count() < propsToAgg.Count)
 			? throw new ArgumentException($"Invalid aggregate property values. All values in propsToAgg must be present in type {typeof(T)}", nameof(propsToAgg))
-			: !parallel
-			? collection.GroupBy(x => new { GroupKey = string.Join("|", groupingProperties.Select(y => y.GetValue(x)?.ToString() ?? string.Empty)) })
+			: collection.GroupBy(x => new { GroupKey = string.Join("|", groupingProperties.Select(y => y.GetValue(x)?.ToString() ?? string.Empty)) })
 				//return collection.GroupBy(_ => new { GroupKey = string.Join("|", groupingProperties.Select(x => x.GetValue(x)?.ToString() ?? string.Empty)) })
-				.Select(x =>
-				{
-					T result = new();
-					foreach (PropertyInfo prop in properties)
-					{
-						if (propsToAgg.Contains(prop.Name))
-						{
-							string aggregatedValue = distinct ? string.Join(separator, x.Select(y => prop.GetValue(y)?.ToString() ?? string.Empty).Distinct()) :
-								string.Join(separator, x.Select(y => prop.GetValue(y)?.ToString() ?? string.Empty));
-							prop.SetValue(result, aggregatedValue);
-						}
-						else
-						{
-							prop.SetValue(result, prop.GetValue(x.First()));
-						}
-					}
-					return result;
-				})
-			: collection.AsParallel().WithMergeOptions(ParallelMergeOptions.NotBuffered)
+				.Select(x => AggregateGroup(x, properties, propsToAgg, separator, distinct));
+		}
+		else
+		{
+			return !groupingProperties.AnyFast() || (propsToAgg.AsValueEnumerable().Intersect(properties.Select(x => x.Name)).Count() < propsToAgg.Count)
+			? throw new ArgumentException($"Invalid aggregate property values. All values in propsToAgg must be present in type {typeof(T)}", nameof(propsToAgg))
+			: (IEnumerable<T>)collection.AsParallel().WithMergeOptions(ParallelMergeOptions.NotBuffered)
 				.GroupBy(x => new { GroupKey = string.Join("|", groupingProperties.Select(y => y.GetValue(x)?.ToString() ?? string.Empty)) })
-				.Select(x =>
-				{
-					T result = new();
-					foreach (PropertyInfo prop in properties)
-					{
-						if (propsToAgg.Contains(prop.Name))
-						{
-							string aggregatedValue = distinct ? string.Join(separator, x.Select(y => prop.GetValue(y)?.ToString() ?? string.Empty).Distinct()) :
-								string.Join(separator, x.Select(y => prop.GetValue(y)?.ToString() ?? string.Empty));
-							prop.SetValue(result, aggregatedValue);
-						}
-						else
-						{
-							prop.SetValue(result, prop.GetValue(x.First()));
-						}
-					}
-					return result;
-				});
+				.Select(x => AggregateGroup(x, properties, propsToAgg, separator, distinct));
+		}
+	}
+
+	private static T AggregateGroup<T>(IEnumerable<T> group, PropertyInfo[] properties, ISet<string> propsToAgg, string separator, bool distinct) where T : class, new()
+	{
+		T result = new();
+		foreach (PropertyInfo prop in properties)
+		{
+			if (propsToAgg.Contains(prop.Name))
+			{
+				string aggregatedValue = distinct ? string.Join(separator, group.Select(y => prop.GetValue(y)?.ToString() ?? string.Empty).Distinct()) :
+					string.Join(separator, group.Select(y => prop.GetValue(y)?.ToString() ?? string.Empty));
+				prop.SetValue(result, aggregatedValue);
+			}
+			else
+			{
+				prop.SetValue(result, prop.GetValue(group.First()));
+			}
+		}
+		return result;
 	}
 
 	/// <summary>
@@ -1265,9 +1250,6 @@ public static partial class Collections
 		{
 			return [];
 		}
-
-		// Calculate total possible combinations
-		//long totalCombinations = sourcesArray.Aggregate(1L, (acc, curr) => acc * curr.Length);
 
 		// Get the number of elements we're combining
 		int length = sourcesArray.Length;
@@ -1333,12 +1315,6 @@ public static partial class Collections
 		{
 			yield break;
 		}
-
-		//long totalCombinations = sourcesArray.Aggregate(1L, (acc, curr) => acc * curr.Length);
-		//if (maxCombinations.HasValue && totalCombinations > maxCombinations.Value)
-		//{
-		//    throw new ArgumentException($"Total possible combinations ({totalCombinations}) exceeds maximum allowed ({maxCombinations.Value})");
-		//}
 
 		HashSet<string> yielded = new();
 
