@@ -342,7 +342,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		try
 		{
-			await using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+			await using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 			if (queryTimeout != null)
 			{
 				context.Database.SetCommandTimeout((TimeSpan)queryTimeout);
