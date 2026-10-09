@@ -175,11 +175,11 @@ public static class ConversionTask
 				if (strict)
 				{
 					conversion.AddParameter("-strict -2");
-					await conversion.Start(cancellationTokenSource.Token).ConfigureAwait(false);
+					await conversion.Start(cancellationTokenSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
 				}
 				else
 				{
-					await conversion.Start(cancellationTokenSource.Token).ConfigureAwait(false);
+					await conversion.Start(cancellationTokenSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
 				}
 			}
 			catch (OperationCanceledException ex)
