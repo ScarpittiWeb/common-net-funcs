@@ -174,7 +174,7 @@ public sealed class MessagePackStreamingTests
 	public async Task MessagePackStreamingResult_WithCancellation_StopsStreamingWithoutThrowingAndSetsClientClosedStatus()
 	{
 		// Arrange
-		CancellationTokenSource cts = new();
+		using CancellationTokenSource cts = new();
 		int itemsYielded = 0;
 		async IAsyncEnumerable<TestModel> GetDataSlowly()
 		{
@@ -185,7 +185,7 @@ public sealed class MessagePackStreamingTests
 				yield return new TestModel { Id = i, Name = $"Test{i}" };
 				if (i == 2)
 				{
-					cts.Cancel();
+					await cts.CancelAsync();
 				}
 			}
 		}
@@ -205,7 +205,7 @@ public sealed class MessagePackStreamingTests
 	public async Task MessagePackStreamingResult_WithCancellation_PropagatesTokenToAsyncEnumerable()
 	{
 		// Arrange
-		CancellationTokenSource cts = new();
+		using CancellationTokenSource cts = new();
 		int itemsProduced = 0;
 
 		// Only completes early if the cancellation token passed to the enumerator is signaled (via WithCancellation).
@@ -224,7 +224,7 @@ public sealed class MessagePackStreamingTests
 
 		Task executeTask = result.ExecuteResultAsync(actionContext);
 		await Task.Delay(50, Current.CancellationToken);
-		cts.Cancel();
+		await cts.CancelAsync();
 
 		// Act - if the token isn't propagated to the enumerable, this will hang until the test times out
 		Task completedTask = await Task.WhenAny(executeTask, Task.Delay(TimeSpan.FromSeconds(5), Current.CancellationToken));

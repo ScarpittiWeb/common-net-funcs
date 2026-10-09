@@ -218,41 +218,6 @@ public static class GenericMinimalEndpoints
 	/// <returns>Ok if successful, otherwise NoContent</returns>
 	public static async Task<Results<Ok<TEntity>, NoContent, ValidationProblem>> Patch<TEntity, TContext>(TEntity? dbModel, JsonPatchDocument<TEntity> patch, IBaseDbContextActions<TEntity, TContext> baseAppDbContextActions) where TEntity : class?, new() where TContext : DbContext
 	{
-		try
-		{
-			if (dbModel == null)
-			{
-				return TypedResults.NoContent();
-			}
-
-			if (patch.Operations.Count == 0)
-			{
-				return TypedResults.Ok(dbModel);
-			}
-
-			TEntity updateModel = dbModel.DeepClone();
-
-			patch.ApplyTo(updateModel);
-
-			List<ValidationResult> failedValidations = [];
-			if (!Validator.TryValidateObject(updateModel, new(updateModel), failedValidations))
-			{
-				Dictionary<string, string[]> result = failedValidations.ToDictionary(x => x.MemberNames.FirstOrDefault() ?? "Error", x => new string[] { x.ErrorMessage! });
-				return TypedResults.ValidationProblem(result);
-			}
-
-			updateModel.CopyPropertiesTo(dbModel);
-			baseAppDbContextActions.Update(dbModel);
-			if (await baseAppDbContextActions.SaveChanges().ConfigureAwait(false))
-			{
-				return TypedResults.Ok(dbModel);
-			}
-		}
-		catch (Exception ex)
-		{
-			logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
-
-		}
-		return TypedResults.NoContent();
+		return EndpointUpdateHelper.ToTypedResult(await EndpointUpdateHelper.UpdateAndSave(dbModel, patch.Operations.Count > 0, updateModel => patch.ApplyTo(updateModel), baseAppDbContextActions, static x => x).ConfigureAwait(false));
 	}
 }

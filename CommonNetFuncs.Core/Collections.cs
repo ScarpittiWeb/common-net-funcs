@@ -406,7 +406,7 @@ public static partial class Collections
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static List<T> SingleToList<T>(this T? obj)
 	{
-		return obj != null! ? [obj!] : [];
+		return obj != null! ? [obj] : [];
 	}
 
 	/// <summary>
@@ -419,7 +419,11 @@ public static partial class Collections
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static List<string> SingleToList(this string? s, bool allowEmptyValues = false)
 	{
-		return !allowEmptyValues ? (!s.IsNullOrWhiteSpace()) ? [s] : [] : s != null ? [s] : [];
+		if (!allowEmptyValues)
+		{
+			return (!s.IsNullOrWhiteSpace()) ? [s] : [];
+		}
+		return s != null ? [s] : [];
 	}
 
 	/// <summary>
@@ -434,7 +438,6 @@ public static partial class Collections
 	public static T? GetObjectByPartial<T>(this IQueryable<T> queryable, T partialObject, bool ignoreDefaultValues = false, CancellationToken cancellationToken = default) where T : class
 	{
 		// Get the properties of the object using reflection
-		//PropertyInfo[] properties = typeof(TObj).GetProperties(BindingFlags.Public | BindingFlags.Instance);
 		PropertyInfo[] properties = GetOrAddPropertiesFromReflectionCache(typeof(T));
 
 		// Build the expression tree for the conditions
@@ -466,11 +469,6 @@ public static partial class Collections
 					continue;
 				}
 			}
-
-			//if (partialValue is DateTime dateTimeValue)
-			//{
-			//	partialValue = dateTimeValue.ToUniversalTime();
-			//}
 
 			// Only compare non-null (and potentially non-default) values since these are going to be the ones that matter
 			// Build the condition for this property
@@ -724,8 +722,7 @@ public static partial class Collections
 				Task<T?>? tmp = outstandingItem;
 
 				// note: passed in as "state", not captured, so not a foreach/capture bug
-				outstandingItem = new(Transform!, row);
-				//outstandingItem.Start();
+				outstandingItem = new(Transform, row);
 				outstandingItem.Start();
 
 				if (tmp?.Result != null)
@@ -789,14 +786,14 @@ public static partial class Collections
 		foreach ((DataColumn DataColumn, PropertyInfo PropertyInfo, bool IsShort) pair in map)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			object? value = row[pair.DataColumn!];
+			object? value = row[pair.DataColumn];
 
 			// Handle issue where DB returns Int16 for boolean values
 			if (value is not System.DBNull)
 			{
-				if (pair.IsShort && ((pair.PropertyInfo!.PropertyType == typeof(bool)) || (pair.PropertyInfo!.PropertyType == typeof(bool?))))
+				if (pair.IsShort && ((pair.PropertyInfo.PropertyType == typeof(bool)) || (pair.PropertyInfo.PropertyType == typeof(bool?))))
 				{
-					pair.PropertyInfo!.SetValue(item, ToBoolean(value));
+					pair.PropertyInfo.SetValue(item, ToBoolean(value));
 				}
 				else
 				{
@@ -805,11 +802,11 @@ public static partial class Collections
 					{
 						if ((valueType == typeof(DateTime)) || (valueType == typeof(DateTime?)))
 						{
-							pair.PropertyInfo!.SetValue(item, DateOnly.FromDateTime((DateTime)value));
+							pair.PropertyInfo.SetValue(item, DateOnly.FromDateTime((DateTime)value));
 						}
 						else if (DateOnlyCompat.TryParse((string)value, CultureInfo.InvariantCulture, out DateOnly dateOnlyValue))
 						{
-							pair.PropertyInfo!.SetValue(item, dateOnlyValue);
+							pair.PropertyInfo.SetValue(item, dateOnlyValue);
 						}
 						else
 						{
@@ -820,11 +817,11 @@ public static partial class Collections
 					{
 						if ((valueType == typeof(DateOnly)) || (valueType == typeof(DateOnly?)))
 						{
-							pair.PropertyInfo!.SetValue(item, ((DateOnly)value).ToDateTime(TimeOnly.MinValue));
+							pair.PropertyInfo.SetValue(item, ((DateOnly)value).ToDateTime(TimeOnly.MinValue));
 						}
 						else if (DateTimeCompat.TryParse((string)value, CultureInfo.InvariantCulture, out DateTime dateTimeValue))
 						{
-							pair.PropertyInfo!.SetValue(item, dateTimeValue);
+							pair.PropertyInfo.SetValue(item, dateTimeValue);
 						}
 						else
 						{
@@ -833,13 +830,13 @@ public static partial class Collections
 					}
 					else
 					{
-						pair.PropertyInfo!.SetValue(item, value);
+						pair.PropertyInfo.SetValue(item, value);
 					}
 				}
 			}
 			else
 			{
-				pair.PropertyInfo!.SetValue(item, null);
+				pair.PropertyInfo.SetValue(item, null);
 			}
 		}
 		return item;
@@ -867,97 +864,6 @@ public static partial class Collections
 		dataTable ??= new();
 		return data.ToDataTableExpressionTrees(dataTable, useParallel, approximateCount, degreeOfParallelism, cancellationToken);
 	}
-
-	///// <summary>
-	///// Convert an <see cref="IEnumerable{TObj}"/> into equivalent <see cref="DataTable"/> object using expression trees.
-	///// </summary>
-	///// <typeparam name="TObj">Class to use in table creation.</typeparam>
-	///// <param name="data">Collection to convert into a DataTable.</param>
-	///// <param name="dataTable">DataTable to optionally insert data into.</param>
-	///// <param name="useParallel">Optional: Parallelizes the conversion. Default is <see langword="false"/>.</param>
-	///// <param name="approximateCount">Optional: Used for pre-allocating variable size when using parallelization, default is data.Count().</param>
-	///// <param name="degreeOfParallelism">Optional: Used for setting number of parallel operations when using parallelization, default is -1 (#cores on machine).</param>
-	///// <param name="cancellationToken">Optional: The cancellation token for this operation.</param>
-	///// <returns>A <see cref="DataTable"/> representation of <paramref name="data"/>.</returns>
-	//[Obsolete("Please use ToDataTable<TObj>(this IEnumerable<TObj>? data, DataTable? dataTable = null, bool useExpressionTrees = true, bool useParallel = false, int? approximateCount = null, int degreeOfParallelism = -1, CancellationToken cancellationToken = default) instead", false)]
-	//[return: NotNullIfNotNull(nameof(data))]
-	//public static DataTable? ToDataTableReflection<TObj>(this IEnumerable<TObj>? data, DataTable? dataTable = null, bool useParallel = false, int? approximateCount = null, int degreeOfParallelism = -1, CancellationToken cancellationToken = default) where TObj : class, new()
-	//{
-	//	if (data == null)
-	//	{
-	//		return null;
-	//	}
-
-	//	dataTable ??= new();
-	//	PropertyInfo[] properties = GetOrAddPropertiesFromReflectionCache(typeof(TObj));
-
-	//	// Remove invalid columns
-	//	IEnumerable<string> propertyNames = properties.Select(x => x.Name);
-	//	DataColumn[] columns = new DataColumn[dataTable.Columns.Count];
-	//	dataTable.Columns.CopyTo(columns, 0);
-	//	foreach (DataColumn? col in columns.Where(x => !propertyNames.Contains(x.ColumnName)))
-	//	{
-	//		dataTable.Columns.Remove(col.ColumnName);
-	//	}
-
-	//	// Create columns
-	//	foreach (PropertyInfo? prop in properties.Where(x => !dataTable.Columns.Contains(x.Name)))
-	//	{
-	//		dataTable.Columns.Add(prop.Name, Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType);
-	//	}
-
-	//	// Add rows
-	//	if (!useParallel)
-	//	{
-	//		foreach (TObj item in data.Where(x => x != null))
-	//		{
-	//			cancellationToken.ThrowIfCancellationRequested();
-	//			DataRow row = dataTable.NewRow();
-	//			foreach (PropertyInfo prop in properties)
-	//			{
-	//				row[prop.Name] = prop.GetValue(item) ?? System.DBNull.Value;
-	//			}
-	//			dataTable.Rows.Add(row);
-	//		}
-	//	}
-	//	else
-	//	{
-	//		// Process items in parallel and collect results
-	//		int columnCount = dataTable.Columns.Count;
-	//		List<object[]> rows = new(approximateCount ?? data.Count());
-	//		object lockObj = new();
-
-	//		ParallelOptions options = new() { MaxDegreeOfParallelism = (degreeOfParallelism == -1) ? Environment.ProcessorCount : degreeOfParallelism };
-	//		Parallel.ForEach(data, options, () => new List<object[]>(), (item, _, localRows) =>
-	//		{
-	//			cancellationToken.ThrowIfCancellationRequested();
-	//			object[] rowValues = new object[columnCount];
-	//			for (int i = 0; i < columnCount; i++)
-	//			{
-	//				rowValues[i] = properties[i].GetValue(item) ?? System.DBNull.Value;
-	//			}
-
-	//			localRows.Add(rowValues);
-	//			return localRows;
-	//		},
-	//			localRows =>
-	//			{
-	//				lock (lockObj)
-	//				{
-	//					rows.AddRange(localRows);
-	//				}
-	//			});
-
-	//		// Add all rows to the table
-	//		foreach (object[] rowValues in rows)
-	//		{
-	//			cancellationToken.ThrowIfCancellationRequested();
-	//			dataTable.Rows.Add(rowValues);
-	//		}
-	//	}
-
-	//	return dataTable;
-	//}
 
 	private static readonly ConcurrentDictionary<Type, TypeAccessor> TypeAccessorCache = new();
 
@@ -1017,7 +923,8 @@ public static partial class Collections
 	/// <param name="degreeOfParallelism">The degree of parallelism to use if <paramref name="useParallel"/> is true.</param>
 	/// <param name="cancellationToken">Optional: The cancellation token for this operation.</param>
 	/// <returns>A <see cref="DataTable"/> representation of <paramref name="data"/>.</returns>
-	private static DataTable ToDataTableExpressionTrees<T>(this IEnumerable<T> data, DataTable dataTable, bool useParallel, int? approximateCount, int degreeOfParallelism, CancellationToken cancellationToken = default) where T : class, new()
+	private static DataTable ToDataTableExpressionTrees<T>(this IEnumerable<T> data, DataTable dataTable, bool useParallel, int? approximateCount, int degreeOfParallelism,
+		CancellationToken cancellationToken = default) where T : class, new()
 	{
 		TypeAccessor typeAccessor = TypeAccessorCache.GetOrAdd(typeof(T), t => new TypeAccessor(t));
 
@@ -1160,49 +1067,41 @@ public static partial class Collections
 		PropertyInfo[] properties = GetOrAddPropertiesFromReflectionCache(typeof(T));
 		PropertyInfo[] groupingProperties = properties.Where(p => !propsToAgg.Contains(p.Name)).ToArray();
 
-		return !groupingProperties.AnyFast() || (propsToAgg.AsValueEnumerable().Intersect(properties.Select(x => x.Name)).Count() < propsToAgg.Count)
+		if (!parallel)
+		{
+			return !groupingProperties.AnyFast() || (propsToAgg.AsValueEnumerable().Intersect(properties.Select(x => x.Name)).Count() < propsToAgg.Count)
 			? throw new ArgumentException($"Invalid aggregate property values. All values in propsToAgg must be present in type {typeof(T)}", nameof(propsToAgg))
-			: !parallel
-			? collection.GroupBy(x => new { GroupKey = string.Join("|", groupingProperties.Select(y => y.GetValue(x)?.ToString() ?? string.Empty)) })
+			: collection.GroupBy(x => new { GroupKey = string.Join("|", groupingProperties.Select(y => y.GetValue(x)?.ToString() ?? string.Empty)) })
 				//return collection.GroupBy(_ => new { GroupKey = string.Join("|", groupingProperties.Select(x => x.GetValue(x)?.ToString() ?? string.Empty)) })
-				.Select(x =>
-				{
-					T result = new();
-					foreach (PropertyInfo prop in properties)
-					{
-						if (propsToAgg.Contains(prop.Name))
-						{
-							string aggregatedValue = distinct ? string.Join(separator, x.Select(y => prop.GetValue(y)?.ToString() ?? string.Empty).Distinct()) :
-								string.Join(separator, x.Select(y => prop.GetValue(y)?.ToString() ?? string.Empty));
-							prop.SetValue(result, aggregatedValue);
-						}
-						else
-						{
-							prop.SetValue(result, prop.GetValue(x.First()));
-						}
-					}
-					return result;
-				})
-			: collection.AsParallel().WithMergeOptions(ParallelMergeOptions.NotBuffered)
+				.Select(x => AggregateGroup(x, properties, propsToAgg, separator, distinct));
+		}
+		else
+		{
+			return !groupingProperties.AnyFast() || (propsToAgg.AsValueEnumerable().Intersect(properties.Select(x => x.Name)).Count() < propsToAgg.Count)
+			? throw new ArgumentException($"Invalid aggregate property values. All values in propsToAgg must be present in type {typeof(T)}", nameof(propsToAgg))
+			: (IEnumerable<T>)collection.AsParallel().WithMergeOptions(ParallelMergeOptions.NotBuffered)
 				.GroupBy(x => new { GroupKey = string.Join("|", groupingProperties.Select(y => y.GetValue(x)?.ToString() ?? string.Empty)) })
-				.Select(x =>
-				{
-					T result = new();
-					foreach (PropertyInfo prop in properties)
-					{
-						if (propsToAgg.Contains(prop.Name))
-						{
-							string aggregatedValue = distinct ? string.Join(separator, x.Select(y => prop.GetValue(y)?.ToString() ?? string.Empty).Distinct()) :
-								string.Join(separator, x.Select(y => prop.GetValue(y)?.ToString() ?? string.Empty));
-							prop.SetValue(result, aggregatedValue);
-						}
-						else
-						{
-							prop.SetValue(result, prop.GetValue(x.First()));
-						}
-					}
-					return result;
-				});
+				.Select(x => AggregateGroup(x, properties, propsToAgg, separator, distinct));
+		}
+	}
+
+	private static T AggregateGroup<T>(IEnumerable<T> group, PropertyInfo[] properties, ISet<string> propsToAgg, string separator, bool distinct) where T : class, new()
+	{
+		T result = new();
+		foreach (PropertyInfo prop in properties)
+		{
+			if (propsToAgg.Contains(prop.Name))
+			{
+				string aggregatedValue = distinct ? string.Join(separator, group.Select(y => prop.GetValue(y)?.ToString() ?? string.Empty).Distinct()) :
+					string.Join(separator, group.Select(y => prop.GetValue(y)?.ToString() ?? string.Empty));
+				prop.SetValue(result, aggregatedValue);
+			}
+			else
+			{
+				prop.SetValue(result, prop.GetValue(group.First()));
+			}
+		}
+		return result;
 	}
 
 	/// <summary>
@@ -1265,9 +1164,6 @@ public static partial class Collections
 		{
 			return [];
 		}
-
-		// Calculate total possible combinations
-		//long totalCombinations = sourcesArray.Aggregate(1L, (acc, curr) => acc * curr.Length);
 
 		// Get the number of elements we're combining
 		int length = sourcesArray.Length;
@@ -1333,12 +1229,6 @@ public static partial class Collections
 		{
 			yield break;
 		}
-
-		//long totalCombinations = sourcesArray.Aggregate(1L, (acc, curr) => acc * curr.Length);
-		//if (maxCombinations.HasValue && totalCombinations > maxCombinations.Value)
-		//{
-		//    throw new ArgumentException($"Total possible combinations ({totalCombinations}) exceeds maximum allowed ({maxCombinations.Value})");
-		//}
 
 		HashSet<string> yielded = new();
 

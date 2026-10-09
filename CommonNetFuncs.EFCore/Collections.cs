@@ -52,7 +52,7 @@ public static class Collections
 		{
 			// Build the final lambda expression and execute the query
 			Expression<Func<T, bool>> lambda = Expression.Lambda<Func<T, bool>>(conditions, parameter);
-			model = await queryable.FirstOrDefaultAsync(lambda, cancellationToken);
+			model = await queryable.FirstOrDefaultAsync(lambda, cancellationToken).ConfigureAwait(false);
 		}
 		return model;
 	}

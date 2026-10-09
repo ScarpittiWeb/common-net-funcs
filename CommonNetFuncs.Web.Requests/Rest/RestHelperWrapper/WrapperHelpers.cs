@@ -262,13 +262,15 @@ internal static class WrapperHelpers
 		};
 	}
 
+	private const char UrlSeparator = (char)47;
+
 	internal static RequestOptions<T> GetRequestOptions<T>(RestHelperOptions options, Uri? baseAddress, IDictionary<string, string> headers, HttpMethod httpMethod,
 		string? bearerToken, T? postObject = default, HttpContent? patchDocument = null)
 	{
 		RequestOptions<T> baseRequestOptions = new()
 		{
 			Url = baseAddress != null
-				? new Uri(new Uri(baseAddress.ToString().TrimEnd('/') + '/'), options.Url.TrimStart('/')).ToString()
+				? new Uri(new Uri(baseAddress.ToString().TrimEnd(UrlSeparator) + UrlSeparator), options.Url.TrimStart(UrlSeparator)).ToString()
 				: options.Url,
 			HttpMethod = httpMethod,
 			BearerToken = bearerToken,

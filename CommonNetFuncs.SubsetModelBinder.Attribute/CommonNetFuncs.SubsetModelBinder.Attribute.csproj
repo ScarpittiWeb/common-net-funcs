@@ -18,11 +18,9 @@
 		<PackageProjectUrl>https://github.com/NickScarpitti/common-net-funcs/tree/main/$(AssemblyName)</PackageProjectUrl>
 		<IncludeSymbols>true</IncludeSymbols>
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
-		<!--<DebugType>embedded</DebugType>-->
 		<Description>
       Attribute for CommonNetFuncs.SubsetModelBinder
 		</Description>
-		<!--<GeneratePackageOnBuild>True</GeneratePackageOnBuild>-->
 		<PackageTags>dotnet;helpers;generator;model;binding;source generator;model binding;mvc</PackageTags>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<RootNamespace>CommonNetFuncs.SubsetModelBinder</RootNamespace>
@@ -30,7 +28,7 @@
 	</PropertyGroup>
 
 	<PropertyGroup>
-		<Version>4.3.4</Version>
+		<Version>4.4.0</Version>
 		<MinVerTagPrefix>subsetmodelbinder.attribute-</MinVerTagPrefix>
 		<MinVerIgnoreHeight>true</MinVerIgnoreHeight>
 		<MinVerSkip Condition="'$(Configuration)' == 'Debug'">true</MinVerSkip>

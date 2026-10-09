@@ -7,6 +7,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
 using xRetry.v3;
 using static CommonNetFuncs.Compression.Streams;
+using static Xunit.TestContext;
 
 namespace Web.Middleware.Tests.CachingMiddleware;
 
@@ -109,7 +110,7 @@ public sealed class MemoryCacheMiddlewareTests
 
 		// Assert
 		responseStream.Position = 0;
-		string result = await new StreamReader(responseStream).ReadToEndAsync();
+		string result = await new StreamReader(responseStream).ReadToEndAsync(Current.CancellationToken);
 		result.ShouldBe("cached response");
 		metrics.CacheHits().ShouldBe(1);
 		A.CallTo(() => next(context)).MustNotHaveHappened();
@@ -227,7 +228,7 @@ public sealed class MemoryCacheMiddlewareTests
 		context.Request.Query = new QueryCollection(queryDict);
 
 		const string originalData = "Test data";
-		byte[] compressedData = await Encoding.UTF8.GetBytes(originalData).CompressAsync(ECompressionType.Gzip);
+		byte[] compressedData = await Encoding.UTF8.GetBytes(originalData).CompressAsync(ECompressionType.Gzip, cancellationToken: Current.CancellationToken);
 		object? outValue = new CacheEntry()
 		{
 			Data = compressedData,
@@ -247,7 +248,7 @@ public sealed class MemoryCacheMiddlewareTests
 
 		// Assert
 		responseStream.Position = 0;
-		string result = await new StreamReader(responseStream).ReadToEndAsync();
+		string result = await new StreamReader(responseStream).ReadToEndAsync(Current.CancellationToken);
 		result.ShouldBe(originalData);
 		metrics.CacheHits().ShouldBe(1);
 	}
@@ -1145,7 +1146,7 @@ public sealed class MemoryCacheMiddlewareTests
 		Dictionary<string, StringValues> queryDict = new() { { options.UseCacheQueryParam, "true" } };
 		context.Request.Query = new QueryCollection(queryDict);
 
-		byte[] emptyCompressed = await Array.Empty<byte>().CompressAsync(ECompressionType.Gzip);
+		byte[] emptyCompressed = await Array.Empty<byte>().CompressAsync(ECompressionType.Gzip, cancellationToken: Current.CancellationToken);
 		CacheEntry cachedEntry = new()
 		{
 			Data = emptyCompressed,

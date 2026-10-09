@@ -9,18 +9,18 @@ This project contains helper methods for deep cloning objects in .NET applicatio
 ## Contents
 
 - [CommonNetFuncs.DeepClone](#commonnetfuncsdeepclone)
-	- [Contents](#contents)
-	- [ExpressionTrees](#expressiontrees)
-		- [ExpressionTrees Usage Examples](#expressiontrees-usage-examples)
-			- [DeepClone](#deepclone)
-	- [Reflection](#reflection)
-		- [Reflection Usage Examples](#reflection-usage-examples)
-			- [DeepCloneR](#deepcloner)
-	- [Serialize](#serialize)
-		- [Serialize Usage Examples](#serialize-usage-examples)
-			- [DeepCloneS](#deepclones)
-	- [Installation](#installation)
-	- [License](#license)
+  - [Contents](#contents)
+  - [ExpressionTrees](#expressiontrees)
+    - [ExpressionTrees Usage Examples](#expressiontrees-usage-examples)
+      - [DeepClone](#deepclone)
+  - [Reflection](#reflection)
+    - [Reflection Usage Examples](#reflection-usage-examples)
+      - [DeepCloneR](#deepcloner)
+  - [Serialize](#serialize)
+    - [Serialize Usage Examples](#serialize-usage-examples)
+      - [DeepCloneS](#deepclones)
+  - [Installation](#installation)
+  - [License](#license)
 
 ---
 

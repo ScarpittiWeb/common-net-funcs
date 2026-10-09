@@ -1,15 +1,12 @@
-﻿using ReinforcedTypings.Tests.TestModels.Collections;
-using ReinforcedTypings.Tests.TestModels.Consts;
-
-namespace ReinforcedTypings.Tests;
+﻿namespace ReinforcedTypings.Tests;
 
 public sealed class ReinforcedTypingsFluentConfigTests
 {
-	private const string ConstsRoot = "ReinforcedTypings.Tests.TestModels.Consts";
+	private const string ConstsRoot = "ReinforcedTypings.Tests.TestModels";
 
 	private const string CollectionsRoot = "ReinforcedTypings.Tests.TestModels";
 
-	private const string MultiAttributeRoot = "ReinforcedTypings.Tests.TestModels.MultiAttribute";
+	private const string MultiAttributeRoot = "ReinforcedTypings.Tests.TestModels";
 
 	#region TsConst - basic export modes
 
@@ -183,7 +180,7 @@ public sealed class ReinforcedTypingsFluentConfigTests
 		{
 			ctx.Global.UseModules = false;
 			ctx.Global.WriteWarningComment = false;
-			ctx.Global.RootNamespace = ConstsRoot; // strips "ReinforcedTypings.Tests.TestModels.Consts" leaving "Sub"
+			ctx.Global.RootNamespace = ConstsRoot; // strips "ReinforcedTypings.Tests.TestModels" leaving "Sub"
 		});
 
 		string content = RtTestHarness.ReadGenerated(outDir, "Sub/NamespacedConsts.ts");
@@ -204,9 +201,9 @@ public sealed class ReinforcedTypingsFluentConfigTests
 		});
 
 		// Written into a namespace-mirroring subdirectory since there is no RootNamespace to strip.
-		string content = RtTestHarness.ReadGenerated(outDir, "ReinforcedTypings/Tests/TestModels/Consts/BasicConstsAll.ts");
+		string content = RtTestHarness.ReadGenerated(outDir, "ReinforcedTypings/Tests/TestModels/BasicConstsAll.ts");
 
-		content.ShouldContain("namespace ReinforcedTypings.Tests.TestModels.Consts {");
+		content.ShouldContain("namespace ReinforcedTypings.Tests.TestModels {");
 		content.ShouldContain("export const BasicConstsAll = {");
 	}
 
@@ -224,7 +221,7 @@ public sealed class ReinforcedTypingsFluentConfigTests
 			ctx.Global.RootNamespace = CollectionsRoot;
 		});
 
-		string content = RtTestHarness.ReadGenerated(outDir, "Collections/BasicCollectionsAll.ts");
+		string content = RtTestHarness.ReadGenerated(outDir, "BasicCollectionsAll.ts");
 
 		content.ShouldContain("Names: ['a', 'b', 'c'] as string[],");
 		content.ShouldNotContain("Ignored"); // [TsIgnoreCollection]
@@ -243,7 +240,7 @@ public sealed class ReinforcedTypingsFluentConfigTests
 			ctx.Global.RootNamespace = CollectionsRoot;
 		});
 
-		string content = RtTestHarness.ReadGenerated(outDir, "Collections/BasicCollectionsSelected.ts");
+		string content = RtTestHarness.ReadGenerated(outDir, "BasicCollectionsSelected.ts");
 
 		content.ShouldContain("Exported: [3, 4] as number[],");
 		content.ShouldNotContain("NotExported");
@@ -258,7 +255,7 @@ public sealed class ReinforcedTypingsFluentConfigTests
 			ctx.Global.RootNamespace = CollectionsRoot;
 		});
 
-		RtTestHarness.GeneratedFileExists(outDir, "Collections/EmptyEligibleCollections.ts").ShouldBeFalse();
+		RtTestHarness.GeneratedFileExists(outDir, "EmptyEligibleCollections.ts").ShouldBeFalse();
 	}
 
 	#endregion
@@ -275,14 +272,14 @@ public sealed class ReinforcedTypingsFluentConfigTests
 			ctx.Global.RootNamespace = CollectionsRoot;
 		});
 
-		string content = RtTestHarness.ReadGenerated(outDir, "Collections/ReferenceCollections.ts");
+		string content = RtTestHarness.ReadGenerated(outDir, "ReferenceCollections.ts");
 
-		content.ShouldContain("import type { ExportedEnum } from './ExportedEnum';");
+		content.ShouldContain("import type { ExportedOption } from './ExportedOption';");
 		content.ShouldContain("import type { IAutoIInterfaceModel } from './AutoIInterfaceModel';"); // AutoI (default true) prefixes with I
 		content.ShouldContain("import type { PlainInterfaceModel } from './PlainInterfaceModel';"); // AutoI = false: no I prefix
 		content.ShouldContain("import type { ExportedClassModel } from './ExportedClassModel';");
 
-		content.ShouldContain("Enums: [0, 1] as ExportedEnum[],"); // Enum values serialize numerically (no [TsEnum(UseString = true)])
+		content.ShouldContain("Enums: [0, 1] as ExportedOption[],"); // Enum values serialize numerically (no [TsEnum(UseString = true)])
 		content.ShouldContain("AutoIModels: [{ Name: 'one' }] as IAutoIInterfaceModel[],");
 		content.ShouldContain("PlainModels: [{ Name: 'two' }] as PlainInterfaceModel[],");
 		content.ShouldContain("ClassModels: [{ Name: 'three' }] as ExportedClassModel[],");
@@ -300,7 +297,7 @@ public sealed class ReinforcedTypingsFluentConfigTests
 			ctx.Global.RootNamespace = CollectionsRoot;
 		});
 
-		string content = RtTestHarness.ReadGenerated(outDir, "Collections/ReferenceCollections.ts");
+		string content = RtTestHarness.ReadGenerated(outDir, "ReferenceCollections.ts");
 
 		content.ShouldContain("Unresolved: ");
 		content.ShouldContain("as unknown[],");
@@ -316,11 +313,12 @@ public sealed class ReinforcedTypingsFluentConfigTests
 			ctx.Global.RootNamespace = CollectionsRoot;
 		});
 
-		string content = RtTestHarness.ReadGenerated(outDir, "Collections/ReferenceCollections.ts");
+		string content = RtTestHarness.ReadGenerated(outDir, "ReferenceCollections.ts");
 
+		// Types in the root namespace have no namespace qualifier to prefix.
 		content.ShouldNotContain("import type");
-		content.ShouldContain("as Collections.ExportedEnum[],");
-		content.ShouldContain("as Collections.IAutoIInterfaceModel[],");
+		content.ShouldContain("as ExportedOption[],");
+		content.ShouldContain("as IAutoIInterfaceModel[],");
 	}
 
 	[Fact]
@@ -333,12 +331,12 @@ public sealed class ReinforcedTypingsFluentConfigTests
 			ctx.Global.RootNamespace = CollectionsRoot;
 		});
 
-		string content = RtTestHarness.ReadGenerated(outDir, "Collections/CrossNamespaceCollections.ts");
+		string content = RtTestHarness.ReadGenerated(outDir, "CrossNamespaceCollections.ts");
 
 		content.ShouldContain("import type { IOtherNamespaceModel } from './Other/OtherNamespaceModel';");
 
 		// And the referenced type's own file must actually exist in that subdirectory.
-		RtTestHarness.GeneratedFileExists(outDir, "Collections/Other/OtherNamespaceModel.ts").ShouldBeFalse(); // Only [TsInterface]-only types are handled by RT itself, not this hand-written generator
+		RtTestHarness.GeneratedFileExists(outDir, "Other/OtherNamespaceModel.ts").ShouldBeFalse(); // Only [TsInterface]-only types are handled by RT itself, not this hand-written generator
 	}
 
 	#endregion
@@ -356,7 +354,7 @@ public sealed class ReinforcedTypingsFluentConfigTests
 			ctx.Global.RootNamespace = CollectionsRoot;
 		});
 
-		string content = RtTestHarness.ReadGenerated(outDir, "Collections/BasicCollectionsAll.ts");
+		string content = RtTestHarness.ReadGenerated(outDir, "BasicCollectionsAll.ts");
 
 		content.ShouldContain("export declare const BasicCollectionsAllCollections: {");
 		content.ShouldContain("readonly Names: readonly string[];");
@@ -374,7 +372,7 @@ public sealed class ReinforcedTypingsFluentConfigTests
 			ctx.Global.RootNamespace = CollectionsRoot;
 		});
 
-		string content = RtTestHarness.ReadGenerated(outDir, "Collections/BasicCollectionsAll.ts");
+		string content = RtTestHarness.ReadGenerated(outDir, "BasicCollectionsAll.ts");
 
 		content.ShouldContain("names: ['a', 'b', 'c'] as string[],");
 	}

@@ -100,7 +100,7 @@ public static class Helpers
 		{
 			if (!File.Exists(logFile))
 			{
-				await File.Create(logFile).DisposeAsync();
+				await File.Create(logFile).DisposeAsync().ConfigureAwait(false);
 			}
 			await using StreamWriter streamWriter = new(logFile, true);
 			await streamWriter.WriteLineAsync(outputString).ConfigureAwait(false);
@@ -443,13 +443,13 @@ public static class Helpers
 	{
 		try
 		{
-			return await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_nvenc)) || // Check for NVENC (NVIDIA)
-					await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_qsv)) || // Check for QuickSync (Intel)
-					await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_amf)) || // Check for AMF (AMD)
-					await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_vaapi)) || // Check for VAAPI (Linux)
-					await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_vdpau)) || // Check for VDPAU (Legacy Linux)
-					await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_vulkan)) || // Check for Vulkan
-					await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_videotoolbox)); // Check for VideoToolbox (macOS)
+			return await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_nvenc)).ConfigureAwait(false) || // Check for NVENC (NVIDIA)
+					await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_qsv)).ConfigureAwait(false) || // Check for QuickSync (Intel)
+					await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_amf)).ConfigureAwait(false) || // Check for AMF (AMD)
+					await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_vaapi)).ConfigureAwait(false) || // Check for VAAPI (Linux)
+					await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_vdpau)).ConfigureAwait(false) || // Check for VDPAU (Legacy Linux)
+					await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_vulkan)).ConfigureAwait(false) || // Check for Vulkan
+					await CheckHardwareEncoderByName(nameof(EHwAccelerator.h264_videotoolbox)).ConfigureAwait(false); // Check for VideoToolbox (macOS)
 		}
 		catch
 		{
@@ -484,8 +484,8 @@ public static class Helpers
 				return false;
 			}
 
-			string output = await process.StandardOutput.ReadToEndAsync();
-			await process.WaitForExitAsync();
+			string output = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
+			await process.WaitForExitAsync().ConfigureAwait(false);
 
 			// Check if the encoder name appears in the output
 			return output.Contains(encoderName, StringComparison.OrdinalIgnoreCase);

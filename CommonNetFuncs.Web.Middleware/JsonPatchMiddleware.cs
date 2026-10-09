@@ -73,14 +73,14 @@ public sealed class JsonPatchDocumentConverter<T> : JsonConverter<JsonPatchDocum
 {
 	public override JsonPatchDocument<T>? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
 	{
-		using JsonDocument doc = JsonDocument.ParseValue(ref reader);
-		return Newtonsoft.Json.JsonConvert.DeserializeObject<JsonPatchDocument<T>>(doc.RootElement.GetRawText());
+		using JsonDocument jsonDocument = JsonDocument.ParseValue(ref reader);
+		return Newtonsoft.Json.JsonConvert.DeserializeObject<JsonPatchDocument<T>>(jsonDocument.RootElement.GetRawText());
 	}
 
 	public override void Write(Utf8JsonWriter writer, JsonPatchDocument<T> value, JsonSerializerOptions options)
 	{
-		using JsonDocument doc = JsonDocument.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(value));
-		doc.WriteTo(writer);
+		using JsonDocument jsonDocument = JsonDocument.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(value));
+		jsonDocument.WriteTo(writer);
 	}
 }
 

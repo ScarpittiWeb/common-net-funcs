@@ -27,7 +27,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 			throw new ArgumentNullException(nameof(model), "Model cannot be null");
 		}
 
-		await using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		await using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 		if (removeNavigationProps)
 		{
 			model.RemoveNavigationProperties(context);
@@ -50,7 +50,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	/// <param name="removeNavigationProps">Optional: If true, all navigation properties / related entities will be removed from the main entity. Default is false.</param>
 	public async Task CreateMany(IEnumerable<TEntity> model, bool removeNavigationProps = false)
 	{
-		await using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		await using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 		if (removeNavigationProps)
 		{
 			model.SetValue(x => x.RemoveNavigationProperties(context));
@@ -75,7 +75,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	/// <param name="globalFilterOptions">Optional: Global filter options (not applicable to this operation as it works with loaded entities).</param>
 	public void DeleteByObject(TEntity model, bool removeNavigationProps = false, GlobalFilterOptions? globalFilterOptions = null)
 	{
-		using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 
 		try
 		{
@@ -102,7 +102,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	/// <returns><see langword="bool"/> indicating success.</returns>
 	public async Task<bool> DeleteByKey(object key, GlobalFilterOptions? globalFilterOptions = null)
 	{
-		await using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		await using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 		DbSet<TEntity> table = context.Set<TEntity>();
 		try
 		{
@@ -189,7 +189,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	/// <returns><see langword="bool"/> indicating success.</returns>
 	public bool DeleteMany(IEnumerable<TEntity> models, bool removeNavigationProps = false, GlobalFilterOptions? globalFilterOptions = null)
 	{
-		using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 		try
 		{
 			if (removeNavigationProps)
@@ -217,7 +217,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	/// <param name="cancellationToken">Optional: Cancellation token for this operation.</param>
 	public async Task<int?> DeleteMany(Expression<Func<TEntity, bool>> whereExpression, GlobalFilterOptions? globalFilterOptions = null, CancellationToken cancellationToken = default)
 	{
-		await using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		await using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 		try
 		{
 			DbSet<TEntity> table = context.Set<TEntity>();
@@ -240,7 +240,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	/// <returns><see langword="bool"/> indicating success.</returns>
 	public async Task<bool> DeleteManyTracked(IEnumerable<TEntity> models, bool removeNavigationProps = false, GlobalFilterOptions? globalFilterOptions = null)
 	{
-		await using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		await using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 		try
 		{
 			if (removeNavigationProps)
@@ -268,7 +268,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	/// <returns><see langword="bool"/> indicating success.</returns>
 	public async Task<bool> DeleteManyByKeys(IEnumerable<object> keys, GlobalFilterOptions? globalFilterOptions = null) //Does not work with PostgreSQL, not testable
 	{
-		await using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		await using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 		try
 		{
 			// Note: Global filters don't apply to DeleteRangeByKeyAsync operations
@@ -290,7 +290,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	/// <param name="removeNavigationProps">Optional: If true, all navigation properties / related entities will be removed from the main entity. Default is false.</param>
 	public void Update(TEntity model, bool removeNavigationProps = false) //Send in modified object
 	{
-		using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 		if (removeNavigationProps)
 		{
 			model.RemoveNavigationProperties(context);
@@ -308,7 +308,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		try
 		{
-			using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+			using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 			if (removeNavigationProps)
 			{
 				models.SetValue(x => x.RemoveNavigationProperties(context), cancellationToken: cancellationToken);
@@ -342,7 +342,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		try
 		{
-			await using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+			await using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 			if (queryTimeout != null)
 			{
 				context.Database.SetCommandTimeout((TimeSpan)queryTimeout);
@@ -371,7 +371,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		try
 		{
-			await using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+			await using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 			return await context.SaveChangesAsync().ConfigureAwait(false) > 0;
 		}
 		catch (DbUpdateException duex)

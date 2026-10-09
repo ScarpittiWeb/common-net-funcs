@@ -44,7 +44,6 @@ public sealed class SshFtpService : ISshFtpService
 
 	public SftpClient Client { get; private set; }
 
-	//private readonly SftpClient Client;
 	private readonly FileTransferConnection connection;
 	private bool disposed;
 

@@ -9,9 +9,9 @@ This project provides an attribute that forces a class to only contain propertie
 ## Contents
 
 - [CommonNetFuncs.SubsetModelBinder](#commonnetfuncssubsetmodelbinder)
-	- [Contents](#contents)
-	- [Installation](#installation)
-	- [License](#license)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [License](#license)
 
 ---
 

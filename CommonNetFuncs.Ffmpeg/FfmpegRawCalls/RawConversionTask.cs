@@ -117,9 +117,6 @@ public static partial class RawConversionTask
 			additionalLogText, processPriority, cancellationTokenSource).ConfigureAwait(false);
 	}
 
-	// [GeneratedRegex(@"time=(\d{2}):(\d{2}):(\d{2})\.(\d{2}).*?fps=\s*(\d+(?:\.\d+)?)")]
-	// private static partial Regex ProgressRegex();
-
 	private static async Task<bool> InnerFmpegConversionTask(FileInfo fileToConvert, string outputFileName, string ffmpegCommandArguments, bool overwriteExisting, string? workingPath = null, int conversionIndex = 0,
 			ConcurrentDictionary<int, decimal>? fpsDict = null, bool cancelIfLarger = true, string? taskDescription = null, ConcurrentBag<string>? conversionOutputs = null, string? additionalLogText = null,
 			ProcessPriorityClass processPriority = ProcessPriorityClass.BelowNormal, CancellationTokenSource? cancellationTokenSource = null)
@@ -134,7 +131,7 @@ public static partial class RawConversionTask
 
 			ProcessStartInfo startInfo = new()
 			{
-				FileName = "ffmpeg",
+				FileName = "ffmpeg", // Expects ffmpeg to be available in the system's PATH
 				Arguments = ffmpegCommandArguments,
 				UseShellExecute = false,
 				RedirectStandardOutput = true,
@@ -171,7 +168,7 @@ public static partial class RawConversionTask
 			}
 
 			// Wait for completion or cancellation
-			Task completionTask = process.WaitForExitAsync();
+			Task completionTask = process.WaitForExitAsync(cancellationTokenSource?.Token ?? CancellationToken.None);
 			List<Task> tasks = [completionTask];
 
 			Task<bool>? cancellationTask = null;
@@ -190,7 +187,7 @@ public static partial class RawConversionTask
 				return false;
 			}
 
-			await completionTask;
+			await completionTask.ConfigureAwait(false);
 
 			// Check if conversion was successful
 			if (process.ExitCode != 0)
@@ -219,9 +216,6 @@ public static partial class RawConversionTask
 			fpsDict?.TryRemove(conversionIndex, out _);
 		}
 	}
-
-	// [GeneratedRegex(@"time=(\d{2}):(\d{2}):(\d{2})\.(\d{2}).*?fps=\s*(\d+(?:\.\d+)?)")]
-	// private static partial Regex ProgressRegex();
 }
 
 // Extension method for WaitHandle

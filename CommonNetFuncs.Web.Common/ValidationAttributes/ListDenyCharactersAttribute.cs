@@ -55,25 +55,7 @@ public sealed class ListDenyCharactersAttribute : ValidationAttribute
 
 	protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
 	{
-		if (value is null)
-		{
-			return ValidationResult.Success;
-		}
-
-		string memberName = validationContext.MemberName ?? string.Empty;
-
-		// Handle different types of collections
-		if (value is IEnumerable<string?> or IEnumerable<string>)
-		{
-			ValidationResult? result = ValidateEnumerable((IEnumerable<string?>)value, memberName);
-			return result ?? ValidationResult.Success;
-		}
-		else if (value.GetType().IsEnumerable())
-		{
-			ValidationResult? result = ValidateEnumerable(((IEnumerable)value).Cast<object?>().Select(x => Convert.ToString(x, CultureInfo.CurrentCulture)), memberName);
-			return result ?? ValidationResult.Success;
-		}
-		throw new InvalidDataException($"${nameof(ListDenyCharactersAttribute)} can only be used on properties that implement IEnumerable");
+		return ValidationAttributeHelpers.ValidateStringList(value, validationContext, nameof(ListDenyCharactersAttribute), ValidateEnumerable);
 	}
 
 	private ValidationResult? ValidateEnumerable(IEnumerable<string?> values, string memberName)

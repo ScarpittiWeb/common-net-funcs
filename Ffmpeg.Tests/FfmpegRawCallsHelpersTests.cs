@@ -41,9 +41,9 @@ public sealed class FfmpegRawCallsHelpersTests
 		videoStream.CodecType.ShouldBe(CodecType.Video);
 		videoStream.CodecName.ShouldNotBeNullOrWhiteSpace();
 		videoStream.Width.HasValue.ShouldBeTrue();
-		(videoStream.Width!.Value > 0).ShouldBeTrue();
+		(videoStream.Width.Value > 0).ShouldBeTrue();
 		videoStream.Height.HasValue.ShouldBeTrue();
-		(videoStream.Height!.Value > 0).ShouldBeTrue();
+		(videoStream.Height.Value > 0).ShouldBeTrue();
 		videoStream.FrameRate.ShouldBeGreaterThan(0);
 		result.VideoFormat.ShouldNotBeNullOrWhiteSpace();
 	}

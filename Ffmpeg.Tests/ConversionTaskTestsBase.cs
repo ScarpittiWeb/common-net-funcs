@@ -38,35 +38,44 @@ public abstract class ConversionTaskTestsBase : IDisposable
 
 	protected virtual void Dispose(bool disposing)
 	{
-		if (!disposed)
+		if (disposed)
 		{
-			if (disposing)
+			return;
+		}
+
+		if (disposing)
+		{
+			DeleteWorkingDirectory();
+		}
+		disposed = true;
+	}
+
+	// Each instance has its own unique directory, so deletion can be attempted right away;
+	// retry briefly in case ffmpeg hasn't fully released a file handle yet.
+	private void DeleteWorkingDirectory()
+	{
+		if (!Directory.Exists(workingDir))
+		{
+			return;
+		}
+
+		const int maxAttempts = 5;
+		for (int attempt = 1; attempt <= maxAttempts; attempt++)
+		{
+			try
 			{
-				// Cleanup temporary files after tests. Each instance has its own unique directory, so deletion can be
-				// attempted right away; retry briefly in case ffmpeg hasn't fully released a file handle yet.
-				if (Directory.Exists(workingDir))
-				{
-					const int maxAttempts = 5;
-					for (int attempt = 1; attempt <= maxAttempts; attempt++)
-					{
-						try
-						{
-							Directory.Delete(workingDir, true);
-							break;
-						}
-						catch (IOException ioex)
-						{
-							if (attempt == maxAttempts)
-							{
-								Console.WriteLine(ioex);
-								break;
-							}
-							Task.Delay(200).Wait();
-						}
-					}
-				}
+				Directory.Delete(workingDir, true);
+				return;
 			}
-			disposed = true;
+			catch (IOException ioex)
+			{
+				if (attempt == maxAttempts)
+				{
+					Console.WriteLine(ioex);
+					return;
+				}
+				Task.Delay(200).Wait();
+			}
 		}
 	}
 

@@ -47,25 +47,7 @@ public sealed class ListRegularExpressionAttribute : ValidationAttribute
 	{
 		SetupRegex();
 
-		if (value is null)
-		{
-			return ValidationResult.Success;
-		}
-
-		string memberName = validationContext.MemberName ?? string.Empty;
-
-		// Handle different types of collections
-		if (value is IEnumerable<string?> or IEnumerable<string>)
-		{
-			ValidationResult? result = ValidateEnumerable((IEnumerable<string?>)value, memberName);
-			return result ?? ValidationResult.Success;
-		}
-		else if (value.GetType().IsEnumerable())
-		{
-			ValidationResult? result = ValidateEnumerable(((IEnumerable<object?>)value).Select(x => Convert.ToString(x, CultureInfo.CurrentCulture)), memberName);
-			return result ?? ValidationResult.Success;
-		}
-		throw new InvalidDataException($"${nameof(ListRegularExpressionAttribute)} can only be used on properties that implement IEnumerable");
+		return ValidationAttributeHelpers.ValidateStringList(value, validationContext, nameof(ListRegularExpressionAttribute), ValidateEnumerable);
 	}
 
 	private ValidationResult? ValidateEnumerable(IEnumerable<string?> values, string memberName)
@@ -73,25 +55,9 @@ public sealed class ListRegularExpressionAttribute : ValidationAttribute
 		int index = 0;
 		foreach (string? item in values)
 		{
-			if (!string.IsNullOrEmpty(item)) //Null / empty passes automatically
+			if (!string.IsNullOrEmpty(item) && !ValidationAttributeHelpers.HasFullMatch(Regex!, item)) //Null / empty passes automatically
 			{
-				bool pass = false;
-
-				foreach (ValueMatch m in Regex!.EnumerateMatches(item))
-				{
-					// We are looking for an exact match, not just a search hit. This matches what
-					// the RegularExpressionValidator control does
-					if (m.Index == 0 && m.Length == item.Length)
-					{
-						pass = true;
-						break;
-					}
-				}
-
-				if (!pass)
-				{
-					return new ValidationResult($"Item at index {index} '{item.UrlEncodeReadable()}' does not match the required pattern '{Pattern}'", [memberName]);
-				}
+				return new ValidationResult($"Item at index {index} '{item.UrlEncodeReadable()}' does not match the required pattern '{Pattern}'", [memberName]);
 			}
 			index++;
 		}
@@ -123,15 +89,6 @@ public sealed class ListRegularExpressionAttribute : ValidationAttribute
 	[MemberNotNull(nameof(Regex))]
 	private void SetupRegex()
 	{
-		// Compile the regex for better performance when used multiple times
-		if (Regex == null)
-		{
-			if (string.IsNullOrEmpty(Pattern))
-			{
-				throw new InvalidOperationException("Regex pattern cannot be null or empty");
-			}
-
-			Regex = MatchTimeoutInMilliseconds == -1 ? new Regex(Pattern, RegexOptions.Compiled) : new Regex(Pattern, RegexOptions.Compiled, TimeSpan.FromMilliseconds(MatchTimeoutInMilliseconds));
-		}
+		Regex ??= ValidationAttributeHelpers.CreateRegex(Pattern, MatchTimeoutInMilliseconds);
 	}
 }

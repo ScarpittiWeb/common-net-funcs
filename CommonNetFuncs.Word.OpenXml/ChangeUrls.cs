@@ -38,7 +38,6 @@ public static class ChangeUrls
 						break;
 					}
 				}
-				//mainPart.Document.Save();
 				success = true;
 			}
 			wordDoc.Save();
@@ -79,7 +78,6 @@ public static class ChangeUrls
 						mainPart.AddHyperlinkRelationship(new Uri(newUrl), true, hyperlink.Id);
 					}
 				}
-				//mainPart.Document.Save();
 				success = true;
 			}
 		}
@@ -128,7 +126,6 @@ public static class ChangeUrls
 						}
 					}
 				}
-				//mainPart.Document.Save();
 				success = true;
 			}
 		}
@@ -178,7 +175,6 @@ public static class ChangeUrls
 							}
 						}
 					}
-					//mainPart.Document.Save();
 				}
 				success = true;
 			}

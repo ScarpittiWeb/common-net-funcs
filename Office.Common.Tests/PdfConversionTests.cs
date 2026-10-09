@@ -1375,7 +1375,7 @@ public sealed class PdfConversionTests //: IDisposable
 			// Assert - the outer catch wraps the "LibreOffice has failed with {exitCode}" inner exception
 			ex.Message.ShouldContain("Failed to run LibreOffice!");
 			ex.InnerException.ShouldNotBeNull();
-			ex.InnerException!.Message.ShouldContain("LibreOffice has failed with");
+			ex.InnerException.Message.ShouldContain("LibreOffice has failed with");
 		}
 		finally
 		{
@@ -1432,7 +1432,7 @@ public sealed class PdfConversionTests //: IDisposable
 			// Assert
 			ex.Message.ShouldContain("Failed to run LibreOffice!");
 			ex.InnerException.ShouldNotBeNull();
-			ex.InnerException!.Message.ShouldContain("LibreOffice has failed with");
+			ex.InnerException.Message.ShouldContain("LibreOffice has failed with");
 		}
 		finally
 		{

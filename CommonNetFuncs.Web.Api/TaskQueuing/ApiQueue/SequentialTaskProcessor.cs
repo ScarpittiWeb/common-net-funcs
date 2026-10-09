@@ -53,7 +53,7 @@ public class SequentialTaskProcessor : BackgroundService
 			stats.QueuedTasks++;
 		}
 
-		object? result = await queuedTask.CompletionSource.Task;
+		object? result = await queuedTask.CompletionSource.Task.ConfigureAwait(false);
 		return (T?)result;
 	}
 
@@ -146,7 +146,7 @@ public class SequentialTaskProcessor : BackgroundService
 		try
 		{
 			// Wait for ExecuteAsync to finish processing
-			StopAsync(CancellationToken.None).Wait(TimeSpan.FromSeconds(10));
+			StopAsync(CancellationToken.None).Wait(TimeSpan.FromSeconds(10), cancellationTokenSource.Token);
 		}
 		catch (Exception ex)
 		{
@@ -161,9 +161,9 @@ public class SequentialTaskProcessor : BackgroundService
 				{
 					break;
 				}
-				// Wait for the processing task to complete
 
-				processingTask.CompletionSource.Task.Wait(TimeSpan.FromSeconds(5));
+				// Wait for the processing task to complete
+				processingTask.CompletionSource.Task.Wait(TimeSpan.FromSeconds(5), cancellationTokenSource.Token);
 			}
 		}
 		catch (Exception ex)

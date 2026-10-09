@@ -127,24 +127,6 @@ public static class TypeChecks
 		});
 	}
 
-	/// <summary>
-	/// <para>Returns true if passed in type is a simple type, which includes:</para> <para>Primitives, Enum, String, Decimal, DateTime, DateTimeOffset, TimeSpan, Guid</para>
-	/// </summary>
-	/// <param name="type">Type to check if it's a simple type</param>
-	/// <returns>
-	/// <para>True if type is:</para> <para>Primitive, Enum, String, Decimal, DateTime, DateTimeOffset, TimeSpan, Guid</para>
-	/// </returns>
-	//public static bool IsSimpleType(this Type type)
-	//{
-	//    return type.IsPrimitive || type.IsEnum
-	//        || type == typeof(string)
-	//        || type == typeof(decimal)
-	//        || type == typeof(DateTime)
-	//        || type == typeof(DateTimeOffset)
-	//        || type == typeof(TimeSpan)
-	//        || type == typeof(Guid);
-	//}
-
 	public static bool IsSimpleType(this Type type)
 	{
 		return SimpleTypeCache.GetOrAdd(type, x => x.IsPrimitive ||
@@ -167,54 +149,6 @@ public static class TypeChecks
 	public static bool IsReadOnlyCollectionType(this Type type)
 	{
 		ThrowHelper.ThrowIfNull(type, nameof(type));
-
-		// Check if the type itself is a generic IReadOnlyCollection<> or IReadOnlyList<> or ReadOnlyCollection<>
-		//if (type.IsGenericType)
-		//{
-		//    Type genericType = type.GetGenericTypeDefinition();
-		//    if (genericType == typeof(IReadOnlyCollection<>) ||
-		//        genericType == typeof(IReadOnlyList<>) ||
-		//        genericType == typeof(ReadOnlyCollection<>))
-		//    {
-		//        return true;
-		//    }
-		//}
-
-		//if (type.IsArray)
-		//{
-		//    return false;
-		//}
-
-		//if (type.Name.Equals("List`1"))
-		//{
-		//    return false;
-		//}
-
-		//if (type.Name.Equals("Dictionary`2"))
-		//{
-		//    return false;
-		//}
-
-		//if (type.Name.Equals("ReadOnlyDictionary"))
-		//{
-		//    return true;
-		//}
-
-		//if (type.BaseType?.Name == "Array")
-		//{
-		//    return false;
-		//}
-
-		//// Check all interfaces (including inherited) for IReadOnlyCollection<> or IReadOnlyList<>
-		//return type.GetInterfaces().Any(interfaceType =>
-		//{
-		//    if (!interfaceType.IsGenericType)
-		//    {
-		//        return false;
-		//    }
-		//    Type genericInterfaceType = interfaceType.GetGenericTypeDefinition();
-		//    return interfaceType.IsGenericType && (genericInterfaceType == typeof(IReadOnlyCollection<>) || genericInterfaceType == typeof(IReadOnlyList<>));
-		//});
 
 		// Direct generic type checks
 		return ReadOnlyCollectionTypeCache.GetOrAdd(type, x =>

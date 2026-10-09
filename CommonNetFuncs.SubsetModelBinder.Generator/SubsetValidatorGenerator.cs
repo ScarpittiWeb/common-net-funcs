@@ -11,8 +11,8 @@ namespace CommonNetFuncs.SubsetModelBinder;
 [Generator(LanguageNames.CSharp)]
 public sealed class SubsetValidatorGenerator : IIncrementalGenerator
 {
-	private const string FullyQualifiedAttributeName = "CommonNetFuncs.SubsetModelBinder.SubsetOfAttribute"; //typeof(SubsetOfAttribute).Namespace + "." + nameof(SubsetOfAttribute);//"CommonNetFuncs.SubsetModelBinder.SubsetOfAttribute"; //typeof(SubsetOfAttribute).Namespace + nameof(SubsetOfAttribute);
-	private const string AttributeName = "SubsetOfAttribute"; //typeof(SubsetOfAttribute).Namespace + "." + nameof(SubsetOfAttribute);//"CommonNetFuncs.SubsetModelBinder.SubsetOfAttribute"; //typeof(SubsetOfAttribute).Namespace + nameof(SubsetOfAttribute);
+	private const string FullyQualifiedAttributeName = "CommonNetFuncs.SubsetModelBinder.SubsetOfAttribute";
+	private const string AttributeName = "SubsetOfAttribute";
 
 	public void Initialize(IncrementalGeneratorInitializationContext context)
 	{
@@ -30,7 +30,7 @@ public sealed class SubsetValidatorGenerator : IIncrementalGenerator
 
 	private static ClassDeclarationSyntax? GetSemanticTargetForGeneration(GeneratorAttributeSyntaxContext context) //Used to be GeneratorSyntaxContext
 	{
-		ClassDeclarationSyntax classDeclarationSyntax = (ClassDeclarationSyntax)context.TargetNode;//.Node;
+		ClassDeclarationSyntax classDeclarationSyntax = (ClassDeclarationSyntax)context.TargetNode;
 		foreach (AttributeListSyntax attributeListSyntax in classDeclarationSyntax.AttributeLists)
 		{
 			foreach (AttributeSyntax attributeSyntax in attributeListSyntax.Attributes)
@@ -64,7 +64,7 @@ public sealed class SubsetValidatorGenerator : IIncrementalGenerator
 		{
 			SemanticModel semanticModel = compilation.GetSemanticModel(subsetClass.SyntaxTree);
 
-			if (semanticModel.GetDeclaredSymbol(subsetClass) is not INamedTypeSymbol subsetClassSymbol)
+			if (semanticModel.GetDeclaredSymbol(subsetClass, context.CancellationToken) is not INamedTypeSymbol subsetClassSymbol)
 			{
 				continue;
 			}

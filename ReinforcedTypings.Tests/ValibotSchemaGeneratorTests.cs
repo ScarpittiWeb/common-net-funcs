@@ -1,8 +1,7 @@
 ﻿using System.Reflection;
 using CommonNetFuncs.ReinforcedTypings.Valibot;
+using ReinforcedTypings.Tests.TestModels;
 using ReinforcedTypings.Tests.TestModels.Valibot;
-using ReinforcedTypings.Tests.TestModels.Valibot.EdgeCases;
-
 namespace ReinforcedTypings.Tests;
 
 /// <summary>
@@ -76,11 +75,7 @@ public sealed class ValibotSchemaGeneratorTests
 	[InlineData("PhoneNumber: v.optional(v.nullable(v.pipe(v.string(), v.regex(/^\\+?[\\d\\s\\-().]+$/, 'The {0} field is not a valid phone number.')))),")]
 	[InlineData("CardNumber: v.optional(v.nullable(v.pipe(v.string(), v.creditCard('The {0} field is not a valid credit card number.')))),")]
 	public void GenerateValibotSchema_NullableStringValidators_ProduceExpectedPipe(string expectedLine)
-	{
-		string schema = GenerateSchema(typeof(FullValidationModel));
-
-		schema.ShouldContain(expectedLine);
-	}
+		=> GenerateSchema(typeof(FullValidationModel)).ShouldContain(expectedLine);
 
 	[Fact]
 	public void GenerateValibotSchema_CustomDenyCharactersAndDenyRegex_ProduceRegexPipes()
@@ -107,11 +102,7 @@ public sealed class ValibotSchemaGeneratorTests
 	[InlineData("Clean: v.optional(v.array(v.pipe(v.string(), v.regex(/^[^!@#]*$/)))),")] // ListDenyCharacters
 	[InlineData("GoodWords: v.optional(v.array(v.pipe(v.string(), v.regex(/^(?!.*bad).*$/)))),")] // ListDenyRegularExpression
 	public void GenerateValibotSchema_ListItemLevelValidators_EmbedPipeIntoArrayElementSchema(string expectedLine)
-	{
-		string schema = GenerateSchema(typeof(FullValidationModel));
-
-		schema.ShouldContain(expectedLine);
-	}
+		=> GenerateSchema(typeof(FullValidationModel)).ShouldContain(expectedLine);
 
 	[Theory]
 	[InlineData("ExternalId: v.optional(v.string()),")] // Guid
@@ -121,11 +112,7 @@ public sealed class ValibotSchemaGeneratorTests
 	[InlineData("OptionalNumber: v.optional(v.nullable(v.number())),")] // nullable value type
 	[InlineData("RequiredNumber: v.optional(v.number()),")] // non-nullable value type without [Required]
 	public void GenerateValibotSchema_ScalarAndEnumTypes_MapToExpectedBaseSchema(string expectedLine)
-	{
-		string schema = GenerateSchema(typeof(FullValidationModel));
-
-		schema.ShouldContain(expectedLine);
-	}
+		=> GenerateSchema(typeof(FullValidationModel)).ShouldContain(expectedLine);
 
 	[Fact]
 	public void GenerateValibotSchema_NestedComplexProperty_RecursesIntoInlineObjectSchema()
@@ -242,11 +229,7 @@ public sealed class ValibotSchemaGeneratorTests
 	[InlineData("Flag: v.optional(v.boolean()),")] // bool
 	[InlineData("Misc: v.optional(v.nullable(v.any())),")] // System-namespaced type falls through to the v.any() fallback
 	public void GenerateValibotSchema_RemainingScalarAndCollectionShapes_MapToExpectedBaseSchema(string expectedLine)
-	{
-		string schema = GenerateSchema(typeof(FullValidationModel));
-
-		schema.ShouldContain(expectedLine);
-	}
+		=> GenerateSchema(typeof(FullValidationModel)).ShouldContain(expectedLine);
 
 	[Fact]
 	public void GenerateValibotSchema_TsIgnoredPropertyOnNestedType_IsExcludedFromInlineObjectSchema()
@@ -283,7 +266,7 @@ public sealed class ValibotSchemaGeneratorTests
 		MethodInfo method = typeof(ValibotSchemaGenerator).GetMethod("GetAttrErrorMessage", BindingFlags.NonPublic | BindingFlags.Static)
 			?? throw new InvalidOperationException("GetAttrErrorMessage method not found via reflection.");
 
-		ReinforcedTypings.Tests.TestModels.Valibot.ListMaxLengthAttribute withMessage = new(5) { ErrorMessage = "boom" };
+		ReinforcedTypings.Tests.TestModels.ListMaxLengthAttribute withMessage = new(5) { ErrorMessage = "boom" };
 
 		string? result = (string?)method.Invoke(null, [withMessage]);
 
@@ -296,7 +279,7 @@ public sealed class ValibotSchemaGeneratorTests
 		MethodInfo method = typeof(ValibotSchemaGenerator).GetMethod("GetAttrErrorMessage", BindingFlags.NonPublic | BindingFlags.Static)
 			?? throw new InvalidOperationException("GetAttrErrorMessage method not found via reflection.");
 
-		ReinforcedTypings.Tests.TestModels.Valibot.ListMaxLengthAttribute withoutMessage = new(5);
+		ReinforcedTypings.Tests.TestModels.ListMaxLengthAttribute withoutMessage = new(5);
 
 		string? result = (string?)method.Invoke(null, [withoutMessage]);
 

@@ -348,7 +348,7 @@ public sealed class EmailTests
 
 		// Assert - AttachmentStream holds Gzip-compressed data, so it will be larger than the original and must be decompressed to verify
 		attachment.AttachmentStream.ShouldNotBeNull();
-		attachment.AttachmentStream!.Position.ShouldBe(0);
+		attachment.AttachmentStream.Position.ShouldBe(0);
 		using MemoryStream compressedCopy = new();
 		attachment.AttachmentStream.CopyTo(compressedCopy);
 		compressedCopy.ToArray().Decompress(ECompressionType.Gzip, cancellationToken: Current.CancellationToken).ShouldBe(bytes);
@@ -643,14 +643,14 @@ public sealed class EmailTests
 		part1.ShouldNotBeNull();
 		part1.Content.ShouldNotBeNull();
 		await using MemoryStream content1 = new();
-		await part1.Content!.DecodeToAsync(content1, Current.CancellationToken);
+		await part1.Content.DecodeToAsync(content1, Current.CancellationToken);
 		content1.ToArray().ShouldBe(originalBytes1);
 
 		MimePart? part2 = bodyBuilder.Attachments[1] as MimePart;
 		part2.ShouldNotBeNull();
 		part2.Content.ShouldNotBeNull();
 		await using MemoryStream content2 = new();
-		await part2.Content!.DecodeToAsync(content2, Current.CancellationToken);
+		await part2.Content.DecodeToAsync(content2, Current.CancellationToken);
 		content2.ToArray().ShouldBe(originalBytes2);
 	}
 
@@ -682,24 +682,26 @@ public sealed class EmailTests
 		zipPart.Content.ShouldNotBeNull();
 
 		await using MemoryStream zipContent = new();
-		await zipPart.Content!.DecodeToAsync(zipContent, Current.CancellationToken);
+		await zipPart.Content.DecodeToAsync(zipContent, Current.CancellationToken);
 		zipContent.Position = 0;
 
 		using ZipArchive archive = new(zipContent, ZipArchiveMode.Read);
 
-		using MemoryStream entry1Content = new();
-		await using (Stream entry1Stream = archive.GetEntry("test1.txt")!.Open())
-		{
-			await entry1Stream.CopyToAsync(entry1Content, Current.CancellationToken);
-		}
-		entry1Content.ToArray().ShouldBe(originalBytes1);
+		(await ReadZipEntryAsync(archive, "test1.txt")).ShouldBe(originalBytes1);
+		(await ReadZipEntryAsync(archive, "test2.txt")).ShouldBe(originalBytes2);
+	}
 
-		using MemoryStream entry2Content = new();
-		await using (Stream entry2Stream = archive.GetEntry("test2.txt")!.Open())
-		{
-			await entry2Stream.CopyToAsync(entry2Content, Current.CancellationToken);
-		}
-		entry2Content.ToArray().ShouldBe(originalBytes2);
+	private static async Task<byte[]> ReadZipEntryAsync(ZipArchive archive, string entryName)
+	{
+		ZipArchiveEntry entry = archive.GetEntry(entryName)!;
+#if NET10_0_OR_GREATER
+		await using Stream entryStream = await entry.OpenAsync(Current.CancellationToken);
+#else
+		await using Stream entryStream = entry.Open();
+#endif
+		using MemoryStream entryContent = new();
+		await entryStream.CopyToAsync(entryContent, Current.CancellationToken);
+		return entryContent.ToArray();
 	}
 
 	#endregion

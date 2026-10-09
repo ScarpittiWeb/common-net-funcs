@@ -51,13 +51,13 @@ public static partial class FileHelpers
 			{
 				if (!suppressLogging)
 				{
-					logger.Warn("[{directory}] does not exist! Creating new directory...", directory);
+					logger.Warn("[{Directory}] does not exist! Creating new directory...", directory);
 				}
 				Directory.CreateDirectory(directory);
 			}
 			else if (!suppressLogging)
 			{
-				logger.Warn("[{directory}] does not exist! Unable to continue...", directory);
+				logger.Warn("[{Directory}] does not exist! Unable to continue...", directory);
 				return string.Empty;
 			}
 		}
@@ -84,7 +84,7 @@ public static partial class FileHelpers
 			{
 				if (!suppressLogging)
 				{
-					logger.Info("[{testPath}] exists, checking with iterator [{i}]", testPath, i);
+					logger.Info("[{TestPath}] exists, checking with iterator [{Iterator}]", testPath, i);
 				}
 
 				// Check if file already has an iterator
@@ -105,7 +105,7 @@ public static partial class FileHelpers
 		}
 		else if (!suppressLogging)
 		{
-			logger.Info("[{testPath}] is unique", testPath);
+			logger.Info("[{TestPath}] is unique", testPath);
 		}
 
 		return testPath;
@@ -132,13 +132,13 @@ public static partial class FileHelpers
 			{
 				if (!suppressLogging)
 				{
-					logger.Warn("[{directory}] does not exist! Creating new directory...", directory);
+					logger.Warn("[{Directory}] does not exist! Creating new directory...", directory);
 				}
 				Directory.CreateDirectory(directory);
 			}
 			else if (!suppressLogging)
 			{
-				logger.Warn("[{directory}] does not exist! Unable to continue...", directory);
+				logger.Warn("[{Directory}] does not exist! Unable to continue...", directory);
 				return string.Empty;
 			}
 		}
@@ -176,7 +176,7 @@ public static partial class FileHelpers
 
 				if (!suppressLogging)
 				{
-					logger.Info("Checking new testPath [{testPath}] with iterator [{i}]", testPath, i);
+					logger.Info("Checking new testPath [{TestPath}] with iterator [{Iterator}]", testPath, i);
 				}
 
 				i++;
@@ -184,7 +184,7 @@ public static partial class FileHelpers
 		}
 		else if (!suppressLogging)
 		{
-			logger.Info("Original path with cleaned file name [{testPath}] is unique", testPath);
+			logger.Info("Original path with cleaned file name [{TestPath}] is unique", testPath);
 		}
 
 		return Path.GetFileName(testPath);
@@ -361,7 +361,7 @@ public static partial class FileHelpers
 		{
 			try
 			{
-				ReadResult readResult = await reader.ReadAsync(cancellationToken);
+				ReadResult readResult = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
 				ReadOnlySequence<byte> data = readResult.Buffer;
 				totalBytesRead += data.Length;
 
@@ -378,13 +378,13 @@ public static partial class FileHelpers
 				// Write directly without ToArray() allocation
 				if (data.IsSingleSegment)
 				{
-					await outputStream.WriteAsync(data.First, cancellationToken);
+					await outputStream.WriteAsync(data.First, cancellationToken).ConfigureAwait(false);
 				}
 				else
 				{
 					foreach (ReadOnlyMemory<byte> segment in data)
 					{
-						await outputStream.WriteAsync(segment, cancellationToken);
+						await outputStream.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
 					}
 				}
 
@@ -423,56 +423,9 @@ public static partial class FileHelpers
 	/// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
 	/// <typeparam name="TReturn">Type of the return value.</typeparam>
 	/// <returns>A tuple with a success flag and the appropriate return value based on the outcome of the operation, or null if not provided.</returns>
-	public static async Task<(bool success, TReturn? result)> ReadFileFromPipe<TReturn>(this PipeReader reader, Stream outputStream, TReturn? successReturn = default,
+	public static Task<(bool success, TReturn? result)> ReadFileFromPipe<TReturn>(this PipeReader reader, Stream outputStream, TReturn? successReturn = default,
 		Func<Exception, TReturn?>? errorReturn = default, CancellationToken cancellationToken = default)
 	{
-		while (true)
-		{
-			try
-			{
-				ReadResult readResult = await reader.ReadAsync(cancellationToken);
-				ReadOnlySequence<byte> data = readResult.Buffer;
-
-				if (data.IsEmpty && readResult.IsCompleted)
-				{
-					break;
-				}
-
-				// Write directly without ToArray() allocation
-				if (data.IsSingleSegment)
-				{
-					await outputStream.WriteAsync(data.First, cancellationToken);
-				}
-				else
-				{
-					foreach (ReadOnlyMemory<byte> segment in data)
-					{
-						await outputStream.WriteAsync(segment, cancellationToken);
-					}
-				}
-
-				reader.AdvanceTo(data.End);
-
-				if (readResult.IsCompleted)
-				{
-					break;
-				}
-			}
-			catch (Exception ex)
-			{
-				if (errorReturn != null)
-				{
-					return (false, errorReturn(ex));
-				}
-				throw new FileLoadException("Error reading file from pipe", ex);
-			}
-		}
-
-		await outputStream.FlushAsync(cancellationToken).ConfigureAwait(false);
-		if (outputStream.CanSeek)
-		{
-			outputStream.Position = 0;
-		}
-		return (true, successReturn);
+		return reader.ReadFileFromPipe(outputStream, long.MaxValue, successReturn, default(TReturn), errorReturn, cancellationToken);
 	}
 }

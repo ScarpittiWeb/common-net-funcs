@@ -206,7 +206,7 @@ public sealed class GenericEndpointsTests
 
 		// Assert
 		result.Result.ShouldBeOfType<ObjectResult>();
-		((ObjectResult)result.Result!).StatusCode.ShouldBe(400);
+		((ObjectResult)result.Result).StatusCode.ShouldBe(400);
 	}
 
 	[Fact]
@@ -243,7 +243,7 @@ public sealed class GenericEndpointsTests
 		// Assert
 		result.ShouldNotBeNull();
 		result.Result.ShouldBeOfType<OkObjectResult>();
-		((OkObjectResult)result.Result!).Value.ShouldBe(expectedDeletedCount);
+		((OkObjectResult)result.Result).Value.ShouldBe(expectedDeletedCount);
 		A.CallTo(() => dbContextActions.DeleteMany(whereClause, A<GlobalFilterOptions?>._, A<CancellationToken>._)).MustHaveHappenedOnceExactly();
 	}
 
@@ -261,7 +261,7 @@ public sealed class GenericEndpointsTests
 		// Assert
 		result.ShouldNotBeNull();
 		result.Result.ShouldBeOfType<OkObjectResult>();
-		((OkObjectResult)result.Result!).Value.ShouldBe(0);
+		((OkObjectResult)result.Result).Value.ShouldBe(0);
 	}
 
 	[Fact]
@@ -310,7 +310,7 @@ public sealed class GenericEndpointsTests
 		// Assert
 		result.ShouldNotBeNull();
 		result.Result.ShouldBeOfType<OkObjectResult>();
-		((OkObjectResult)result.Result!).Value.ShouldBe(expectedUpdatedCount);
+		((OkObjectResult)result.Result).Value.ShouldBe(expectedUpdatedCount);
 		A.CallTo(() => dbContextActions.UpdateMany(whereClause, updateSettersConfig, A<TimeSpan?>._, A<GlobalFilterOptions?>._, A<CancellationToken>._)).MustHaveHappenedOnceExactly();
 	}
 
@@ -329,7 +329,7 @@ public sealed class GenericEndpointsTests
 		// Assert
 		result.ShouldNotBeNull();
 		result.Result.ShouldBeOfType<OkObjectResult>();
-		((OkObjectResult)result.Result!).Value.ShouldBe(0);
+		((OkObjectResult)result.Result).Value.ShouldBe(0);
 	}
 
 	[Fact]
@@ -382,7 +382,7 @@ public sealed class GenericEndpointsTests
 		// Assert
 		result.ShouldNotBeNull();
 		result.Result.ShouldBeOfType<OkObjectResult>();
-		((OkObjectResult)result.Result!).Value.ShouldBe(expectedUpdatedCount);
+		((OkObjectResult)result.Result).Value.ShouldBe(expectedUpdatedCount);
 	}
 
 	[Fact]
@@ -400,6 +400,6 @@ public sealed class GenericEndpointsTests
 		// Assert
 		result.ShouldNotBeNull();
 		result.Result.ShouldBeOfType<OkObjectResult>();
-		((OkObjectResult)result.Result!).Value.ShouldBe(expectedDeletedCount);
+		((OkObjectResult)result.Result).Value.ShouldBe(expectedDeletedCount);
 	}
 }

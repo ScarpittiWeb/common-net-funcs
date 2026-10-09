@@ -92,30 +92,9 @@ public class RestHelpersCommon(HttpClient client) : IRestHelpersCommon
 	}
 }
 
-public class RestHelpersCommonFactory(IHttpClientFactory httpClientFactory, string? httpClientName = null) : IRestHelpersCommon, IDisposable
+public class RestHelpersCommonFactory(IHttpClientFactory httpClientFactory, string? httpClientName = null)
+	: RestHelpersCommon(string.IsNullOrWhiteSpace(httpClientName) ? httpClientFactory.CreateClient() : httpClientFactory.CreateClient(httpClientName)), IDisposable
 {
-	public readonly HttpClient client = string.IsNullOrWhiteSpace(httpClientName) ? httpClientFactory.CreateClient() : httpClientFactory.CreateClient(httpClientName);
-
-	public Task<TResponse?> RestRequest<TResponse, TBody>(RequestOptions<TBody> baseRequestOptions, CancellationToken cancellationToken = default)
-	{
-		return client.RestRequest<TResponse, TBody>(baseRequestOptions, cancellationToken);
-	}
-
-	public IAsyncEnumerable<TResponse?> StreamingRestRequest<TResponse, TBody>(RequestOptions<TBody> baseRequestOptions, CancellationToken cancellationToken = default)
-	{
-		return client.StreamingRestRequest<TResponse, TBody>(baseRequestOptions, cancellationToken);
-	}
-
-	public Task<RestObject<TResponse>> RestRequestObject<TResponse, TBody>(RequestOptions<TBody> baseRequestOptions, CancellationToken cancellationToken = default)
-	{
-		return client.RestObjectRequest<TResponse, TBody>(baseRequestOptions, cancellationToken);
-	}
-
-	public Task<StreamingRestObject<TResponse>> StreamingRestRequestObject<TResponse, TBody>(RequestOptions<TBody> baseRequestOptions, CancellationToken cancellationToken = default)
-	{
-		return client.StreamingRestObjectRequest<TResponse, TBody>(baseRequestOptions, cancellationToken);
-	}
-
 	public void Dispose()
 	{
 		Dispose(true);

@@ -268,7 +268,7 @@ public static class Async
 		try
 		{
 			TResult resultObject = await task.ConfigureAwait(false);
-			if (resultObject != null)
+			if (resultObject is not null)
 			{
 				lock (obj)
 				{
@@ -294,7 +294,7 @@ public static class Async
 		try
 		{
 			TResult resultObject = await task().ConfigureAwait(false);
-			if (resultObject != null)
+			if (resultObject is not null)
 			{
 				lock (obj)
 				{
@@ -326,7 +326,7 @@ public static class Async
 				await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 			}
 			TResult resultObject = await task().ConfigureAwait(false);
-			if (resultObject != null)
+			if (resultObject is not null)
 			{
 				lock (obj)
 				{
@@ -356,7 +356,7 @@ public static class Async
 		try
 		{
 			TResult resultObject = await task.ConfigureAwait(false);
-			if (resultObject != null)
+			if (resultObject is not null)
 			{
 				lock (obj)
 				{
@@ -382,7 +382,7 @@ public static class Async
 		try
 		{
 			TResult resultObject = await task().ConfigureAwait(false);
-			if (resultObject != null)
+			if (resultObject is not null)
 			{
 				lock (obj)
 				{
@@ -414,7 +414,7 @@ public static class Async
 				await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 			}
 			TResult resultObject = await task().ConfigureAwait(false);
-			if (resultObject != null)
+			if (resultObject is not null)
 			{
 				lock (obj)
 				{
@@ -511,7 +511,7 @@ public static class Async
 		try
 		{
 			TResult resultObject = await task.ConfigureAwait(false);
-			if (resultObject != null && obj != null)
+			if (resultObject is not null && obj != null)
 			{
 				obj.AddRange(resultObject);
 			}
@@ -534,7 +534,7 @@ public static class Async
 		try
 		{
 			TResult resultObject = await task().ConfigureAwait(false);
-			if (resultObject != null && obj != null)
+			if (resultObject is not null && obj != null)
 			{
 				obj.AddRange(resultObject);
 			}
@@ -563,7 +563,7 @@ public static class Async
 				await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 			}
 			TResult resultObject = await task().ConfigureAwait(false);
-			if (resultObject != null && obj != null)
+			if (resultObject is not null && obj != null)
 			{
 				obj.AddRange(resultObject, cancellationToken);
 			}

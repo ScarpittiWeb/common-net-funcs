@@ -1,7 +1,9 @@
-﻿using CommonNetFuncs.Core;
+﻿using System.Diagnostics.CodeAnalysis;
+using CommonNetFuncs.Core;
 
 namespace Core.Tests;
 
+[SuppressMessage("Major Code Smell", "S107:Methods should not have too many parameters", Justification = "Theory methods take one parameter per data value")]
 public sealed class DimensionScaleTests
 {
 	// 2D int tests

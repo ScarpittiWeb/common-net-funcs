@@ -127,7 +127,6 @@ public static class UriHelpers
 				queryParameters.Set(queryParameters.GetKey(i), redactedString); //Replace values with redactedString value
 			}
 
-			//return $"{uri.GetLeftPart(UriPartial.Path)}?{queryParameters}";
 			// Use Authority instead of GetLeftPart to avoid extra slash, then rebuild the path
 			string basePart = $"{uri.Scheme}://{uri.Authority}{uri.AbsolutePath.TrimEnd('/')}";
 			return $"{basePart}?{queryParameters}";

@@ -7,6 +7,8 @@ namespace CommonNetFuncs.Core;
 /// </summary>
 public static class MathHelpers
 {
+	private const string NumbersParameterNullOrEmptyError = "numbers parameter cannot be null or empty.";
+
 	/// <summary>
 	/// Rounds value up to the next whole value specified by significance parameter.
 	/// </summary>
@@ -398,7 +400,7 @@ public static class MathHelpers
 	{
 		if (numbers?.Any() != true)
 		{
-			throw new ArgumentException("numbers parameter cannot be null or empty.");
+			throw new ArgumentException(NumbersParameterNullOrEmptyError);
 		}
 
 		TNumber[] sorted = numbers.Order().ToArray();
@@ -415,7 +417,7 @@ public static class MathHelpers
 	{
 		if (numbers?.Any() != true)
 		{
-			throw new ArgumentException("numbers parameter cannot be null or empty.");
+			throw new ArgumentException(NumbersParameterNullOrEmptyError);
 		}
 
 		int[] sorted = numbers.OrderBy(static x => x).ToArray();
@@ -429,7 +431,7 @@ public static class MathHelpers
 	{
 		if (numbers?.Any() != true)
 		{
-			throw new ArgumentException("numbers parameter cannot be null or empty.");
+			throw new ArgumentException(NumbersParameterNullOrEmptyError);
 		}
 
 		long[] sorted = numbers.OrderBy(static x => x).ToArray();
@@ -443,7 +445,7 @@ public static class MathHelpers
 	{
 		if (numbers?.Any() != true)
 		{
-			throw new ArgumentException("numbers parameter cannot be null or empty.");
+			throw new ArgumentException(NumbersParameterNullOrEmptyError);
 		}
 
 		float[] sorted = numbers.OrderBy(static x => x).ToArray();
@@ -457,7 +459,7 @@ public static class MathHelpers
 	{
 		if (numbers?.Any() != true)
 		{
-			throw new ArgumentException("numbers parameter cannot be null or empty.");
+			throw new ArgumentException(NumbersParameterNullOrEmptyError);
 		}
 
 		double[] sorted = numbers.OrderBy(static x => x).ToArray();
@@ -471,7 +473,7 @@ public static class MathHelpers
 	{
 		if (numbers?.Any() != true)
 		{
-			throw new ArgumentException("numbers parameter cannot be null or empty.");
+			throw new ArgumentException(NumbersParameterNullOrEmptyError);
 		}
 
 		decimal[] sorted = numbers.OrderBy(static x => x).ToArray();

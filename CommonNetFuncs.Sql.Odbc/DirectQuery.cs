@@ -1,9 +1,7 @@
 ﻿using System.Data;
-using System.Data.Common;
 using System.Data.Odbc;
 using System.Runtime.CompilerServices;
 using CommonNetFuncs.Sql.Common;
-using static CommonNetFuncs.Core.ExceptionLocation;
 using static CommonNetFuncs.Sql.Common.DirectQuery;
 
 namespace CommonNetFuncs.Sql.Odbc;
@@ -15,7 +13,6 @@ public class DirectQuery(Func<string, OdbcConnection>? connectionFactory = null)
 {
 	private readonly Func<string, OdbcConnection> connectionFactory = connectionFactory ?? (connStr => new OdbcConnection(connStr));
 
-	private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
 	/// <summary>
 	/// Returns a DataTable using the SQL and data connection passed to the function
@@ -90,34 +87,9 @@ public class DirectQuery(Func<string, OdbcConnection>? connectionFactory = null)
 		await using OdbcConnection sqlConn = connectionFactory(connStr);
 		await using OdbcCommand sqlCmd = new(sql, sqlConn);
 
-		IAsyncEnumerator<T>? enumeratedReader = null;
-		for (int i = 0; i < maxRetry; i++)
+		await foreach (T item in GetDataStreamWithRetryAsync<T>(sqlConn, sqlCmd, commandTimeoutSeconds, maxRetry, useCache, cancellationToken).ConfigureAwait(false))
 		{
-			try
-			{
-				enumeratedReader = Common.DirectQuery.GetDataStreamAsync<T>(sqlConn, sqlCmd, commandTimeoutSeconds, useCache, cancellationToken).GetAsyncEnumerator(cancellationToken);
-				break;
-			}
-			catch (DbException ex)
-			{
-				logger.Error(ex, "DB Error @ {ErrorLocation}", ex.GetLocationOfException());
-			}
-			catch (Exception ex)
-			{
-				logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
-			}
-		}
-
-		if (enumeratedReader != null)
-		{
-			while (await enumeratedReader.MoveNextAsync().ConfigureAwait(false))
-			{
-				yield return enumeratedReader!.Current;
-			}
-		}
-		else
-		{
-			yield break;
+			yield return item;
 		}
 	}
 
@@ -134,25 +106,7 @@ public class DirectQuery(Func<string, OdbcConnection>? connectionFactory = null)
 		using OdbcConnection sqlConn = connectionFactory(connStr);
 		using OdbcCommand sqlCmd = new(sql, sqlConn);
 
-		IEnumerable<T>? results = null;
-		for (int i = 0; i < maxRetry; i++)
-		{
-			try
-			{
-				results = Common.DirectQuery.GetDataStream<T>(sqlConn, sqlCmd, commandTimeoutSeconds, useCache, cancellationToken);
-				break;
-			}
-			catch (DbException ex)
-			{
-				logger.Error(ex, "DB Error @ {ErrorLocation}", ex.GetLocationOfException());
-			}
-			catch (Exception ex)
-			{
-				logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
-			}
-		}
-
-		return results ?? [];
+		return GetDataStreamWithRetry<T>(sqlConn, sqlCmd, commandTimeoutSeconds, maxRetry, useCache, cancellationToken);
 	}
 
 	/// <summary>

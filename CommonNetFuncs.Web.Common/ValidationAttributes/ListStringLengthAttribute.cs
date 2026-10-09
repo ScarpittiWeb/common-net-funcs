@@ -38,11 +38,6 @@ public sealed class ListStringLengthAttribute(int maximumLength) : ValidationAtt
 			throw new InvalidDataException("ListStringLengthAttribute must be used on a collection");
 		}
 
-		//if (value is not IEnumerable<string?> list)
-		//{
-		//   return ValidationResult.Success;
-		//}
-
 		int index = 0;
 		foreach (string? item in collection)
 		{

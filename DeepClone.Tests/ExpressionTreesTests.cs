@@ -242,7 +242,7 @@ public sealed class ExpressionTreesTests : IDisposable
 		// Assert
 		result.Numbers.ShouldNotBeSameAs(source.Numbers);
 		result.Numbers!.Count.ShouldBe(source.Numbers.Count);
-		result.Numbers.SequenceEqual(source.Numbers!).ShouldBeTrue();
+		result.Numbers.SequenceEqual(source.Numbers).ShouldBeTrue();
 	}
 
 	[Fact]
@@ -503,7 +503,7 @@ public sealed class ExpressionTreesTests : IDisposable
 		result.InnerStruct.Value.ShouldBe(10);
 		result.InnerStruct.ClassField.ShouldNotBeNull();
 		result.InnerStruct.ClassField.ShouldNotBeSameAs(source.InnerStruct.ClassField);
-		result.InnerStruct.ClassField!.Number.ShouldBe(50);
+		result.InnerStruct.ClassField.Number.ShouldBe(50);
 		result.InnerStruct.ClassField.Text.ShouldBe("nested");
 	}
 }

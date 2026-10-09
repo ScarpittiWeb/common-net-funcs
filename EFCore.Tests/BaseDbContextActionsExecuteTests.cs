@@ -119,7 +119,7 @@ public sealed class BaseDbContextActionsExecuteTests : IDisposable
 			TestDbContext context = scope.ServiceProvider.GetRequiredService<TestDbContext>();
 			TestEntity? updatedEntity = await context.TestEntities.FindAsync(new object?[] { targetId }, Current.CancellationToken);
 			updatedEntity.ShouldNotBeNull();
-			updatedEntity!.Name.ShouldBe(newName);
+			updatedEntity.Name.ShouldBe(newName);
 
 			// Verify others weren't updated
 			List<TestEntity> otherEntities = await context.TestEntities.Where(x => x.Id != targetId).ToListAsync(Current.CancellationToken);
@@ -634,9 +634,8 @@ public sealed class BaseDbContextActionsExecuteTests : IDisposable
 		List<TestEntity> entities = fixture.CreateMany<TestEntity>(totalCount).ToList();
 		for (int i = 0; i < entities.Count; i++)
 		{
-			entities[i].Name = i < matchCount
-				? (method == "EndsWith" ? $"Name{matchPattern}" : $"{matchPattern}{i}")
-				: (method == "EndsWith" ? $"Name{keepPattern}" : $"{keepPattern}{i}");
+			string pattern = i < matchCount ? matchPattern : keepPattern;
+			entities[i].Name = method == "EndsWith" ? $"Name{pattern}" : $"{pattern}{i}";
 		}
 
 		using (IServiceScope scope = serviceProvider.CreateScope())
@@ -724,7 +723,21 @@ public sealed class BaseDbContextActionsExecuteTests : IDisposable
 		List<TestEntity> entities = fixture.CreateMany<TestEntity>(12).ToList();
 		for (int i = 0; i < entities.Count; i++)
 		{
-			entities[i].Name = i < 4 ? "Group1" : i < 8 ? "Group2" : "Group3";
+			string groupName;
+			if (i < 4)
+			{
+				groupName = "Group1";
+			}
+			else if (i < 8)
+			{
+				groupName = "Group2";
+			}
+			else
+			{
+				groupName = "Group3";
+			}
+
+			entities[i].Name = groupName;
 		}
 
 		using (IServiceScope scope = serviceProvider.CreateScope())
@@ -795,9 +808,8 @@ public sealed class BaseDbContextActionsExecuteTests : IDisposable
 		List<TestEntity> entities = fixture.CreateMany<TestEntity>(totalCount).ToList();
 		for (int i = 0; i < entities.Count; i++)
 		{
-			entities[i].Name = targetName == "Even"
-				? (i % 2 == 0 ? "Even" : "Odd")
-				: "Group1";
+			string evenOdd = i % 2 == 0 ? "Even" : "Odd";
+			entities[i].Name = targetName == "Even" ? evenOdd : "Group1";
 		}
 
 		using (IServiceScope scope = serviceProvider.CreateScope())
@@ -896,7 +908,21 @@ public sealed class BaseDbContextActionsExecuteTests : IDisposable
 		List<TestEntity> entities = fixture.CreateMany<TestEntity>(15).ToList();
 		for (int i = 0; i < entities.Count; i++)
 		{
-			entities[i].Name = i < 5 ? "Batch1" : i < 10 ? "Batch2" : "Batch3";
+			string batchName;
+			if (i < 5)
+			{
+				batchName = "Batch1";
+			}
+			else if (i < 10)
+			{
+				batchName = "Batch2";
+			}
+			else
+			{
+				batchName = "Batch3";
+			}
+
+			entities[i].Name = batchName;
 		}
 
 		using (IServiceScope scope = serviceProvider.CreateScope())

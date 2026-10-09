@@ -83,66 +83,10 @@ public static partial class Base64
 	/// </summary>
 	/// <param name="ms">Memory stream containing image data to convert into a base 64 string</param>
 	/// <returns>Base 64 string representation of image</returns>
-	public static async Task<string?> ConvertImageFileToBase64Async(this MemoryStream ms)
+	public static Task<string?> ConvertImageFileToBase64Async(this MemoryStream ms)
 	{
-		try
-		{
-			if (ms.Length > 0)
-			{
-				if (!ms.CanRead)
-				{
-					throw new NotSupportedException("Memory stream must be readable to convert to base 64");
-				}
-
-				if (ms.CanSeek && ms.Position != 0)
-				{
-					ms.Position = 0;
-				}
-
-				SKImageInfo bounds = SKBitmap.DecodeBounds(ms);
-				if (bounds.Height > 0 && bounds.Width > 0)
-				{
-					ReadOnlySpan<byte> imageBytes = ms.ToArray();
-					return ToBase64String(imageBytes);
-				}
-			}
-		}
-		catch (Exception ex)
-		{
-			logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
-		}
-
-		return null;
+		return Task.FromResult(ms.ConvertImageFileToBase64());
 	}
-
-	///// <summary>
-	///// Clean up a base 64 image value by removing any prefix or unwanted characters
-	///// </summary>
-	///// <param name="imgValue">Base 64 string from web element to clean up</param>
-	///// <returns>CLean base 64 image string, or null if invalid</returns>
-	//[Obsolete("Please use ExtractBase64 instead.")]
-	//public static string? CleanImageValue(this string? imgValue)
-	//{
-	//  if (!string.IsNullOrWhiteSpace(imgValue))
-	//  {
-	//    const string B64 = "base64";
-	//    if (imgValue?.Contains(',') == true)
-	//    {
-	//      int numChars = imgValue.Length - imgValue.IndexOf(',') - 1;
-	//      imgValue = imgValue.Substring(imgValue.Length - numChars, numChars);
-	//    }
-	//    else if (imgValue?.Contains(B64) == true && imgValue.Length > B64.Length)
-	//    {
-	//      int numChars = imgValue.Length - imgValue.IndexOf(B64) - B64.Length;
-	//      imgValue = imgValue.Substring(imgValue.Length - numChars, numChars);
-	//    }
-	//    return imgValue.IsValidBase64Image() ? imgValue : null;
-	//  }
-	//  else
-	//  {
-	//    return null;
-	//  }
-	//}
 
 	/// <summary>
 	/// Extract a base 64 image value from a typical CSS background image string.
@@ -221,7 +165,6 @@ public static partial class Base64
 			ReadOnlySpan<byte> bytes = FromBase64String(imageBase64);
 
 			using SKBitmap image = SKBitmap.Decode(bytes);
-			// using Image image = Image.Load(bytes);
 			if (image?.Width > 0 && image.Height > 0)
 			{
 				using FileStream fileStream = File.OpenWrite(savePath);
@@ -229,14 +172,13 @@ public static partial class Base64
 				fileStream.Flush();
 				fileStream.Close();
 				fileStream.Dispose();
-				// image.Save(savePath);
 			}
 
 			return true;
 		}
 		catch (Exception ex)
 		{
-			logger.Error(ex, "{ErrorLocation} Error\nSave Path: {savePath}", ex.GetLocationOfException(), savePath);
+			logger.Error(ex, "{ErrorLocation} Error\nSave Path: {SavePath}", ex.GetLocationOfException(), savePath);
 			return false;
 		}
 	}
@@ -259,22 +201,20 @@ public static partial class Base64
 		{
 			ReadOnlySpan<byte> bytes = FromBase64String(imageBase64);
 			using SKBitmap image = SKBitmap.Decode(bytes);
-			// using Image image = Image.Load(bytes);
 			if (image?.Width > 0 && image.Height > 0)
 			{
 				await using FileStream fileStream = File.OpenWrite(savePath);
 				image.Encode(format, quality).SaveTo(fileStream);
-				await fileStream.FlushAsync();
+				await fileStream.FlushAsync().ConfigureAwait(false);
 				fileStream.Close();
-				await fileStream.DisposeAsync();
-				// await image.SaveAsync(savePath);
+				await fileStream.DisposeAsync().ConfigureAwait(false);
 			}
 
 			return true;
 		}
 		catch (Exception ex)
 		{
-			logger.Error(ex, "{ErrorLocation} Error\nSave Path: {savePath}", ex.GetLocationOfException(), savePath);
+			logger.Error(ex, "{ErrorLocation} Error\nSave Path: {SavePath}", ex.GetLocationOfException(), savePath);
 			return false;
 		}
 	}
@@ -295,7 +235,6 @@ public static partial class Base64
 		{
 			ReadOnlySpan<byte> bytes = FromBase64String(imageBase64);
 			SKImageInfo bounds = SKBitmap.DecodeBounds(bytes);
-			// using Image image = Image.Load(bytes);
 			return bounds.Width > 0 && bounds.Height > 0;
 		}
 		catch (Exception ex)

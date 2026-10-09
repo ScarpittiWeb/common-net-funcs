@@ -9,12 +9,12 @@ This lightweight project contains a helper method for fast mapping of properties
 ## Contents
 
 - [CommonNetFuncs.FastMap](#commonnetfuncsfastmap)
-	- [Contents](#contents)
-	- [FastMapper](#fastmapper)
-		- [FastMapper Usage Examples](#fastmapper-usage-examples)
-			- [FastMap](#fastmap)
-	- [Installation](#installation)
-	- [License](#license)
+  - [Contents](#contents)
+  - [FastMapper](#fastmapper)
+    - [FastMapper Usage Examples](#fastmapper-usage-examples)
+      - [FastMap](#fastmap)
+  - [Installation](#installation)
+  - [License](#license)
 
 ---
 
@@ -73,4 +73,3 @@ dotnet add package CommonNetFuncs.FastMap
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](https://github.com/NickScarpitti/common-net-funcs/blob/main/LICENSE) file for details.
-

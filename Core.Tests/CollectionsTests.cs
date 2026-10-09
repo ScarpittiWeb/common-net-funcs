@@ -1302,14 +1302,14 @@ public sealed class CollectionsTests
 		// Assert
 
 		result.Count.ShouldBe(2);
-		result[0]!.Id.ShouldBe(1);
-		result[0]!.Name.ShouldBe("test1");
-		result[0]!.IsActive.ShouldBeTrue();
-		result[0]!.Description.ShouldBeNull();
-		result[1]!.Id.ShouldBe(2);
-		result[1]!.Name.ShouldBe("test2");
-		result[1]!.IsActive.ShouldBeFalse();
-		result[1]!.Description.ShouldBeNull();
+		result[0].Id.ShouldBe(1);
+		result[0].Name.ShouldBe("test1");
+		result[0].IsActive.ShouldBeTrue();
+		result[0].Description.ShouldBeNull();
+		result[1].Id.ShouldBe(2);
+		result[1].Name.ShouldBe("test2");
+		result[1].IsActive.ShouldBeFalse();
+		result[1].Description.ShouldBeNull();
 	}
 
 	[Fact]
@@ -1334,16 +1334,16 @@ public sealed class CollectionsTests
 		// Assert
 
 		result.Count.ShouldBe(2);
-		result[0]!.Id.ShouldBe(1);
-		result[0]!.Name.ShouldBe("test1");
-		result[0]!.IsActive.ShouldBeTrue();
-		result[0]!.Date.ShouldBe(DateTime.MinValue);
-		result[0]!.DateOnly.ShouldBe(DateOnly.MinValue);
-		result[1]!.Id.ShouldBe(2);
-		result[1]!.Name.ShouldBe("test2");
-		result[1]!.IsActive.ShouldBeFalse();
-		result[1]!.Date.ShouldBe(DateTime.MaxValue);
-		result[1]!.DateOnly.ShouldBe(DateOnly.MaxValue);
+		result[0].Id.ShouldBe(1);
+		result[0].Name.ShouldBe("test1");
+		result[0].IsActive.ShouldBeTrue();
+		result[0].Date.ShouldBe(DateTime.MinValue);
+		result[0].DateOnly.ShouldBe(DateOnly.MinValue);
+		result[1].Id.ShouldBe(2);
+		result[1].Name.ShouldBe("test2");
+		result[1].IsActive.ShouldBeFalse();
+		result[1].Date.ShouldBe(DateTime.MaxValue);
+		result[1].DateOnly.ShouldBe(DateOnly.MaxValue);
 	}
 
 	[Fact]
@@ -1368,16 +1368,16 @@ public sealed class CollectionsTests
 		// Assert
 
 		result.Count.ShouldBe(2);
-		result[0]!.Id.ShouldBe(1);
-		result[0]!.Name.ShouldBe("test1");
-		result[0]!.IsActive.ShouldBeTrue();
-		result[0]!.Date.ShouldBe(DateTime.MinValue);
-		result[0]!.DateOnly.ShouldBe(DateOnly.MinValue);
-		result[1]!.Id.ShouldBe(2);
-		result[1]!.Name.ShouldBe("test2");
-		result[1]!.IsActive.ShouldBeFalse();
-		result[1]!.Date.ShouldBe(new DateTime(DateOnly.MaxValue, TimeOnly.MinValue, DateTimeKind.Unspecified));
-		result[1]!.DateOnly.ShouldBe(DateOnly.MaxValue);
+		result[0].Id.ShouldBe(1);
+		result[0].Name.ShouldBe("test1");
+		result[0].IsActive.ShouldBeTrue();
+		result[0].Date.ShouldBe(DateTime.MinValue);
+		result[0].DateOnly.ShouldBe(DateOnly.MinValue);
+		result[1].Id.ShouldBe(2);
+		result[1].Name.ShouldBe("test2");
+		result[1].IsActive.ShouldBeFalse();
+		result[1].Date.ShouldBe(new DateTime(DateOnly.MaxValue, TimeOnly.MinValue, DateTimeKind.Unspecified));
+		result[1].DateOnly.ShouldBe(DateOnly.MaxValue);
 	}
 
 	[Theory]
@@ -1407,16 +1407,16 @@ public sealed class CollectionsTests
 			// Assert
 
 			result.Count.ShouldBe(2);
-			result[0]!.Id.ShouldBe(1);
-			result[0]!.Name.ShouldBe("test1");
-			result[0]!.IsActive.ShouldBeTrue();
-			result[0]!.Date.ShouldBe(DateTime.MinValue);
-			result[0]!.DateOnly.ShouldBe(DateOnly.MinValue);
-			result[1]!.Id.ShouldBe(2);
-			result[1]!.Name.ShouldBe("test2");
-			result[1]!.IsActive.ShouldBeFalse();
-			result[1]!.Date.ShouldBe(new DateTime(DateOnly.MaxValue, TimeOnly.MinValue, DateTimeKind.Unspecified));
-			result[1]!.DateOnly.ShouldBe(DateOnly.MaxValue);
+			result[0].Id.ShouldBe(1);
+			result[0].Name.ShouldBe("test1");
+			result[0].IsActive.ShouldBeTrue();
+			result[0].Date.ShouldBe(DateTime.MinValue);
+			result[0].DateOnly.ShouldBe(DateOnly.MinValue);
+			result[1].Id.ShouldBe(2);
+			result[1].Name.ShouldBe("test2");
+			result[1].IsActive.ShouldBeFalse();
+			result[1].Date.ShouldBe(new DateTime(DateOnly.MaxValue, TimeOnly.MinValue, DateTimeKind.Unspecified));
+			result[1].DateOnly.ShouldBe(DateOnly.MaxValue);
 		}
 		else
 		{
@@ -1453,16 +1453,16 @@ public sealed class CollectionsTests
 			// Assert
 
 			result.Count.ShouldBe(2);
-			result[0]!.Id.ShouldBe(1);
-			result[0]!.Name.ShouldBe("test1");
-			result[0]!.IsActive.ShouldBeTrue();
-			result[0]!.Date.ShouldBe(DateTime.MinValue);
-			result[0]!.DateOnly.ShouldBe(DateOnly.MinValue);
-			result[1]!.Id.ShouldBe(2);
-			result[1]!.Name.ShouldBe("test2");
-			result[1]!.IsActive.ShouldBeFalse();
-			result[1]!.Date.ShouldBe(DateTime.MaxValue);
-			result[1]!.DateOnly.ShouldBe(DateOnly.MaxValue);
+			result[0].Id.ShouldBe(1);
+			result[0].Name.ShouldBe("test1");
+			result[0].IsActive.ShouldBeTrue();
+			result[0].Date.ShouldBe(DateTime.MinValue);
+			result[0].DateOnly.ShouldBe(DateOnly.MinValue);
+			result[1].Id.ShouldBe(2);
+			result[1].Name.ShouldBe("test2");
+			result[1].IsActive.ShouldBeFalse();
+			result[1].Date.ShouldBe(DateTime.MaxValue);
+			result[1].DateOnly.ShouldBe(DateOnly.MaxValue);
 		}
 		else
 		{
@@ -1492,8 +1492,8 @@ public sealed class CollectionsTests
 		// Assert
 
 		result.Count.ShouldBe(2);
-		result.ShouldContain(item => (item!.Id == 1) && (item.Name == "test1") && item.IsActive);
-		result.ShouldContain(item => (item!.Id == 2) && (item.Name == "test2") && !item.IsActive);
+		result.ShouldContain(item => (item.Id == 1) && (item.Name == "test1") && item.IsActive);
+		result.ShouldContain(item => (item.Id == 2) && (item.Name == "test2") && !item.IsActive);
 	}
 
 	[Fact]
@@ -1515,8 +1515,8 @@ public sealed class CollectionsTests
 		// Assert
 
 		result.Count.ShouldBe(2);
-		result.ShouldContain(item => (item!.Id == 1) && (item.Name == "test1"));
-		result.ShouldContain(item => (item!.Id == 2) && (item.Name == "test2"));
+		result.ShouldContain(item => (item.Id == 1) && (item.Name == "test1"));
+		result.ShouldContain(item => (item.Id == 2) && (item.Name == "test2"));
 	}
 
 	[Fact]
@@ -1538,8 +1538,8 @@ public sealed class CollectionsTests
 		// Assert
 
 		result.Count.ShouldBe(2);
-		result.ShouldContain(item => (item!.Id == 1) && (item.Name == "test1"));
-		result.ShouldContain(item => (item!.Id == 2) && (item.Name == "test2"));
+		result.ShouldContain(item => (item.Id == 1) && (item.Name == "test1"));
+		result.ShouldContain(item => (item.Id == 2) && (item.Name == "test2"));
 	}
 
 	#endregion

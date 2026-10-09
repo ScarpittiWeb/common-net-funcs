@@ -104,7 +104,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 			else
 			{
 				// Use the more efficient FindAsync when filters don't need to be disabled
-				model = await context.Set<TEntity>().FindAsync([primaryKey], cancellationToken).ConfigureAwait(true);
+				model = await context.Set<TEntity>().FindAsync([primaryKey], cancellationToken).ConfigureAwait(false);
 			}
 		}
 		catch (Exception ex)
@@ -251,7 +251,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 			if (model != null)
 			{
 				IQueryable<TEntity> query = BuildFullQuery(context, fullQueryOptions, false, trackEntities);
-				model = await query.GetObjectByPartialAsync(context, model, cancellationToken: cancellationToken);
+				model = await query.GetObjectByPartialAsync(context, model, cancellationToken: cancellationToken).ConfigureAwait(false);
 			}
 		}
 		catch (InvalidOperationException ioEx)
@@ -264,7 +264,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 					if (model != null)
 					{
 						IQueryable<TEntity> query = BuildFullQuery(context, fullQueryOptions, true, false);
-						model = await query.GetObjectByPartialAsync(context, model, cancellationToken: cancellationToken);
+						model = await query.GetObjectByPartialAsync(context, model, cancellationToken: cancellationToken).ConfigureAwait(false);
 					}
 					logger.Warn(AddCircularRefTemplate, typeof(TEntity).Name);
 					circularReferencingEntities.TryAdd(typeof(TEntity), true);
@@ -313,7 +313,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 			if (model != null)
 			{
 				IQueryable<TEntity> query = BuildFullQuery(context, fullQueryOptions, false, trackEntities);
-				model = await query.GetObjectByPartialAsync(context, model, cancellationToken: cancellationToken);
+				model = await query.GetObjectByPartialAsync(context, model, cancellationToken: cancellationToken).ConfigureAwait(false);
 			}
 		}
 		catch (InvalidOperationException ioEx)
@@ -326,7 +326,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 					if (model != null)
 					{
 						IQueryable<TEntity> query = BuildFullQuery(context, fullQueryOptions, true, false);
-						model = await query.GetObjectByPartialAsync(context, model, cancellationToken: cancellationToken);
+						model = await query.GetObjectByPartialAsync(context, model, cancellationToken: cancellationToken).ConfigureAwait(false);
 					}
 					logger.Warn(AddCircularRefTemplate, typeof(TEntity).Name);
 					circularReferencingEntities.TryAdd(typeof(TEntity), true);
@@ -522,7 +522,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		fullQueryOptions ??= new();
 		return await ExecuteWithCircularRefHandling(async (handlingCircularRef, cancellationToken) =>
-			await GetQueryAllFull(queryTimeout, handlingCircularRef, trackEntities, fullQueryOptions).ToListAsync(cancellationToken).ConfigureAwait(false), cancellationToken);
+			await GetQueryAllFull(queryTimeout, handlingCircularRef, trackEntities, fullQueryOptions).ToListAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -541,7 +541,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		fullQueryOptions ??= new();
 		return await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await GetQueryAllFull(selectExpression, queryTimeout, false, trackEntities, fullQueryOptions, globalFilterOptions).ToListAsync(cancellationToken).ConfigureAwait(false), cancellationToken);
+			await GetQueryAllFull(selectExpression, queryTimeout, false, trackEntities, fullQueryOptions, globalFilterOptions).ToListAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -808,7 +808,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		fullQueryOptions ??= new FullQueryOptions();
 		return await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await GetQueryWithFilterFull(whereExpression, queryTimeout, false, trackEntities, fullQueryOptions).ToListAsync(cancellationToken).ConfigureAwait(false), cancellationToken);
+			await GetQueryWithFilterFull(whereExpression, queryTimeout, false, trackEntities, fullQueryOptions).ToListAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -828,7 +828,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		fullQueryOptions ??= new FullQueryOptions();
 		return await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await GetQueryWithFilterFull(whereExpression, selectExpression, queryTimeout, false, trackEntities, fullQueryOptions).ToListAsync(cancellationToken).ConfigureAwait(false), cancellationToken);
+			await GetQueryWithFilterFull(whereExpression, selectExpression, queryTimeout, false, trackEntities, fullQueryOptions).ToListAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -946,7 +946,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		fullQueryOptions ??= new FullQueryOptions();
 		return await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await GetQueryNavigationWithFilterFull(whereExpression, selectExpression, queryTimeout, false, trackEntities, fullQueryOptions).ToListAsync(cancellationToken).ConfigureAwait(false), cancellationToken);
+			await GetQueryNavigationWithFilterFull(whereExpression, selectExpression, queryTimeout, false, trackEntities, fullQueryOptions).ToListAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -1004,9 +1004,9 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		fullQueryOptions ??= new FullQueryOptions();
 		IQueryable<TEntity> query = GetQueryNavigationWithFilterFull(whereExpression, selectExpression, queryTimeout, false, trackEntities, fullQueryOptions);
-		await using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		await using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 		return await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await BuildFullQuery(query, context, fullQueryOptions, false, trackEntities).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false), cancellationToken);
+			await BuildFullQuery(query, context, fullQueryOptions, false, trackEntities).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -1026,7 +1026,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		fullQueryOptions ??= new();
 		IQueryable<TEntity> query = GetQueryNavigationWithFilterFull(whereExpression, selectExpression, queryTimeout, false, trackEntities, fullQueryOptions);
-		using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 
 		return ExecuteStreamingWithCircularRefHandling((_) => BuildFullQuery(query, context, fullQueryOptions, false, trackEntities).Distinct(), cancellationToken);
 	}
@@ -1169,9 +1169,9 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		fullQueryOptions ??= new FullQueryOptions();
 		IQueryable<TOutput> qModel = GetQueryPagingWithFilterFull(whereExpression, selectExpression, orderByString, queryTimeout, false, trackEntities, fullQueryOptions);
-		await using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		await using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 		return (await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await BuildPagingResult(qModel, skip, pageSize, cancellationToken).ConfigureAwait(false), cancellationToken))!;
+			await BuildPagingResult(qModel, skip, pageSize, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false))!;
 	}
 
 	/// <summary>
@@ -1196,9 +1196,9 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		fullQueryOptions ??= new FullQueryOptions();
 		IQueryable<TOutput> qModel = GetQueryPagingWithFilterFull(whereExpression, selectExpression, ascendingOrderExpression, queryTimeout, false, trackEntities, fullQueryOptions);
-		await using DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		await using DbContext context = ServiceProvider.GetRequiredService<TContext>();
 		return (await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await BuildPagingResult(qModel, skip, pageSize, cancellationToken).ConfigureAwait(false), cancellationToken))!;
+			await BuildPagingResult(qModel, skip, pageSize, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false))!;
 	}
 
 	/// <summary>
@@ -1334,7 +1334,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 		await using DbContext context = InitializeContext(queryTimeout);
 		IQueryable<TEntity> query = BuildFullQuery(context, fullQueryOptions, false, trackEntities).Where(whereExpression);
 		return await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await ApplyGlobalFilters(query, globalFilterOptions).FirstOrDefaultAsync(whereExpression, cancellationToken).ConfigureAwait(false), cancellationToken);
+			await ApplyGlobalFilters(query, globalFilterOptions).FirstOrDefaultAsync(whereExpression, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -1356,7 +1356,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 		await using DbContext context = InitializeContext(queryTimeout);
 		IQueryable<TEntity> query = BuildFullQuery(context, fullQueryOptions, false, trackEntities).Where(whereExpression);
 		return await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await ApplyGlobalFilters(query, globalFilterOptions).Select(selectExpression).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false), cancellationToken);
+			await ApplyGlobalFilters(query, globalFilterOptions).Select(selectExpression).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
 	#endregion
@@ -1416,7 +1416,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 		await using DbContext context = InitializeContext(queryTimeout);
 		IQueryable<TEntity> query = BuildFullQuery(context, fullQueryOptions, false, trackEntities).Where(whereExpression).OrderByDescending(descendingOrderExpression);
 		return await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await ApplyGlobalFilters(query, globalFilterOptions).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false), cancellationToken);
+			await ApplyGlobalFilters(query, globalFilterOptions).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
 	#endregion
@@ -1478,7 +1478,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 		await using DbContext context = InitializeContext(queryTimeout);
 		IQueryable<TEntity> query = BuildFullQuery(context, fullQueryOptions, false, trackEntities).Where(whereExpression).OrderBy(ascendingOrderExpression);
 		return await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await ApplyGlobalFilters(query, globalFilterOptions).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false), cancellationToken);
+			await ApplyGlobalFilters(query, globalFilterOptions).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
 	#endregion
@@ -1539,7 +1539,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 		await using DbContext context = InitializeContext(queryTimeout);
 		IQueryable<TEntity> query = BuildFullQuery(context, fullQueryOptions, false, trackEntities).Where(whereExpression);
 		return await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await ApplyGlobalFilters(query, globalFilterOptions).MaxAsync(maxExpression, cancellationToken).ConfigureAwait(false), cancellationToken);
+			await ApplyGlobalFilters(query, globalFilterOptions).MaxAsync(maxExpression, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
 	#endregion
@@ -1600,7 +1600,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 		await using DbContext context = InitializeContext(queryTimeout);
 		IQueryable<TEntity> query = BuildFullQuery(context, fullQueryOptions, false, trackEntities).Where(whereExpression);
 		return await ExecuteWithCircularRefHandling(async (_, cancellationToken) =>
-			await ApplyGlobalFilters(query, globalFilterOptions).MinAsync(minExpression, cancellationToken).ConfigureAwait(false), cancellationToken);
+			await ApplyGlobalFilters(query, globalFilterOptions).MinAsync(minExpression, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
 	#endregion

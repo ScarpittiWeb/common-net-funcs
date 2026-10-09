@@ -9,18 +9,18 @@ This project contains helper methods for reading and writing CSV files.
 ## Contents
 
 - [CommonNetFuncs.Csv](#commonnetfuncscsv)
-	- [Contents](#contents)
-	- [CsvExportHelpers](#csvexporthelpers)
-		- [CsvExportHelpers Usage Examples](#csvexporthelpers-usage-examples)
-			- [ExportToCsv](#exporttocsv)
-	- [CsvReadHelpers](#csvreadhelpers)
-		- [CsvReadHelpers Usage Examples](#csvreadhelpers-usage-examples)
-			- [ReadCsv](#readcsv)
-			- [ReadCsvAsync](#readcsvasync)
-			- [ReadCsvAsyncEnumerable](#readcsvasyncenumerable)
-			- [ReadCsvToDataTable](#readcsvtodatatable)
-	- [Installation](#installation)
-	- [License](#license)
+  - [Contents](#contents)
+  - [CsvExportHelpers](#csvexporthelpers)
+    - [CsvExportHelpers Usage Examples](#csvexporthelpers-usage-examples)
+      - [ExportToCsv](#exporttocsv)
+  - [CsvReadHelpers](#csvreadhelpers)
+    - [CsvReadHelpers Usage Examples](#csvreadhelpers-usage-examples)
+      - [ReadCsv](#readcsv)
+      - [ReadCsvAsync](#readcsvasync)
+      - [ReadCsvAsyncEnumerable](#readcsvasyncenumerable)
+      - [ReadCsvToDataTable](#readcsvtodatatable)
+  - [Installation](#installation)
+  - [License](#license)
 
 ---
 

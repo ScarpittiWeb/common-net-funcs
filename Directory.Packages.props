@@ -15,7 +15,7 @@
 		<PackageVersion Include="DocumentFormat.OpenXml" Version="3.5.1" />
 		<!-- FakeItEasy must be 8.3.0 until AutoFixture.AutoFakeItEasy is updated to use the new version (9.x.x) -->
 		<PackageVersion Include="FakeItEasy" Version="8.3.0" />
-		<PackageVersion Include="FastExpressionCompiler" Version="5.4.1" />
+		<PackageVersion Include="FastExpressionCompiler" Version="6.0.0" />
 		<PackageVersion Include="Hangfire.AspNetCore" Version="1.8.25" />
 		<PackageVersion Include="Hangfire.Core" Version="1.8.25" />
 		<PackageVersion Include="MailKit" Version="4.18.1" />
@@ -74,8 +74,8 @@
 		<PackageVersion Include="System.Text.Json" Version="10.0.12" />
 		<PackageVersion Include="Xabe.FFmpeg" Version="6.1.1" />
 		<PackageVersion Include="xRetry.v3" Version="1.0.0" />
-		<PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
-		<PackageVersion Include="xunit.v3" Version="4.0.1" />
+		<PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+		<PackageVersion Include="xunit.v3" Version="4.0.2" />
 		<PackageVersion Include="Z.EntityFramework.Extensions.EFCore" Version="10.105.8" />
 		<PackageVersion Include="Z.EntityFramework.Plus.EFCore" Version="10.105.8" />
 		<PackageVersion Include="ZLinq" Version="1.5.6" />

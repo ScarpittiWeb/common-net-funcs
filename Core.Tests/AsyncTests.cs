@@ -3868,7 +3868,6 @@ public sealed class AsyncTests
 						concurrent++;
 						maxConcurrent = Math.Max(maxConcurrent, concurrent);
 					}
-					//await Task.Delay(50);
 					Task.Delay(50).GetAwaiter().GetResult();
 					lock (lockObj)
 					{

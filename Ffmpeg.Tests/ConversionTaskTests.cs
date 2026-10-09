@@ -35,7 +35,6 @@ public sealed class ConversionTaskTests() : ConversionTaskTestsBase("ConversionT
 		const string ffmpegCommand = "-c:v libx264 -preset medium -crf 50";
 
 		// Act
-		//bool result = await RawConversionTask.FfmpegConversionTask(fileToConvert, outputFileName, ffmpegCommand, true, workingDir);
 		bool result = await ConversionTask.FfmpegConversionTask(fileToConvert, outputFileName, ffmpegCommand, workingDir);
 
 		// Assert

@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -66,33 +66,14 @@ public sealed class DenyRegularExpressionAttribute : ValidationAttribute
 			return ValidationResult.Success;
 		}
 
-		if (!DenyOnlyFullMatch)
+		// Fails when the pattern matches anywhere in the string, or only when it matches the entire string if DenyOnlyFullMatch is set
+		if (DenyOnlyFullMatch ? ValidationAttributeHelpers.HasFullMatch(Regex, stringValue) : Regex.IsMatch(stringValue))
 		{
-			// Check if the pattern matches anywhere in the string - if it does, validation fails
-			if (Regex!.IsMatch(stringValue))
-			{
-				string memberName = validationContext.MemberName ?? string.Empty;
-				return new ValidationResult(
-					FormatErrorMessage(validationContext.DisplayName),
-					string.IsNullOrEmpty(memberName) ? null : new[] { memberName }
-				);
-			}
-		}
-		else
-		{
-			// Check if the pattern matches - if it does, validation fails (this is the "deny" logic)
-			foreach (ValueMatch m in Regex!.EnumerateMatches(stringValue))
-			{
-				// We are looking for an exact match, not just a search hit
-				if (m.Index == 0 && m.Length == stringValue.Length)
-				{
-					string memberName = validationContext.MemberName ?? string.Empty;
-					return new ValidationResult(
-						FormatErrorMessage(validationContext.DisplayName),
-						string.IsNullOrEmpty(memberName) ? null : new[] { memberName }
-					);
-				}
-			}
+			string memberName = validationContext.MemberName ?? string.Empty;
+			return new ValidationResult(
+				FormatErrorMessage(validationContext.DisplayName),
+				string.IsNullOrEmpty(memberName) ? null : new[] { memberName }
+			);
 		}
 
 		// If the pattern doesn't match, validation succeeds
@@ -126,17 +107,6 @@ public sealed class DenyRegularExpressionAttribute : ValidationAttribute
 	[MemberNotNull(nameof(Regex))]
 	private void SetupRegex()
 	{
-		// Compile the regex for better performance when used multiple times
-		if (Regex == null)
-		{
-			if (string.IsNullOrEmpty(Pattern))
-			{
-				throw new InvalidOperationException("Regex pattern cannot be null or empty");
-			}
-
-			Regex = MatchTimeoutInMilliseconds == -1
-				? new Regex(Pattern, RegexOptions.Compiled)
-				: new Regex(Pattern, RegexOptions.Compiled, TimeSpan.FromMilliseconds(MatchTimeoutInMilliseconds));
-		}
+		Regex ??= ValidationAttributeHelpers.CreateRegex(Pattern, MatchTimeoutInMilliseconds);
 	}
 }

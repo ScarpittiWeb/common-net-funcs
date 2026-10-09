@@ -85,7 +85,7 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 			semaphore.Release();
 		}
 
-		return (T?)await queuedTask.CompletionSource.Task;
+		return (T?)await queuedTask.CompletionSource.Task.ConfigureAwait(false);
 	}
 
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken) // Stopping token used here to match the BackgroundService base class
@@ -118,23 +118,7 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 
 				stopwatch.Stop();
 
-				lock (statsLock)
-				{
-					stats.TotalProcessedTasks++;
-					stats.LastProcessedAt = DateTime.UtcNow;
-
-					PriorityStats priorityStats = stats.PriorityBreakdown[currentTask.PriorityLevel];
-					priorityStats.ProcessedTasks++;
-					priorityStats.LastProcessedAt = DateTime.UtcNow;
-
-					List<TimeSpan> processingTimes = processingTimesByPriority[currentTask.PriorityLevel];
-					processingTimes.Add(stopwatch.Elapsed);
-
-					if (processingTimes.Count > processTimeWindow)
-					{
-						processingTimes.RemoveAt(0);
-					}
-				}
+				PrioritizedQueueStatsRecorder.RecordProcessedTask(stats, statsLock, processingTimesByPriority, processTimeWindow, currentTask.PriorityLevel, stopwatch.Elapsed);
 
 				logger.Debug("Completed task {TaskId}", currentTask.Id);
 			}

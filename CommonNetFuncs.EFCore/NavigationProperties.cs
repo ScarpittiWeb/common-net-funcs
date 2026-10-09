@@ -249,7 +249,7 @@ public static class NavigationProperties
 			{
 				// Skip if property has JsonIgnore attribute
 
-				PropertyInfo? propertyInfo = GetOrAddPropertiesFromReflectionCache(entityType).First(x => x.Name.StrComp(navigation.Name)); //entityType.GetProperty(navigation.Name);
+				PropertyInfo? propertyInfo = GetOrAddPropertiesFromReflectionCache(entityType).First(x => x.Name.StrComp(navigation.Name));
 
 				if (navigationPropertiesOptions.NavPropAttributesToIgnore != null)
 				{
@@ -344,11 +344,6 @@ public static class NavigationProperties
 
 		if (!topLevelNavigations.AnyFast())
 		{
-			//IEnumerable<INavigation> navigations = (context.Model.FindEntityType(entityType)?.GetNavigations()
-			//    .Where(x => entityType.GetProperty(x.Name)!.GetCustomAttributes(typeof(System.Text.Json.Serialization.JsonIgnoreAttribute), true).Length == 0 &&
-			//        entityType.GetProperty(x.Name)!.GetCustomAttributes(typeof(JsonIgnoreAttribute), true).Length == 0)) ?? [];
-
-
 			IEntityType? entityType = context.Model.FindEntityType(entityClassType);
 			IEnumerable<INavigation> navigations = navPropAttributesToIgnore != null ?
 				entityType?.GetNavigations().Where(x => !navPropAttributesToIgnore.Any(y => entityClassType.GetProperty(x.Name)!.GetCustomAttributes(y, true).AnyFast())) ?? [] :

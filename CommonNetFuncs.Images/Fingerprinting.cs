@@ -102,7 +102,7 @@ public static class ImageFingerprinting
 		{
 			try
 			{
-				results.Add(await FingerprintImage(file, algorithm));
+				results.Add(await FingerprintImage(file, algorithm).ConfigureAwait(false));
 			}
 			catch (Exception ex)
 			{
@@ -147,7 +147,7 @@ public static class ImageFingerprinting
 	/// <summary>Convenience: scan a directory and return all duplicate pairs.</summary>
 	public static async Task<IReadOnlyList<SimilarityResult>> FindDuplicatesInDirectory(string directoryPath, bool recursive = false, ImageHashAlgorithm algorithm = ImageHashAlgorithm.DifferenceHash)
 	{
-		IReadOnlyList<ImageFingerprint> fingerprints = await FingerprintDirectory(directoryPath, recursive, algorithm);
+		IReadOnlyList<ImageFingerprint> fingerprints = await FingerprintDirectory(directoryPath, recursive, algorithm).ConfigureAwait(false);
 		return FindDuplicates(fingerprints);
 	}
 

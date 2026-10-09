@@ -540,7 +540,7 @@ public class EndpointQueueServiceTests : IDisposable
 
 		QueueStats stats = await service.GetQueueStatsAsync(key);
 		stats.LastProcessedAt.ShouldNotBeNull();
-		stats.LastProcessedAt!.Value.ShouldBeGreaterThanOrEqualTo(startTime);
+		stats.LastProcessedAt.Value.ShouldBeGreaterThanOrEqualTo(startTime);
 	}
 
 	[Fact]
@@ -563,7 +563,7 @@ public class EndpointQueueServiceTests : IDisposable
 
 		// Act - invoke cleanup (should not remove recently used queue)
 
-		cleanupMethod!.Invoke(service, new object?[] { null });
+		cleanupMethod.Invoke(service, new object?[] { null });
 
 		// Assert - queue should still exist
 
@@ -590,22 +590,22 @@ public class EndpointQueueServiceTests : IDisposable
 
 		System.Reflection.FieldInfo? queuesField = typeof(EndpointQueueService).GetField("queues", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 		queuesField.ShouldNotBeNull();
-		ConcurrentDictionary<string, CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue.EndpointQueue>? queuesDict = queuesField!.GetValue(service) as System.Collections.Concurrent.ConcurrentDictionary<string, CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue.EndpointQueue>;
+		ConcurrentDictionary<string, CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue.EndpointQueue>? queuesDict = queuesField.GetValue(service) as ConcurrentDictionary<string, CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue.EndpointQueue>;
 		queuesDict.ShouldNotBeNull();
 
 		// Get the queue and its internal stats field
 
-		queuesDict!.TryGetValue("old-queue", out CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue.EndpointQueue? queue).ShouldBeTrue();
+		queuesDict.TryGetValue("old-queue", out CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue.EndpointQueue? queue).ShouldBeTrue();
 		queue.ShouldNotBeNull();
 
 		System.Reflection.FieldInfo? statsField = typeof(CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue.EndpointQueue).GetField("stats", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 		statsField.ShouldNotBeNull();
-		QueueStats? statsObj = statsField!.GetValue(queue) as QueueStats;
+		QueueStats? statsObj = statsField.GetValue(queue) as QueueStats;
 		statsObj.ShouldNotBeNull();
 
 		// Manipulate the stats to have an old LastProcessedAt timestamp
 
-		statsObj!.LastProcessedAt = DateTime.UtcNow.AddHours(-1); // Set to 1 hour ago
+		statsObj.LastProcessedAt = DateTime.UtcNow.AddHours(-1); // Set to 1 hour ago
 
 		// Get the cleanup method using reflection
 
@@ -614,7 +614,7 @@ public class EndpointQueueServiceTests : IDisposable
 
 		// Act - invoke cleanup (should remove the old queue)
 
-		cleanupMethod!.Invoke(service, new object?[] { null });
+		cleanupMethod.Invoke(service, new object?[] { null });
 
 		// Assert - queue should be removed
 

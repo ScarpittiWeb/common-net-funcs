@@ -717,7 +717,7 @@ public sealed class GenericMinimalDtoEndpointsTests
 
 		// Actually, to trigger the object-level error, we need the updateModel to have AlwaysFail = true.
 		// Since inDto does NOT have AlwaysFail, CopyPropertiesTo won't set it.
-		// So start with dbModel.AlwaysFail = true; after DeepClone, updateModel.AlwaysFail = true;
+		// So start with dbModel.AlwaysFail = true after DeepClone, updateModel.AlwaysFail = true
 		// CopyPropertiesTo(inDto -> updateModel) won't affect AlwaysFail (no such prop on inDto).
 		// Wait, CopyPropertiesTo copies from source to target using matching props.
 		// inDto has Id, Name, Description - not AlwaysFail.

@@ -23,11 +23,11 @@ public sealed class SqlServerDebugTests
 	public void RenderCommandAsScript_ShouldDeclareVarcharParameter_WithSize()
 	{
 		using SqlCommand cmd = new("SELECT * FROM TestTable WHERE Name = @Name");
-		cmd.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 50) { Value = "O'Brien" });
+		cmd.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 50) { Value = "O'Brian" });
 
 		string result = SqlServerDebug.RenderCommandAsScript(cmd);
 
-		result.ShouldContain("DECLARE @Name NVARCHAR(50) = N'O''Brien';");
+		result.ShouldContain("DECLARE @Name NVARCHAR(50) = N'O''Brian';");
 		result.ShouldContain("SELECT * FROM TestTable WHERE Name = @Name");
 	}
 
@@ -114,7 +114,7 @@ public sealed class SqlServerDebugTests
 	public void RenderCommandAsScript_ShouldFormatDateTimeValue_WithQuotes()
 	{
 		using SqlCommand cmd = new("SELECT @CreatedDate");
-		DateTime date = new(2024, 5, 17, 13, 45, 30, 123);
+		DateTime date = new(2024, 5, 17, 13, 45, 30, 123, DateTimeKind.Unspecified);
 		cmd.Parameters.Add(new SqlParameter("@CreatedDate", SqlDbType.DateTime2) { Value = date });
 
 		string result = SqlServerDebug.RenderCommandAsScript(cmd);

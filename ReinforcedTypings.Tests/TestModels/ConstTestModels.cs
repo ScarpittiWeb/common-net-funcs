@@ -1,7 +1,7 @@
 ﻿using CommonNetFuncs.ReinforcedTypings.Constants;
 using Reinforced.Typings.Attributes;
 
-namespace ReinforcedTypings.Tests.TestModels.Consts;
+namespace ReinforcedTypings.Tests.TestModels;
 
 public enum SimpleColor
 {
@@ -11,7 +11,7 @@ public enum SimpleColor
 }
 
 [TsEnum(UseString = true)]
-public enum StringEnum
+public enum StringOption
 {
 	Alpha,
 	Beta,
@@ -65,7 +65,7 @@ public static class RichTypeConsts
 
 	public static readonly SimpleColor Color = SimpleColor.Green;
 
-	public static readonly StringEnum Mode = StringEnum.Beta;
+	public static readonly StringOption Mode = StringOption.Beta;
 
 	public static readonly string? Nothing = null;
 

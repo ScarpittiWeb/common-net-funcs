@@ -859,7 +859,7 @@ public sealed class RestHelpersStaticTests
 		TestModel? result = await stream.ReadResponseStream<TestModel>("application/x-memorypack", null, false, cancellationToken: Current.CancellationToken);
 
 		result.ShouldNotBeNull();
-		result!.Name.ShouldBe("Test");
+		result.Name.ShouldBe("Test");
 		result.Value.ShouldBe(123);
 	}
 
@@ -888,7 +888,7 @@ public sealed class RestHelpersStaticTests
 		TestModel? result = await compressedStream.ReadResponseStream<TestModel>("application/x-memorypack", encoding, false, cancellationToken: Current.CancellationToken);
 
 		result.ShouldNotBeNull();
-		result!.Name.ShouldBe("Compressed");
+		result.Name.ShouldBe("Compressed");
 		result.Value.ShouldBe(456);
 	}
 
@@ -928,7 +928,7 @@ public sealed class RestHelpersStaticTests
 		TestModel? result = await stream.ReadResponseStream<TestModel>("application/x-msgpack", null, false, cancellationToken: Current.CancellationToken);
 
 		result.ShouldNotBeNull();
-		result!.Name.ShouldBe("Test");
+		result.Name.ShouldBe("Test");
 		result.Value.ShouldBe(123);
 	}
 
@@ -953,7 +953,7 @@ public sealed class RestHelpersStaticTests
 		byte[] msgPackBytes = MessagePackSerializer.Serialize(model, cancellationToken: Current.CancellationToken);
 		MemoryStream stream = new(msgPackBytes);
 
-		MessagePackSerializerOptions options = MessagePackSerializerOptions.Standard;
+		MessagePackSerializerOptions options = MessagePackSerializerOptions.Standard.WithSecurity(MessagePackSecurity.UntrustedData);
 
 		TestModel? result = await stream.ReadResponseStream<TestModel>("application/x-msgpack", null, false, messagePackSerializerOptions: options, cancellationToken: Current.CancellationToken);
 
@@ -1205,7 +1205,7 @@ public sealed class RestHelpersStaticTests
 			StringContent patchContent = new("[{\"op\":\"replace\",\"path\":\"/name\",\"value\":\"New\"}]");
 			request.AddContent(method, null, model, patchContent);
 			request.Content.ShouldNotBeNull();
-			request.Content!.Headers.ContentType?.MediaType.ShouldBe("application/json-patch+json");
+			request.Content.Headers.ContentType?.MediaType.ShouldBe("application/json-patch+json");
 		}
 		else
 		{
@@ -1218,7 +1218,7 @@ public sealed class RestHelpersStaticTests
 			else
 			{
 				request.Content.ShouldNotBeNull();
-				request.Content!.Headers.ContentType?.MediaType.ShouldBe(expectedContentType);
+				request.Content.Headers.ContentType?.MediaType.ShouldBe(expectedContentType);
 			}
 		}
 	}
@@ -1235,7 +1235,7 @@ public sealed class RestHelpersStaticTests
 		request.AddContent(HttpMethod.Post, headers, model, null);
 
 		request.Content.ShouldNotBeNull();
-		request.Content!.Headers.ContentType?.MediaType.ShouldBe(expectedMediaType);
+		request.Content.Headers.ContentType?.MediaType.ShouldBe(expectedMediaType);
 	}
 
 	[Fact]
@@ -1261,7 +1261,7 @@ public sealed class RestHelpersStaticTests
 		if (token != null)
 		{
 			request.Headers.Authorization.ShouldNotBeNull();
-			request.Headers.Authorization!.Scheme.ShouldBe("Bearer");
+			request.Headers.Authorization.Scheme.ShouldBe("Bearer");
 			request.Headers.Authorization.Parameter.ShouldBe(token);
 		}
 	}

@@ -1242,7 +1242,7 @@ public sealed class FileHelpersTests : IDisposable
 	public async Task GetAllFilesRecursive_HandlesEmptyDirectoriesWithSubdirectories()
 	{
 		// Arrange - Create a directory structure where some directories have no files
-		// This tests the "if (files.Count == 0) continue" branch
+		// This tests the files.Count == 0 then continue branch
 		string emptyDir1 = Path.Combine(tempDir, "empty1");
 		string emptyDir2 = Path.Combine(tempDir, "empty2");
 		string dirWithFiles = Path.Combine(tempDir, "withFiles");

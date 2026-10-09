@@ -40,7 +40,7 @@ public sealed class QueryParametersTests
 		IEnumerable<string> input = new[] { "test\n", " value ", "null", "  Clean\nThis  " };
 
 		// Act
-		IEnumerable<string> result = input.CleanQueryParam()!;
+		IEnumerable<string> result = input.CleanQueryParam();
 
 		// Assert
 		result.ShouldNotBeNull();
@@ -327,7 +327,7 @@ public sealed class QueryParametersTests
 		IEnumerable<string> input = new[] { "", "  ", "\n" };
 
 		// Act
-		IEnumerable<string> result = input.CleanQueryParam()!;
+		IEnumerable<string> result = input.CleanQueryParam();
 
 		// Assert
 		result.ShouldNotBeNull();

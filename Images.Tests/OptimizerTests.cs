@@ -11,7 +11,6 @@ public sealed class OptimizerTests : IDisposable
 
 	public void Dispose()
 	{
-		//File.Delete(_tempSavePath);
 		GC.SuppressFinalize(this);
 	}
 
@@ -21,6 +20,7 @@ public sealed class OptimizerTests : IDisposable
 		if (!disposed)
 		{
 			disposed = true;
+			try { Directory.Delete(testDataDir, true); } catch { /* Best-effort temp cleanup */ }
 		}
 	}
 #pragma warning restore S1172 // Unused method parameters should be removed
@@ -35,14 +35,21 @@ public sealed class OptimizerTests : IDisposable
 	private readonly string testJpgPath;
 	private readonly string testGifPath;
 	private readonly string testInvalidPath;
+	private readonly string testDataDir;
 
 	public OptimizerTests()
 	{
 		fixture = new Fixture();
 		fixture.Customize(new AutoFakeItEasyCustomization());
 
-		// Setup test file paths
-		string testDataDir = Path.Combine(AppContext.BaseDirectory, "TestData");
+		// Optimizers rewrite files in place, so work on a private copy to avoid locking files other tests read in parallel
+		testDataDir = Path.Combine(Path.GetTempPath(), $"optimizer_test_{Guid.NewGuid():N}");
+		Directory.CreateDirectory(testDataDir);
+		foreach (string source in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "TestData")))
+		{
+			File.Copy(source, Path.Combine(testDataDir, Path.GetFileName(source)));
+		}
+
 		testPngPath = Path.Combine(testDataDir, "test.png");
 		testJpgPath = Path.Combine(testDataDir, "test.jpg");
 		testGifPath = Path.Combine(testDataDir, "test.gif");
@@ -60,7 +67,7 @@ public sealed class OptimizerTests : IDisposable
 	public async Task OptimizeImage_ShouldUseCorrectOptimizer_ForFileExtension(string fileName)
 	{
 		// Arrange
-		string testPath = Path.Combine(AppContext.BaseDirectory, "TestData", fileName);
+		string testPath = Path.Combine(testDataDir, fileName);
 
 		// Act
 		await Optimizer.OptimizeImage(testPath);
@@ -99,7 +106,7 @@ public sealed class OptimizerTests : IDisposable
 	public async Task OptimizeImage_ShouldSkipUnsupportedExtensions(string fileName)
 	{
 		// Arrange
-		string testPath = Path.Combine(AppContext.BaseDirectory, "TestData", fileName);
+		string testPath = Path.Combine(testDataDir, fileName);
 		long originalSize = new FileInfo(testPath).Length;
 
 		// Act
@@ -127,7 +134,7 @@ public sealed class OptimizerTests : IDisposable
 	public async Task OptimizeImage_ShouldAppendFilePathToArgs_WhenNotPresent(string[]? gifsicleArgs, string[]? jpegoptimArgs, string[]? optipngArgs, string fileName)
 	{
 		// Arrange
-		string testPath = Path.Combine(AppContext.BaseDirectory, "TestData", fileName);
+		string testPath = Path.Combine(testDataDir, fileName);
 
 		// Act & Assert
 		await Should.NotThrowAsync(async () => await Optimizer.OptimizeImage(testPath, gifsicleArgs, jpegoptimArgs, optipngArgs));
@@ -140,7 +147,7 @@ public sealed class OptimizerTests : IDisposable
 	public async Task OptimizeImage_ShouldHandleCommandFailure_WithInvalidArguments(string[]? gifsicleArgs, string[]? jpegoptimArgs, string[]? optipngArgs, string fileName)
 	{
 		// Arrange
-		string testPath = Path.Combine(AppContext.BaseDirectory, "TestData", fileName);
+		string testPath = Path.Combine(testDataDir, fileName);
 
 		// Act - pass invalid arguments to trigger command failure (result.IsSuccess == false)
 		await Optimizer.OptimizeImage(testPath, gifsicleArgs, jpegoptimArgs, optipngArgs);

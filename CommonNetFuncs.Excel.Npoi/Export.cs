@@ -11,7 +11,7 @@ using static CommonNetFuncs.Core.ReflectionCaches;
 namespace CommonNetFuncs.Excel.Npoi;
 
 /// <summary>
-/// Export data to an excel data using NPOI
+/// Export data to an excel file using NPOI
 /// </summary>
 public static class Export
 {
@@ -32,55 +32,10 @@ public static class Export
 	/// <param name="createTable">If <see langword="true"/>, will format the exported data into an Excel table.</param>
 	/// <param name="skipColumnNames">List of columns to not include in export</param>
 	/// <returns>MemoryStream containing en excel file with a tabular representation of dataList set to position 0</returns>
-	public static async Task<MemoryStream?> GenericExcelExport<T>(this IEnumerable<T> dataList, MemoryStream? memoryStream = null, bool createTable = false,
+	public static Task<MemoryStream?> GenericExcelExport<T>(this IEnumerable<T> dataList, MemoryStream? memoryStream = null, bool createTable = false,
 			string sheetName = "Data", string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false, CancellationToken cancellationToken = default)
 	{
-		try
-		{
-			if (string.IsNullOrWhiteSpace(sheetName))
-			{
-				sheetName = "Data";
-			}
-
-			if (string.IsNullOrWhiteSpace(tableName))
-			{
-				tableName = "Data";
-			}
-
-			if (sheetName.Length > 31)
-			{
-				throw new ArgumentOutOfRangeException(nameof(sheetName), "Sheet name cannot be longer than 31 characters");
-			}
-
-			if (tableName.Length > 31)
-			{
-				throw new ArgumentOutOfRangeException(nameof(tableName), TableNameLengthError);
-			}
-
-			memoryStream ??= new();
-
-			using SXSSFWorkbook wb = new();
-			ISheet ws = wb.CreateSheet(sheetName);
-			if (!dataList.ExcelExport(wb, ws, createTable, tableName, skipColumnNames, wrapText, cancellationToken))
-			{
-				return null;
-			}
-
-			await memoryStream.WriteFileToMemoryStreamAsync(wb, cancellationToken).ConfigureAwait(false);
-			wb.Close();
-
-			return memoryStream;
-		}
-		catch (OperationCanceledException)
-		{
-			throw new TaskCanceledException($"{nameof(Export)}.{nameof(GenericExcelExport)} was canceled");
-		}
-		catch (Exception ex)
-		{
-			logger.Error(ex, ErrorLocationTemplate, $"{nameof(Export)}.{nameof(GenericExcelExport)}");
-		}
-
-		return new();
+		return ExportToMemoryStreamAsync(memoryStream, sheetName, tableName, (wb, ws, normalizedTableName) => dataList.ExcelExport(wb, ws, createTable, normalizedTableName, skipColumnNames, wrapText, cancellationToken), cancellationToken);
 	}
 
 	/// <summary>
@@ -92,8 +47,14 @@ public static class Export
 	/// <param name="createTable">If <see langword="true"/>, will format the exported data into an Excel table.</param>
 	/// <param name="skipColumnNames">List of columns to not include in export</param>
 	/// <returns>MemoryStream containing en excel file with a tabular representation of dataList set to position 0</returns>
-	public static async Task<MemoryStream?> GenericExcelExport(this DataTable datatable, MemoryStream? memoryStream = null, bool createTable = false,
+	public static Task<MemoryStream?> GenericExcelExport(this DataTable datatable, MemoryStream? memoryStream = null, bool createTable = false,
 			string sheetName = "Data", string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false, CancellationToken cancellationToken = default)
+	{
+		return ExportToMemoryStreamAsync(memoryStream, sheetName, tableName, (wb, ws, normalizedTableName) => datatable.ExcelExport(wb, ws, createTable, normalizedTableName, skipColumnNames, wrapText, cancellationToken), cancellationToken);
+	}
+
+	private static async Task<MemoryStream?> ExportToMemoryStreamAsync(MemoryStream? memoryStream, string sheetName, string tableName, Func<SXSSFWorkbook, ISheet, string, bool> exportData,
+		CancellationToken cancellationToken)
 	{
 		try
 		{
@@ -121,7 +82,7 @@ public static class Export
 
 			using SXSSFWorkbook wb = new();
 			ISheet ws = wb.CreateSheet(sheetName);
-			if (!datatable.ExcelExport(wb, ws, createTable, tableName, skipColumnNames, wrapText, cancellationToken))
+			if (!exportData(wb, ws, tableName))
 			{
 				return null;
 			}
@@ -313,7 +274,6 @@ public static class Export
 				IRow currentRow = ws.GetRow(y) ?? ws.CreateRow(y);
 				foreach (string propName in props.Select(x => x.Name))
 				{
-					//ICell? c = ws.GetCellFromCoordinates(x, y);
 					ICell? c = currentRow.GetCell(x) ?? currentRow.CreateCell(x);
 					if (c != null)
 					{
@@ -340,7 +300,6 @@ public static class Export
 					{
 						object value = prop.GetValue(item) ?? string.Empty;
 
-						//ICell? c = ws.GetCellFromCoordinates(x, y);
 						ICell? c = currentRow.GetCell(x) ?? currentRow.CreateCell(x);
 						if (c != null)
 						{
@@ -372,7 +331,6 @@ public static class Export
 				{
 					for (int i = 0; i < props.Length; i++)
 					{
-						// ws.AutoSizeColumn(x, true);
 						ws.SetColumnWidth(x, (maxColumnWidths[x] <= MaxCellWidthInExcelUnits) ? maxColumnWidths[x] : MaxCellWidthInExcelUnits);
 						x++;
 					}
@@ -437,7 +395,6 @@ public static class Export
 				{
 					if (!skipColumnNames.Contains(column.ColumnName, StringComparer.InvariantCultureIgnoreCase))
 					{
-						//ICell? c = ws.GetCellFromCoordinates(x, y);
 						ICell? c = currentRow.GetCell(x) ?? currentRow.CreateCell(x);
 						if (c != null)
 						{
@@ -465,7 +422,6 @@ public static class Export
 					{
 						if ((value != null) && !skipColumns.Contains(x))
 						{
-							//ICell? c = ws.GetCellFromCoordinates(x, y);
 							ICell? c = currentRow.GetCell(x) ?? currentRow.CreateCell(x);
 							if (c != null)
 							{
@@ -498,7 +454,6 @@ public static class Export
 				{
 					for (int i = 0; i < data.Columns.Count; i++)
 					{
-						// ws.AutoSizeColumn(x, true);
 						ws.SetColumnWidth(x, (maxColumnWidths[x] + (Units.EMU_PER_PIXEL * 3) <= MaxCellWidthInExcelUnits) ? (maxColumnWidths[x] + (Units.EMU_PER_PIXEL * 3)) : MaxCellWidthInExcelUnits);
 						x++;
 					}

@@ -58,78 +58,6 @@ public static class Inspect
 		return hasAttribute;
 	}
 
-	///// <summary>
-	///// Compares two like objects against each other to check to see if they contain the same values
-	///// </summary>
-	///// <param name="obj1">First object to compare for value equality</param>
-	///// <param name="obj2">Second object to compare for value equality</param>
-	///// <returns><see langword="true"/> if the two objects have the same value for all elements, otherwise false</returns>
-	//[Obsolete("Please use IsEqual method instead")]
-	//public static bool IsEqualR(this object? obj1, object? obj2)
-	//{
-	//	return obj1.IsEqualR(obj2, null);
-	//}
-
-	///// <summary>
-	///// Compare two class objects for value equality
-	///// </summary>
-	///// <param name="obj1">First object to compare for value equality</param>
-	///// <param name="obj2">Second object to compare for value equality</param>
-	///// <param name="exemptProps">Names of properties to not include in the matching check</param>
-	///// <returns><see langword="true"/> if both objects contain identical values for all properties except for the ones identified by exemptProps, otherwise false</returns>
-	//[Obsolete("Please use IsEqual method instead")]
-	//public static bool IsEqualR(this object? obj1, object? obj2, IEnumerable<string>? exemptProps = null)
-	//{
-	//	// They're both null.
-	//	if ((obj1 == null) && (obj2 == null))
-	//	{
-	//		return true;
-	//	}
-
-	//	// One is null, so they can't be the same.
-	//	if ((obj1 == null) || (obj2 == null))
-	//	{
-	//		return false;
-	//	}
-
-	//	// How can they be the same if they're different types?
-	//	if (obj1.GetType() != obj1.GetType())
-	//	{
-	//		return false;
-	//	}
-
-	//	IEnumerable<PropertyInfo> props = GetOrAddPropertiesFromReflectionCache(obj1.GetType());
-	//	if (exemptProps?.Any() == true)
-	//	{
-	//		props = props.Where(x => exemptProps?.Contains(x.Name) != true);
-	//	}
-
-	//	foreach (PropertyInfo prop in props)
-	//	{
-	//		object aPropValue = prop.GetValue(obj1) ?? string.Empty;
-	//		object bPropValue = prop.GetValue(obj2) ?? string.Empty;
-
-	//		bool aIsNumeric = aPropValue.IsNumeric();
-	//		bool bIsNumeric = bPropValue.IsNumeric();
-
-	//		try
-	//		{
-	//			// This will prevent issues with numbers with varying decimal places from being counted as a difference
-	//			if ((aIsNumeric && bIsNumeric && (decimal.Parse(aPropValue.ToString()!) != decimal.Parse(bPropValue.ToString()!))) ||
-	//									(!(aIsNumeric && bIsNumeric) && !aPropValue.ToString().StrComp(bPropValue.ToString())))
-	//			{
-	//				return false;
-	//			}
-	//		}
-	//		catch (Exception ex)
-	//		{
-	//			logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
-	//			return false;
-	//		}
-	//	}
-	//	return true;
-	//}
-
 	// This class is used to track object pairs being compared
 	private sealed class ComparisonContext
 	{
@@ -276,7 +204,6 @@ public static class Inspect
 			}
 			else
 			{
-				// comparison = Expression.Equal(value1, value2);
 				comparison = Expression.Constant(true);
 			}
 
@@ -303,16 +230,8 @@ public static class Inspect
 			return "null";
 		}
 
-		HashAlgorithm algorithm = hashAlgorithm switch
-		{
-			EHashAlgorithm.SHA1 => SHA1.Create(),
-			EHashAlgorithm.MD5 => MD5.Create(),
-			EHashAlgorithm.SHA256 => SHA256.Create(),
-			EHashAlgorithm.SHA384 => SHA384.Create(),
-			_ => SHA512.Create()
-		};
-
-		IOrderedEnumerable<PropertyInfo> properties = GetOrAddPropertiesFromReflectionCache(typeof(T)).Where(x => x.CanRead).OrderBy(x => x.Name);
+		HashAlgorithm algorithm = CreateHashAlgorithm(hashAlgorithm);
+		IOrderedEnumerable<PropertyInfo> properties = GetReadablePropertiesOrderedByName(typeof(T));
 
 		using MemoryStream ms = new();
 		using BinaryWriter writer = new(ms);
@@ -341,16 +260,8 @@ public static class Inspect
 			return "null";
 		}
 
-		HashAlgorithm algorithm = hashAlgorithm switch
-		{
-			EHashAlgorithm.SHA1 => SHA1.Create(),
-			EHashAlgorithm.MD5 => MD5.Create(),
-			EHashAlgorithm.SHA256 => SHA256.Create(),
-			EHashAlgorithm.SHA384 => SHA384.Create(),
-			_ => SHA512.Create()
-		};
-
-		IOrderedEnumerable<PropertyInfo> properties = GetOrAddPropertiesFromReflectionCache(typeof(T)).Where(x => x.CanRead).OrderBy(x => x.Name);
+		HashAlgorithm algorithm = CreateHashAlgorithm(hashAlgorithm);
+		IOrderedEnumerable<PropertyInfo> properties = GetReadablePropertiesOrderedByName(typeof(T));
 
 		await using MemoryStream ms = new();
 		await using BinaryWriter writer = new(ms);
@@ -365,6 +276,42 @@ public static class Inspect
 		await ms.FlushAsync().ConfigureAwait(false);
 		ms.Position = 0; // Reset stream position for reading
 		return HashCompat.ToHexStringLower(await algorithm.ComputeHashAsync(ms).ConfigureAwait(false));
+	}
+
+	private static HashAlgorithm CreateHashAlgorithm(EHashAlgorithm hashAlgorithm)
+	{
+		return hashAlgorithm switch
+		{
+			EHashAlgorithm.SHA1 => SHA1.Create(),
+			EHashAlgorithm.MD5 => MD5.Create(),
+			EHashAlgorithm.SHA256 => SHA256.Create(),
+			EHashAlgorithm.SHA384 => SHA384.Create(),
+			_ => SHA512.Create()
+		};
+	}
+
+	private static IOrderedEnumerable<PropertyInfo> GetReadablePropertiesOrderedByName(Type type)
+	{
+		return GetOrAddPropertiesFromReflectionCache(type).Where(x => x.CanRead).OrderBy(x => x.Name);
+	}
+
+	// Sorts the hashes so the collection's hash doesn't depend on element order.
+	private static void WriteSortedItemHashes(BinaryWriter writer, List<string> itemHashes)
+	{
+		itemHashes.Sort();
+
+		writer.Write("[");
+		foreach (string itemHash in itemHashes)
+		{
+			writer.Write(itemHash);
+			writer.Write(",");
+		}
+		writer.Write("]");
+	}
+
+	private static bool IsSimpleValue(Type type, object value)
+	{
+		return type.IsPrimitive || (value is string) || (value is decimal);
 	}
 
 	/// <summary>
@@ -395,29 +342,19 @@ public static class Inspect
 				itemHashes.Add(BitConverter.ToString(HashCompat.Md5HashData(itemMs.ToArray())));
 			}
 
-			// Sort the hashes to ensure order independence
-			itemHashes.Sort();
-
-			// Write the sorted collection
-			writer.Write("[");
-			foreach (string itemHash in itemHashes)
-			{
-				writer.Write(itemHash);
-				writer.Write(",");
-			}
-			writer.Write("]");
+			WriteSortedItemHashes(writer, itemHashes);
 			return;
 		}
 
 		// Handle primitive types and strings
-		if (type.IsPrimitive || (value is string) || (value is decimal))
+		if (IsSimpleValue(type, value))
 		{
 			writer.Write(value.ToString()!);
 			return;
 		}
 
 		// Handle complex objects recursively
-		IOrderedEnumerable<PropertyInfo> properties = GetOrAddPropertiesFromReflectionCache(type).Where(x => x.CanRead).OrderBy(x => x.Name);
+		IOrderedEnumerable<PropertyInfo> properties = GetReadablePropertiesOrderedByName(type);
 
 		writer.Write("{");
 		foreach (PropertyInfo property in properties)
@@ -458,29 +395,19 @@ public static class Inspect
 				itemHashes.Add(BitConverter.ToString(await HashCompat.Md5HashDataAsync(itemMs).ConfigureAwait(false)));
 			}
 
-			// Sort the hashes to ensure order independence
-			itemHashes.Sort();
-
-			// Write the sorted collection
-			writer.Write("[");
-			foreach (string itemHash in itemHashes)
-			{
-				writer.Write(itemHash);
-				writer.Write(",");
-			}
-			writer.Write("]");
+			WriteSortedItemHashes(writer, itemHashes);
 			return;
 		}
 
 		// Handle primitive types and strings
-		if (type.IsPrimitive || (value is string) || (value is decimal))
+		if (IsSimpleValue(type, value))
 		{
 			writer.Write(value.ToString()!);
 			return;
 		}
 
 		// Handle complex objects recursively
-		IOrderedEnumerable<PropertyInfo> properties = GetOrAddPropertiesFromReflectionCache(type).Where(x => x.CanRead).OrderBy(x => x.Name);
+		IOrderedEnumerable<PropertyInfo> properties = GetReadablePropertiesOrderedByName(type);
 
 		writer.Write("{");
 		foreach (PropertyInfo property in properties)

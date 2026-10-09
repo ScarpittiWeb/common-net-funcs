@@ -50,7 +50,7 @@ public sealed class ValidationEndpointFilter(IServiceProviderIsService serviceCh
 			}
 		}
 
-		return await next(context);
+		return await next(context).ConfigureAwait(false);
 	}
 
 	private bool ShouldValidate(Type type)

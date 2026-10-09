@@ -14,7 +14,7 @@ This lightweight project contains helper methods for several common functions re
     - [SshFtp Usage Examples](#sshftp-usage-examples)
       - [Connect / ConnectAsync](#connect--connectasync)
       - [GetFileList / GetFileListAsync](#getfilelist--getfilelistasync)
-      - [GetDataFromCsvAsync](#getdatafromcsvAsync)
+      - [GetDataFromCsvAsync](#getdatafromcsvasync)
       - [UploadFile / UploadFileAsync](#uploadfile--uploadfileasync)
       - [DeleteFile / DeleteFileAsync](#deletefile--deletefileasync)
   - [SshFtpService](#sshftpservice)

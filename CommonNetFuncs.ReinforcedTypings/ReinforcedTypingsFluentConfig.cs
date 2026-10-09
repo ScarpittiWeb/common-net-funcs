@@ -71,16 +71,16 @@ public static class ReinforcedTypingsFluentConfig
 			? builder.Context.SourceAssemblies
 			: [typeof(ReinforcedTypingsFluentConfig).Assembly];
 
-		Type[] allTypes = sourceAssemblies.AsValueEnumerable().SelectMany(a => a.GetTypes()).ToArray();
+		Type[] allTypes = sourceAssemblies.AsValueEnumerable().SelectMany(x => x.GetTypes()).ToArray();
 
 		// ── Valibot schema generation ──────────────────────────────────────────
 		Type[] schemaTypes = allTypes
-			.Where(t => t.GetCustomAttribute<TsInterfaceAttribute>() != null && t.GetCustomAttribute<GenerateValibotSchemaAttribute>() != null)
+			.Where(x => x.GetCustomAttribute<TsInterfaceAttribute>() != null && x.GetCustomAttribute<GenerateValibotSchemaAttribute>() != null)
 			.ToArray();
 
 		if (schemaTypes.Length > 0)
 		{
-			builder.ExportAsInterfaces(schemaTypes, config => config.WithCodeGenerator<ValibotSchemaGenerator>());
+			builder.ExportAsInterfaces(schemaTypes, x => x.WithCodeGenerator<ValibotSchemaGenerator>());
 		}
 
 		// Resolved once from the consuming project's own RT settings (RtTargetDirectory when
@@ -95,8 +95,8 @@ public static class ReinforcedTypingsFluentConfig
 		// A type may carry both attributes at once - generate a single combined file per type (const
 		// section followed by collections section) instead of writing each independently, which would
 		// otherwise overwrite the other's output since they'd resolve to the same file path.
-		HashSet<Type> constTypes = allTypes.Where(t => t.GetCustomAttribute<TsConstAttribute>() != null).ToHashSet();
-		HashSet<Type> collectionTypes = allTypes.Where(t => t.GetCustomAttribute<TsCollectionAttribute>() != null).ToHashSet();
+		HashSet<Type> constTypes = allTypes.Where(x => x.GetCustomAttribute<TsConstAttribute>() != null).ToHashSet();
+		HashSet<Type> collectionTypes = allTypes.Where(x => x.GetCustomAttribute<TsCollectionAttribute>() != null).ToHashSet();
 
 		if (outputDir != null)
 		{
@@ -149,8 +149,8 @@ public static class ReinforcedTypingsFluentConfig
 			return string.Empty;
 		}
 
-		StringBuilder sb = new();
-		void Line(string text = "") => sb.Append(text).Append(global.NewLine);
+		StringBuilder stringBuilder = new();
+		void Line(string text = "") => stringBuilder.Append(text).Append(global.NewLine);
 
 		if (global.WriteWarningComment)
 		{
@@ -176,7 +176,7 @@ public static class ReinforcedTypingsFluentConfig
 
 		if (constBody.Length > 0)
 		{
-			sb.Append(constBody);
+			stringBuilder.Append(constBody);
 		}
 
 		if ((constBody.Length > 0) && (collectionBody.Length > 0))
@@ -186,7 +186,7 @@ public static class ReinforcedTypingsFluentConfig
 
 		if (collectionBody.Length > 0)
 		{
-			sb.Append(collectionBody);
+			stringBuilder.Append(collectionBody);
 		}
 
 		if (wrapInNamespace)
@@ -194,8 +194,12 @@ public static class ReinforcedTypingsFluentConfig
 			Line("}");
 		}
 
-		return sb.ToString();
+		return stringBuilder.ToString();
 	}
+
+	private const string ExportConstPrefix = "export const";
+	private const string StringType = "string";
+	private const string NumberType = "number";
 
 	/// <summary>
 	/// Generates the <c>[TsConst]</c> body (an <c>as const</c> object literal, or an ambient shape
@@ -207,8 +211,8 @@ public static class ReinforcedTypingsFluentConfig
 	/// </summary>
 	private static string GenerateTsConstBody(Type type, TsConstExportMode mode, GlobalParameters global, string indent, bool needsExport, bool wrapInNamespace)
 	{
-		StringBuilder sb = new();
-		void Line(string text = "") => sb.Append(text).Append(global.NewLine);
+		StringBuilder stringBuilder = new();
+		void Line(string text = "") => stringBuilder.Append(text).Append(global.NewLine);
 
 		List<(string PropName, object? Value, Type FieldType)> fields = [];
 		foreach (FieldInfo field in type.GetFields(BindingFlags.Public | BindingFlags.Static))
@@ -232,23 +236,36 @@ public static class ReinforcedTypingsFluentConfig
 			// Pure-typings mode emits an ambient shape declaration only (no runtime implementation),
 			// matching RT's own ".d.ts only" export convention. Literal value syntax doubles as
 			// TypeScript literal-type syntax, so the same serialization is reused for the typing.
-			string declarePrefix = wrapInNamespace ? "export const" : needsExport ? "export declare const" : "declare const";
-			Line($"{indent}{declarePrefix} {type.Name}: {{");
-			foreach ((string propName, object? value, Type fieldType) in fields)
+			string declarePrefix;
+			if (wrapInNamespace)
 			{
-				Line($"{indent}{global.TabSymbol}readonly {propName}: {SerializeTsValue(value, fieldType, global)};");
+				declarePrefix = ExportConstPrefix;
+			}
+			else if(needsExport)
+			{
+				declarePrefix = "export declare const";
+			}
+			else
+			{
+				declarePrefix = "declare const";
+			}
+
+			Line($"{indent}{declarePrefix} {type.Name}: {{");
+			foreach ((string propName, object? value, Type _) in fields)
+			{
+				Line($"{indent}{global.TabSymbol}readonly {propName}: {SerializeTsValue(value, global)};");
 			}
 			Line($"{indent}}};");
 		}
 		else
 		{
-			string declKeyword = needsExport ? "export const" : "const";
+			string declKeyword = needsExport ? ExportConstPrefix : "const";
 			string typeKeyword = needsExport ? "export type" : "type";
 
 			Line($"{indent}{declKeyword} {type.Name} = {{");
-			foreach ((string propName, object? value, Type fieldType) in fields)
+			foreach ((string propName, object? value, Type _) in fields)
 			{
-				Line($"{indent}{global.TabSymbol}{propName}: {SerializeTsValue(value, fieldType, global)},");
+				Line($"{indent}{global.TabSymbol}{propName}: {SerializeTsValue(value, global)},");
 			}
 			Line($"{indent}}} as const;");
 			Line();
@@ -256,7 +273,7 @@ public static class ReinforcedTypingsFluentConfig
 			Line($"{indent}{typeKeyword} {type.Name}Value = (typeof {type.Name})[{type.Name}Key];");
 		}
 
-		return sb.ToString();
+		return stringBuilder.ToString();
 	}
 
 	/// <summary>
@@ -265,26 +282,26 @@ public static class ReinforcedTypingsFluentConfig
 	/// </summary>
 	private static readonly Dictionary<Type, string> BasicTsTypeMap = new()
 	{
-		[typeof(string)] = "string",
-		[typeof(char)] = "string",
-		[typeof(Guid)] = "string",
-		[typeof(DateTime)] = "string",
-		[typeof(DateTimeOffset)] = "string",
-		[typeof(DateOnly)] = "string",
-		[typeof(TimeOnly)] = "string",
-		[typeof(TimeSpan)] = "string",
+		[typeof(string)] = StringType,
+		[typeof(char)] = StringType,
+		[typeof(Guid)] = StringType,
+		[typeof(DateTime)] = StringType,
+		[typeof(DateTimeOffset)] = StringType,
+		[typeof(DateOnly)] = StringType,
+		[typeof(TimeOnly)] = StringType,
+		[typeof(TimeSpan)] = StringType,
 		[typeof(bool)] = "boolean",
-		[typeof(byte)] = "number",
-		[typeof(sbyte)] = "number",
-		[typeof(short)] = "number",
-		[typeof(ushort)] = "number",
-		[typeof(int)] = "number",
-		[typeof(uint)] = "number",
-		[typeof(long)] = "number",
-		[typeof(ulong)] = "number",
-		[typeof(float)] = "number",
-		[typeof(double)] = "number",
-		[typeof(decimal)] = "number",
+		[typeof(byte)] = NumberType,
+		[typeof(sbyte)] = NumberType,
+		[typeof(short)] = NumberType,
+		[typeof(ushort)] = NumberType,
+		[typeof(int)] = NumberType,
+		[typeof(uint)] = NumberType,
+		[typeof(long)] = NumberType,
+		[typeof(ulong)] = NumberType,
+		[typeof(float)] = NumberType,
+		[typeof(double)] = NumberType,
+		[typeof(decimal)] = NumberType,
 	};
 
 	/// <summary>
@@ -353,7 +370,7 @@ public static class ReinforcedTypingsFluentConfig
 		// so referenced types are addressed via their fully namespace-qualified name instead.
 		Dictionary<FieldInfo, string> fieldCastTypes = [];
 
-		foreach ((FieldInfo field, Type elementType) in collectionFields)
+		foreach ((FieldInfo field, Type _) in collectionFields)
 		{
 			string tsType = fieldTsTypes[field];
 			if (!fieldReferencedTypes.TryGetValue(field, out Type? referencedType))
@@ -374,12 +391,25 @@ public static class ReinforcedTypingsFluentConfig
 		}
 
 		// ── Emit the body ───────────────────────────────────────────────────────
-		StringBuilder sb = new();
-		void Line(string text = "") => sb.Append(text).Append(global.NewLine);
+		StringBuilder stringBuilder = new();
+		void Line(string text = "") => stringBuilder.Append(text).Append(global.NewLine);
 
 		if (global.ExportPureTypings)
 		{
-			string declarePrefix = wrapInNamespace ? "export const" : needsExport ? "export declare const" : "declare const";
+			string declarePrefix;
+			if (wrapInNamespace)
+			{
+				declarePrefix = ExportConstPrefix;
+			}
+			else if (needsExport)
+			{
+				declarePrefix = "export declare const";
+			}
+			else
+			{
+				declarePrefix = "declare const";
+			}
+
 			Line($"{indent}{declarePrefix} {type.Name}Collections: {{");
 			foreach ((FieldInfo field, _) in collectionFields)
 			{
@@ -390,14 +420,14 @@ public static class ReinforcedTypingsFluentConfig
 		}
 		else
 		{
-			string declKeyword = needsExport ? "export const" : "const";
+			string declKeyword = needsExport ? ExportConstPrefix : "const";
 			string typeKeyword = needsExport ? "export type" : "type";
 
 			Line($"{indent}{declKeyword} {type.Name}Collections = {{");
-			foreach ((FieldInfo field, Type elementType) in collectionFields)
+			foreach ((FieldInfo field, Type _) in collectionFields)
 			{
 				object? rawValue = field.GetValue(null);
-				string arrayLiteral = SerializeCollectionLiteral(rawValue, elementType, global);
+				string arrayLiteral = SerializeCollectionLiteral(rawValue, global);
 				string propName = ToPropertyName(field.Name, global);
 				Line($"{indent}{global.TabSymbol}{propName}: {arrayLiteral} as {fieldCastTypes[field]}[],");
 			}
@@ -407,7 +437,7 @@ public static class ReinforcedTypingsFluentConfig
 			Line($"{indent}{typeKeyword} {type.Name}CollectionsValue = (typeof {type.Name}Collections)[{type.Name}CollectionsKey];");
 		}
 
-		return (sb.ToString(), imports);
+		return (stringBuilder.ToString(), imports);
 	}
 
 	/// <summary>
@@ -438,7 +468,7 @@ public static class ReinforcedTypingsFluentConfig
 			return fieldType.GetGenericArguments()[0];
 		}
 
-		Type? enumerableInterface = fieldType.GetInterfaces().FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
+		Type? enumerableInterface = fieldType.GetInterfaces().FirstOrDefault(x => x.IsGenericType && x.GetGenericTypeDefinition() == typeof(IEnumerable<>));
 
 		return enumerableInterface?.GetGenericArguments()[0];
 	}
@@ -504,7 +534,7 @@ public static class ReinforcedTypingsFluentConfig
 	/// <c>public static readonly List&lt;T&gt;</c> field) into a TypeScript array literal, recursively
 	/// serializing class-typed elements as object literals.
 	/// </summary>
-	private static string SerializeCollectionLiteral(object? rawValue, Type elementType, GlobalParameters global)
+	private static string SerializeCollectionLiteral(object? rawValue, GlobalParameters global)
 	{
 		if (rawValue is not IEnumerable enumerable || rawValue is string)
 		{
@@ -514,7 +544,7 @@ public static class ReinforcedTypingsFluentConfig
 		List<string> items = [];
 		foreach (object? item in enumerable)
 		{
-			items.Add(SerializeTsValue(item, elementType, global));
+			items.Add(SerializeTsValue(item, global));
 		}
 
 		return $"[{string.Join(", ", items)}]";
@@ -525,7 +555,7 @@ public static class ReinforcedTypingsFluentConfig
 	/// enums (respecting <c>[TsEnum(UseString = true)]</c>), nested collections, and class/record
 	/// instances (recursively emitted as object literals, honoring <c>[TsIgnore]</c> on properties).
 	/// /// </summary>
-	private static string SerializeTsValue(object? value, Type declaredType, GlobalParameters global)
+	private static string SerializeTsValue(object? value, GlobalParameters global)
 	{
 		if (value is null)
 		{
@@ -558,7 +588,7 @@ public static class ReinforcedTypingsFluentConfig
 		Type? nestedElementType = GetCollectionElementType(valueType);
 		if (nestedElementType != null && value is IEnumerable nestedEnumerable)
 		{
-			return SerializeCollectionLiteral(nestedEnumerable, nestedElementType, global);
+			return SerializeCollectionLiteral(nestedEnumerable, global);
 		}
 
 		return SerializeTsObjectLiteral(value, valueType, global);
@@ -583,13 +613,13 @@ public static class ReinforcedTypingsFluentConfig
 
 			object? propValue = prop.GetValue(value);
 			string propName = ToPropertyName(prop.Name, global);
-			propEntries.Add($"{propName}: {SerializeTsValue(propValue, prop.PropertyType, global)}");
+			propEntries.Add($"{propName}: {SerializeTsValue(propValue, global)}");
 		}
 
 		return $"{{ {string.Join(", ", propEntries)} }}";
 	}
 
-	private static string EscapeTs(string value) => value.Replace("\\", "\\\\").Replace("'", "\\'");
+	private static string EscapeTs(string x) => x.Replace("\\", "\\\\").Replace("'", "\\'");
 
 	/// <summary>
 	/// Applies <paramref name="global"/>.<c>CamelCaseForProperties</c> to a field/property name,
@@ -608,8 +638,8 @@ public static class ReinforcedTypingsFluentConfig
 	/// </summary>
 	private static string? ResolveTsNamespace(Type type, GlobalParameters global)
 	{
-		string? ns = type.Namespace;
-		if (string.IsNullOrEmpty(ns))
+		string? typeNamespace = type.Namespace;
+		if (string.IsNullOrEmpty(typeNamespace))
 		{
 			return null;
 		}
@@ -617,18 +647,18 @@ public static class ReinforcedTypingsFluentConfig
 		string? root = global.RootNamespace;
 		if (!string.IsNullOrEmpty(root))
 		{
-			if (ns.Equals(root, StringComparison.Ordinal))
+			if (typeNamespace.Equals(root, StringComparison.Ordinal))
 			{
 				return null;
 			}
 
-			if (ns.StartsWith(root + ".", StringComparison.Ordinal))
+			if (typeNamespace.StartsWith(root + ".", StringComparison.Ordinal))
 			{
-				ns = ns[(root.Length + 1)..];
+				typeNamespace = typeNamespace[(root.Length + 1)..];
 			}
 		}
 
-		return string.IsNullOrEmpty(ns) ? null : ns;
+		return string.IsNullOrEmpty(typeNamespace) ? null : typeNamespace;
 	}
 
 	/// <summary>
@@ -637,7 +667,7 @@ public static class ReinforcedTypingsFluentConfig
 	/// <c>DiscardNamespacesWhenUsingModules</c> only takes effect when <c>UseModules</c> is <c>true</c>;
 	/// when not using ES modules, namespaces always factor into file arrangement.
 	/// </summary>
-	private static bool ShouldFlattenNamespaceFolders(GlobalParameters global) => global.UseModules && global.DiscardNamespacesWhenUsingModules;
+	private static bool ShouldFlattenNamespaceFolders(GlobalParameters x) => x.UseModules && x.DiscardNamespacesWhenUsingModules;
 
 	/// <summary>
 	/// Returns the namespace-derived relative directory (forward-slash separated; empty when flat)
@@ -708,7 +738,21 @@ public static class ReinforcedTypingsFluentConfig
 			string.IsNullOrEmpty(fromDir) ? "." : fromDir,
 			string.IsNullOrEmpty(toDir) ? "." : toDir).Replace('\\', '/');
 
-		string prefix = rel == "." ? string.Empty : rel.StartsWith("..", StringComparison.Ordinal) ? $"{rel}/" : $"./{rel}/";
+		string prefix;
+
+		if(rel == ".")
+		{
+			prefix = string.Empty;
+		}
+		else if(rel.StartsWith("..", StringComparison.Ordinal))
+		{
+			prefix = $"{rel}/";
+		}
+		else
+		{
+			prefix = $"./{rel}/";
+		}
+
 		return $"{prefix}{to.Name}";
 	}
 

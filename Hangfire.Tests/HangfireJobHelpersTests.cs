@@ -61,7 +61,7 @@ public sealed class HangfireJobHelpersTests
 			.Returns(scheduledJobs ?? new JobList<ScheduledJobDto>([]));
 
 		A.CallTo(() => connection.GetJobParameter(A<string>._, "Queue"))
-			.Returns(connectionJobQueue);
+			.Returns(connectionJobQueue!);
 
 		JobStorage.Current = storage;
 		return (storage, monitoringApi, connection);
@@ -281,7 +281,7 @@ public sealed class HangfireJobHelpersTests
 	{
 		// Arrange — null means "no queue recorded", conservatively allow it
 		IStorageConnection connection = A.Fake<IStorageConnection>();
-		A.CallTo(() => connection.GetJobParameter("job-1", "Queue")).Returns(null);
+		A.CallTo(() => connection.GetJobParameter("job-1", "Queue")).Returns(null!);
 
 		// Act
 		bool result = HangfireJobHelpers.IsJobInQueue("job-1", "my-queue", connection);
@@ -409,7 +409,7 @@ public sealed class HangfireJobHelpersTests
 		JobStorage storage = A.Fake<JobStorage>();
 		IStorageConnection connection = A.Fake<IStorageConnection>();
 		A.CallTo(() => storage.GetConnection()).Returns(connection);
-		A.CallTo(() => connection.GetJobParameter(A<string>._, "Queue")).Returns(null);
+		A.CallTo(() => connection.GetJobParameter(A<string>._, "Queue")).Returns(null!);
 		JobStorage.Current = storage;
 
 		// Act

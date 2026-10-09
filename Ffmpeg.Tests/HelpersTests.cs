@@ -751,7 +751,7 @@ public sealed class HelpersTests : IDisposable
 	private static DataReceivedEventArgs CreateDataReceivedEventArgs(string? data)
 	{
 		// Use reflection to create DataReceivedEventArgs since it has no public constructor
-		DataReceivedEventArgs args = (DataReceivedEventArgs)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(DataReceivedEventArgs))!;
+		DataReceivedEventArgs args = (DataReceivedEventArgs)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(DataReceivedEventArgs));
 
 		// Set the Data property using reflection
 		System.Reflection.FieldInfo? dataField = typeof(DataReceivedEventArgs).GetField("_data", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);

@@ -67,7 +67,7 @@ public sealed partial class BaseDbContextActionsTests
 
 		// Assert
 		result.ShouldNotBeNull();
-		result!.Id.ShouldBe(entity.Id);
+		result.Id.ShouldBe(entity.Id);
 	}
 
 	[Theory]
@@ -87,7 +87,7 @@ public sealed partial class BaseDbContextActionsTests
 
 		// Assert
 		result.ShouldNotBeNull();
-		result!.Id.ShouldBe(entity.Id);
+		result.Id.ShouldBe(entity.Id);
 	}
 
 	[Fact]
@@ -102,7 +102,7 @@ public sealed partial class BaseDbContextActionsTests
 		TestEntity? result = await testDbContext.GetByKeyFull(new object[] { entity.Id }, cancellationToken: Current.CancellationToken);
 
 		result.ShouldNotBeNull();
-		result!.Id.ShouldBe(entity.Id);
+		result.Id.ShouldBe(entity.Id);
 	}
 
 	[Fact]
@@ -234,7 +234,7 @@ public sealed partial class BaseDbContextActionsTests
 		List<string>? results = await testDbContext.GetAll(x => x.Name, cancellationToken: Current.CancellationToken);
 
 		results.ShouldNotBeNull();
-		results!.Count.ShouldBe(entities.Count);
+		results.Count.ShouldBe(entities.Count);
 		results.ShouldAllBe(x => !string.IsNullOrEmpty(x));
 	}
 
@@ -250,7 +250,7 @@ public sealed partial class BaseDbContextActionsTests
 		List<string>? results = await testDbContext.GetAllFull(x => x.Name, cancellationToken: Current.CancellationToken);
 
 		results.ShouldNotBeNull();
-		results!.Count.ShouldBe(entities.Count);
+		results.Count.ShouldBe(entities.Count);
 		results.ShouldAllBe(x => !string.IsNullOrEmpty(x));
 	}
 
@@ -669,7 +669,7 @@ public sealed partial class BaseDbContextActionsTests
 		List<string>? results = await testDbContext.GetWithFilter(filter, x => x.Name, cancellationToken: Current.CancellationToken);
 
 		results.ShouldNotBeNull();
-		results!.Count.ShouldBe(1);
+		results.Count.ShouldBe(1);
 		results[0].ShouldBe(target.Name);
 	}
 
@@ -689,7 +689,7 @@ public sealed partial class BaseDbContextActionsTests
 		List<string>? results = await testDbContext.GetWithFilter(full, filter, x => x.Name, cancellationToken: Current.CancellationToken);
 
 		results.ShouldNotBeNull();
-		results!.Count.ShouldBe(1);
+		results.Count.ShouldBe(1);
 		results[0].ShouldBe(target.Name);
 	}
 
@@ -707,7 +707,7 @@ public sealed partial class BaseDbContextActionsTests
 		List<string>? results = await testDbContext.GetWithFilterFull(filter, x => x.Name, cancellationToken: Current.CancellationToken);
 
 		results.ShouldNotBeNull();
-		results!.Count.ShouldBe(1);
+		results.Count.ShouldBe(1);
 		results[0].ShouldBe(target.Name);
 	}
 
@@ -1998,7 +1998,7 @@ public sealed partial class BaseDbContextActionsTests
 		TestEntity? result = await testDbContext.GetMinByOrder(_ => true, x => x.Id, cancellationToken: Current.CancellationToken);
 
 		result.ShouldNotBeNull();
-		result!.Id.ShouldBe(entities.Min(x => x.Id));
+		result.Id.ShouldBe(entities.Min(x => x.Id));
 	}
 
 	[Theory]
@@ -2015,7 +2015,7 @@ public sealed partial class BaseDbContextActionsTests
 		TestEntity? result = await testDbContext.GetMinByOrder(full, _ => true, x => x.Id, cancellationToken: Current.CancellationToken);
 
 		result.ShouldNotBeNull();
-		result!.Id.ShouldBe(entities.Min(x => x.Id));
+		result.Id.ShouldBe(entities.Min(x => x.Id));
 	}
 
 	[Fact]

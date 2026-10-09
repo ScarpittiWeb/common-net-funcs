@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using Xabe.FFmpeg;
 using Xabe.FFmpeg.Exceptions;
 using static CommonNetFuncs.Core.Collections;
@@ -54,7 +55,7 @@ public static class ConversionTask
 				CancellationTokenSource? cancellationTokenSource = null)
 	{
 		return FfmpegConversionTask(fileToConvert, outputFileName, workingPath, codec, outputFormat, conversionPreset, conversionIndex, fpsDict, mediaInfo, null, numberOfThreads, cancelIfLarger,
-						taskDescription, strict, overwriteOutput, processPriority, hardwareAccelerationValues, conversionOutputs, additionalLogText, cancellationTokenSource);
+			taskDescription, strict, overwriteOutput, processPriority, hardwareAccelerationValues, conversionOutputs, additionalLogText, cancellationTokenSource);
 	}
 
 	/// <summary>
@@ -103,7 +104,7 @@ public static class ConversionTask
 			DateTime lastOutput3 = DateTime.UtcNow.AddSeconds(-6);
 
 			Conversion conversion = new();
-			mediaInfo ??= await FFmpeg.GetMediaInfo($"{fileToConvert.@FullName}").ConfigureAwait(false);
+			mediaInfo ??= await FFmpeg.GetMediaInfo($"{fileToConvert.@FullName}", cancellationTokenSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
 			IVideoStream? videoStream = mediaInfo.VideoStreams.FirstOrDefault();
 			IAudioStream? audioStream = mediaInfo.AudioStreams.FirstOrDefault();
 
@@ -175,11 +176,11 @@ public static class ConversionTask
 				if (strict)
 				{
 					conversion.AddParameter("-strict -2");
-					await conversion.Start(cancellationTokenSource.Token).ConfigureAwait(false);
+					await conversion.Start(cancellationTokenSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
 				}
 				else
 				{
-					await conversion.Start(cancellationTokenSource.Token).ConfigureAwait(false);
+					await conversion.Start(cancellationTokenSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
 				}
 			}
 			catch (OperationCanceledException ex)
@@ -189,12 +190,17 @@ public static class ConversionTask
 				conversionFailed = true;
 			}
 
-			//await Console.Out.WriteLineAsync($"Finished conversion file [{fileToConvert.Name}]");
 			logger.Info($"Finished conversion for #{conversionIndex} [{fileToConvert.Name}] with {(conversionFailed ? "[FAILED]" : "[SUCCESS]")} Status");
 		}
 		catch (ConversionException cex)
 		{
 			logger.Error(cex, "Conversion task failed!");
+		}
+		catch (Exception ex) when (cancellationTokenSource.IsCancellationRequested && ex is OperationCanceledException or ArgumentException or JsonException)
+		{
+			//Cancelling while ffprobe is still reading the file makes Xabe throw ArgumentException("Invalid file...") or JsonException (empty ffprobe output) instead of OperationCanceledException
+			logger.Warn(ex, $"Conversion of file [{fileToConvert.Name}] canceled before ffmpeg started.");
+			conversionFailed = true;
 		}
 		finally
 		{

@@ -25,7 +25,7 @@ public static class WaitForHangfireJobsToComplete
 			// Check if we've exceeded the maximum wait time
 			if (DateTime.UtcNow - startTime > maxWaitTime)
 			{
-				logger.Warn("Maximum wait time of {maxWait} minutes exceeded. Some jobs may still be pending.", maxWaitMinutes);
+				logger.Warn("Maximum wait time of {MaxWait} minutes exceeded. Some jobs may still be pending.", maxWaitMinutes);
 				break;
 			}
 
@@ -45,10 +45,10 @@ public static class WaitForHangfireJobsToComplete
 			}
 
 			logger.Info(
-				"Waiting for {total} Hangfire job(s): {enqueued} enqueued, {processing} processing, {scheduled} scheduled",
+				"Waiting for {Total} Hangfire job(s): {Enqueued} enqueued, {Processing} processing, {Scheduled} scheduled",
 				totalPendingJobs, enqueuedCount, processingCount, scheduledCount);
 
-			await Task.Delay(TimeSpan.FromSeconds(checkIntervalSeconds));
+			await Task.Delay(TimeSpan.FromSeconds(checkIntervalSeconds)).ConfigureAwait(false);
 		}
 	}
 }

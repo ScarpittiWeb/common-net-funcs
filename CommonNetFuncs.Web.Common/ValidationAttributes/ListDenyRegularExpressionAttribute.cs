@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -58,25 +58,7 @@ public sealed class ListDenyRegularExpressionAttribute : ValidationAttribute
 	{
 		SetupRegex();
 
-		if (value is null)
-		{
-			return ValidationResult.Success;
-		}
-
-		string memberName = validationContext.MemberName ?? string.Empty;
-
-		// Handle different types of collections
-		if (value is IEnumerable<string?> or IEnumerable<string>)
-		{
-			ValidationResult? result = ValidateEnumerable((IEnumerable<string?>)value, memberName);
-			return result ?? ValidationResult.Success;
-		}
-		else if (value.GetType().IsEnumerable())
-		{
-			ValidationResult? result = ValidateEnumerable(((IEnumerable)value).Cast<object?>().Select(x => Convert.ToString(x, CultureInfo.CurrentCulture)), memberName);
-			return result ?? ValidationResult.Success;
-		}
-		throw new InvalidDataException($"${nameof(ListDenyRegularExpressionAttribute)} can only be used on properties that implement IEnumerable");
+		return ValidationAttributeHelpers.ValidateStringList(value, validationContext, nameof(ListDenyRegularExpressionAttribute), ValidateEnumerable);
 	}
 
 	private ValidationResult? ValidateEnumerable(IEnumerable<string?> values, string memberName)
@@ -84,36 +66,13 @@ public sealed class ListDenyRegularExpressionAttribute : ValidationAttribute
 		int index = 0;
 		foreach (string? item in values)
 		{
-			if (!string.IsNullOrEmpty(item)) // Null / empty passes automatically
+			// Null / empty passes automatically. Denies any match in the string, or only a match of the entire string when DenyOnlyFullMatch is set
+			if (!string.IsNullOrEmpty(item) && (DenyOnlyFullMatch ? ValidationAttributeHelpers.HasFullMatch(Regex!, item) : Regex!.IsMatch(item)))
 			{
-				bool failsValidation = false;
-
-				if (!DenyOnlyFullMatch)
-				{
-					// Check if the pattern matches anywhere in the string - if it does, validation fails
-					failsValidation = Regex!.IsMatch(item);
-				}
-				else
-				{
-					// Check if the pattern is a full match of the entire string
-					foreach (ValueMatch m in Regex!.EnumerateMatches(item))
-					{
-						// We are looking for an exact match, not just a search hit
-						if (m.Index == 0 && m.Length == item.Length)
-						{
-							failsValidation = true;
-							break;
-						}
-					}
-				}
-
-				if (failsValidation)
-				{
-					return new ValidationResult(
-						string.Format(CultureInfo.CurrentCulture, ErrorMessageString, index, item.UrlEncodeReadable(), Pattern),
-						[memberName]
-					);
-				}
+				return new ValidationResult(
+					string.Format(CultureInfo.CurrentCulture, ErrorMessageString, index, item.UrlEncodeReadable(), Pattern),
+					[memberName]
+				);
 			}
 			index++;
 		}
@@ -145,15 +104,6 @@ public sealed class ListDenyRegularExpressionAttribute : ValidationAttribute
 	[MemberNotNull(nameof(Regex))]
 	private void SetupRegex()
 	{
-		// Compile the regex for better performance when used multiple times
-		if (Regex == null)
-		{
-			if (string.IsNullOrEmpty(Pattern))
-			{
-				throw new InvalidOperationException("Regex pattern cannot be null or empty");
-			}
-
-			Regex = MatchTimeoutInMilliseconds == -1 ? new Regex(Pattern, RegexOptions.Compiled) : new Regex(Pattern, RegexOptions.Compiled, TimeSpan.FromMilliseconds(MatchTimeoutInMilliseconds));
-		}
+		Regex ??= ValidationAttributeHelpers.CreateRegex(Pattern, MatchTimeoutInMilliseconds);
 	}
 }

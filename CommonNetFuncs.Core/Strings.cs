@@ -1023,8 +1023,6 @@ public static partial class Strings
 	/// <returns><see langword="true"/> if the strings are equal when ignoring culture and case</returns>
 	public static bool StrEq(this string? s1, string? s2)
 	{
-		// return string.Equals(s1?.Trim() ?? string.Empty, s2?.Trim() ?? string.Empty, StringComparison.InvariantCultureIgnoreCase);
-
 		if (s1 == null && s2 == null)
 		{
 			return true;
@@ -1047,8 +1045,6 @@ public static partial class Strings
 	/// <returns><see langword="true"/> if the strings are equal</returns>
 	public static bool StrComp(this string? s1, string? s2)
 	{
-		// return string.Equals(s1 ?? string.Empty, s2 ?? string.Empty);
-
 		if (s1 == null && s2 == null)
 		{
 			return true;
@@ -1076,8 +1072,6 @@ public static partial class Strings
 	/// <returns><see langword="true"/> if the strings are equal based on the stringComparison value</returns>
 	public static bool StrComp(this string? s1, string? s2, StringComparison stringComparison)
 	{
-		//		return string.Equals(s1 ?? string.Empty, s2 ?? string.Empty, stringComparison);
-
 		if (s1 == null && s2 == null)
 		{
 			return true;
@@ -1251,34 +1245,6 @@ public static partial class Strings
 		int lastIndex = s.LastIndexOf(charToFind);
 		return lastIndex != -1 ? s[(lastIndex + 1)..] : s;
 	}
-
-	///// <summary>
-	///// Removes excess spaces in string properties inside of an object
-	///// </summary>
-	///// <typeparam name="TObj">Type of object to trim strings in</typeparam>
-	///// <param name="obj">Object containing string properties to be trimmed</param>
-	//[return: NotNullIfNotNull(nameof(obj))]
-	//[Obsolete("Please use TrimObjectStrings instead")]
-	//public static TObj? TrimObjectStringsR<TObj>(this TObj? obj) where TObj : class
-	//{
-	//	if (obj != null)
-	//	{
-	//		IEnumerable<PropertyInfo> props = GetOrAddPropertiesFromReflectionCache(typeof(TObj)).Where(x => x.PropertyType == typeof(string));
-	//		if (props.Any())
-	//		{
-	//			foreach (PropertyInfo prop in props)
-	//			{
-	//				string? value = (string?)prop.GetValue(obj);
-	//				if (!value.IsNullOrEmpty())
-	//				{
-	//					prop.SetValue(obj, value.TrimFull());
-	//				}
-	//			}
-	//		}
-	//	}
-	//	return obj;
-	//}
-
 
 	private static readonly ConcurrentDictionary<(Type, bool), Delegate> trimObjectStringsCache = new();
 
@@ -2152,7 +2118,8 @@ public static partial class Strings
 	[return: NotNullIfNotNull(nameof(dateString))]
 	public static string? FormatDateString(this string? dateString, string sourceFormat, string outputFormat = DefaultDateFormat)
 	{
-		return dateString == null ? null : DateTime.ParseExact(dateString, sourceFormat, CultureInfo.InvariantCulture).ToString(string.IsNullOrWhiteSpace(outputFormat) ? DefaultDateFormat : outputFormat);
+		string actualOutputFormat = string.IsNullOrWhiteSpace(outputFormat) ? DefaultDateFormat : outputFormat;
+		return dateString == null ? null : DateTime.ParseExact(dateString, sourceFormat, CultureInfo.InvariantCulture).ToString(actualOutputFormat);
 	}
 
 
@@ -2166,7 +2133,8 @@ public static partial class Strings
 	[return: NotNullIfNotNull(nameof(dateString))]
 	public static ReadOnlySpan<char> FormatDateString(this ReadOnlySpan<char> dateString, string sourceFormat, string outputFormat = DefaultDateFormat)
 	{
-		return dateString.IsEmpty ? ReadOnlySpan<char>.Empty : DateTime.ParseExact(dateString, sourceFormat, CultureInfo.InvariantCulture).ToString(string.IsNullOrWhiteSpace(outputFormat) ? DefaultDateFormat : outputFormat);
+		string actualOutputFormat = string.IsNullOrWhiteSpace(outputFormat) ? DefaultDateFormat : outputFormat;
+		return dateString.IsEmpty ? ReadOnlySpan<char>.Empty : DateTime.ParseExact(dateString, sourceFormat, CultureInfo.InvariantCulture).ToString(actualOutputFormat);
 	}
 
 
@@ -2604,11 +2572,18 @@ public static partial class Strings
 		try
 		{
 			//Try reading fraction value first as decimal.TryParse as decimal.TryParse will just give numerator if there is a fraction
-
-			result = inputString.GetOnlyNumbers(true).TryFractionToDecimal(out decimal fractionValue) ? fractionValue :
-				decimal.TryParse(inputString.GetOnlyNumbers(), out decimal value) ? value :
-				null;
-
+			if (inputString.GetOnlyNumbers(true).TryFractionToDecimal(out decimal fractionValue))
+			{
+				result = fractionValue;
+			}
+			else if (decimal.TryParse(inputString.GetOnlyNumbers(), out decimal value))
+			{
+				result = value;
+			}
+			else
+			{
+				result = null;
+			}
 			success = result != null;
 		}
 		catch (Exception)
@@ -2638,9 +2613,18 @@ public static partial class Strings
 		{
 			//Try reading fraction value first as decimal.TryParse as decimal.TryParse will just give numerator if there is a fraction
 
-			result = inputString.GetOnlyNumbers(true).TryFractionToDecimal(out decimal fractionValue) ? fractionValue :
-				decimal.TryParse(inputString.GetOnlyNumbers(), out decimal value) ? value :
-				default;
+			if (inputString.GetOnlyNumbers(true).TryFractionToDecimal(out decimal fractionValue))
+			{
+				result = fractionValue;
+			}
+			else if (decimal.TryParse(inputString.GetOnlyNumbers(), out decimal value))
+			{
+				result = value;
+			}
+			else
+			{
+				result = default;
+			}
 
 			success = result != default;
 		}
@@ -2771,9 +2755,18 @@ public static partial class Strings
 		{
 			//Try reading fraction value first as double.TryParse as double.TryParse will just give numerator if there is a fraction
 
-			result = inputString.GetOnlyNumbers(true).TryFractionToDouble(out double fractionValue) ? fractionValue :
-				double.TryParse(inputString.GetOnlyNumbers(), out double value) ? value :
-				null;
+			if (inputString.GetOnlyNumbers(true).TryFractionToDouble(out double fractionValue))
+			{
+				result = fractionValue;
+			}
+			else if (double.TryParse(inputString.GetOnlyNumbers(), out double value))
+			{
+				result = value;
+			}
+			else
+			{
+				result = null;
+			}
 
 			success = result != null;
 		}
@@ -2804,9 +2797,18 @@ public static partial class Strings
 		{
 			//Try reading fraction value first as double.TryParse as double.TryParse will just give numerator if there is a fraction
 
-			result = inputString.GetOnlyNumbers(true).TryFractionToDouble(out double fractionValue) ? fractionValue :
-				double.TryParse(inputString.GetOnlyNumbers(), out double value) ? value :
-				default;
+			if (inputString.GetOnlyNumbers(true).TryFractionToDouble(out double fractionValue))
+			{
+				result = fractionValue;
+			}
+			else if (double.TryParse(inputString.GetOnlyNumbers(), out double value))
+			{
+				result = value;
+			}
+			else
+			{
+				result = default;
+			}
 
 			success = result.NotEquals(default, 1e-10m);
 		}

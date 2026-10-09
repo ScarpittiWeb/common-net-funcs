@@ -196,7 +196,7 @@ public static class ExpressionTrees
 			List<ParameterExpression> variables, List<Expression> expressions, bool useCache)
 	{
 		int rank = type.GetArrayRank();
-		List<ParameterExpression> indices = GenerateIndices(rank);
+		ParameterExpression[] indices = GenerateIndices(rank);
 
 		variables.AddRange(indices);
 
@@ -212,20 +212,19 @@ public static class ExpressionTrees
 		expressions.Add(forExpression);
 	}
 
-	private static List<ParameterExpression> GenerateIndices(int arrayRank)
+	private static ParameterExpression[] GenerateIndices(int arrayRank)
 	{
 		// Intended code: int i1, i2, ..., in;
-		List<ParameterExpression> indices = [];
+		ParameterExpression[] indices = new ParameterExpression[arrayRank];
 		for (int i = 0; i < arrayRank; i++)
 		{
-			ParameterExpression indexVariable = Expression.Variable(typeof(int));
-			indices.Add(indexVariable);
+			indices[i] = Expression.Variable(typeof(int));
 		}
 
 		return indices;
 	}
 
-	private static BinaryExpression ArrayFieldToArrayFieldAssignExpression(ParameterExpression inputParameter, ParameterExpression inputDictionary, ParameterExpression outputVariable, Type? elementType, Type arrayType, List<ParameterExpression> indices, bool useCache)
+	private static BinaryExpression ArrayFieldToArrayFieldAssignExpression(ParameterExpression inputParameter, ParameterExpression inputDictionary, ParameterExpression outputVariable, Type? elementType, Type arrayType, ParameterExpression[] indices, bool useCache)
 	{
 		IndexExpression indexTo = Expression.ArrayAccess(outputVariable, indices);
 		MethodCallExpression indexFrom = Expression.ArrayIndex(Expression.Convert(inputParameter, arrayType), indices);
@@ -241,22 +240,19 @@ public static class ExpressionTrees
 
 		LabelTarget endLabelForThisLoop = Expression.Label();
 
-		LoopExpression newLoop =
-			Expression.Loop
-			(
-				Expression.Block
-				(
-					EmptyParameterExpressions,
-					Expression.IfThen(Expression.GreaterThanOrEqual(indexVariable, lengthVariable), Expression.Break(endLabelForThisLoop)),
-					loopToEncapsulate,
-					Expression.PostIncrementAssign(indexVariable)
-				),
-				endLabelForThisLoop
-			);
+		Expression[] loopBody =
+		[
+			Expression.IfThen(Expression.GreaterThanOrEqual(indexVariable, lengthVariable), Expression.Break(endLabelForThisLoop)),
+			loopToEncapsulate,
+			Expression.PostIncrementAssign(indexVariable)
+		];
+
+		LoopExpression newLoop = Expression.Loop(Expression.Block(EmptyParameterExpressions, loopBody), endLabelForThisLoop);
 
 		BinaryExpression lengthAssignment = GetLengthForDimensionExpression(lengthVariable, inputParameter, dimension);
 		BinaryExpression indexAssignment = Expression.Assign(indexVariable, Expression.Constant(0));
-		return Expression.Block(new[] { lengthVariable }, lengthAssignment, indexAssignment, newLoop);
+		Expression[] outerBody = [lengthAssignment, indexAssignment, newLoop];
+		return Expression.Block(new[] { lengthVariable }, outerBody);
 	}
 
 	private static BinaryExpression GetLengthForDimensionExpression(ParameterExpression lengthVariable, ParameterExpression inputParameter, int i)

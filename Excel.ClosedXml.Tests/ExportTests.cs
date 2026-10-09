@@ -236,7 +236,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? ms = await data.GenericExcelExport(cancellationToken: Current.CancellationToken);
 
 		ms.ShouldNotBeNull();
-		ms!.Length.ShouldBeGreaterThan(0);
+		ms.Length.ShouldBeGreaterThan(0);
 		ms.Position.ShouldBe(0);
 		await ms.DisposeAsync();
 	}
@@ -251,7 +251,7 @@ public sealed class ExportTests : IDisposable
 
 		// Validation failure returns new empty MemoryStream, not null
 		ms.ShouldNotBeNull();
-		ms!.Length.ShouldBe(0);
+		ms.Length.ShouldBe(0);
 		await ms.DisposeAsync();
 	}
 
@@ -264,7 +264,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? ms = await data.GenericExcelExport(tableName: longTable, cancellationToken: Current.CancellationToken);
 
 		ms.ShouldNotBeNull();
-		ms!.Length.ShouldBe(0);
+		ms.Length.ShouldBe(0);
 		await ms.DisposeAsync();
 	}
 
@@ -276,7 +276,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? ms = await data.GenericExcelExport(skipColumnNames: ["DateProperty"], cancellationToken: Current.CancellationToken);
 
 		ms.ShouldNotBeNull();
-		using XLWorkbook wb = new(ms!);
+		using XLWorkbook wb = new(ms);
 		IXLWorksheet ws = wb.Worksheets.First();
 		// DateProperty excluded: should not find it as header
 		ws.Cell(1, 1).Value.ToString().ShouldNotBe("DateProperty");
@@ -295,7 +295,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? ms = await data.GenericExcelExport(createTable: true, tableStyle: style, cancellationToken: Current.CancellationToken);
 
 		ms.ShouldNotBeNull();
-		ms!.Length.ShouldBeGreaterThan(0);
+		ms.Length.ShouldBeGreaterThan(0);
 		await ms.DisposeAsync();
 	}
 
@@ -308,7 +308,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? result = await data.GenericExcelExport(existingMs, cancellationToken: Current.CancellationToken);
 
 		result.ShouldNotBeNull();
-		result!.Length.ShouldBeGreaterThan(0);
+		result.Length.ShouldBeGreaterThan(0);
 	}
 
 	[Fact]
@@ -329,7 +329,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? ms = await data.GenericExcelExport(sheetName: "   ", cancellationToken: Current.CancellationToken);
 
 		ms.ShouldNotBeNull();
-		ms!.Length.ShouldBeGreaterThan(0);
+		ms.Length.ShouldBeGreaterThan(0);
 		using XLWorkbook wb = new(ms);
 		wb.Worksheets.Any(ws => ws.Name == "Data").ShouldBeTrue();
 		await ms.DisposeAsync();
@@ -343,7 +343,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? ms = await data.GenericExcelExport(createTable: true, tableName: "   ", cancellationToken: Current.CancellationToken);
 
 		ms.ShouldNotBeNull();
-		ms!.Length.ShouldBeGreaterThan(0);
+		ms.Length.ShouldBeGreaterThan(0);
 		await ms.DisposeAsync();
 	}
 
@@ -359,7 +359,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? ms = await dt.GenericExcelExport(cancellationToken: Current.CancellationToken);
 
 		ms.ShouldNotBeNull();
-		ms!.Length.ShouldBeGreaterThan(0);
+		ms.Length.ShouldBeGreaterThan(0);
 		await ms.DisposeAsync();
 	}
 
@@ -372,7 +372,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? ms = await dt.GenericExcelExport(sheetName: longSheet, cancellationToken: Current.CancellationToken);
 
 		ms.ShouldNotBeNull();
-		ms!.Length.ShouldBe(0);
+		ms.Length.ShouldBe(0);
 		await ms.DisposeAsync();
 	}
 
@@ -385,7 +385,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? ms = await dt.GenericExcelExport(tableName: longTable, cancellationToken: Current.CancellationToken);
 
 		ms.ShouldNotBeNull();
-		ms!.Length.ShouldBe(0);
+		ms.Length.ShouldBe(0);
 		await ms.DisposeAsync();
 	}
 
@@ -397,7 +397,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? ms = await dt.GenericExcelExport(skipColumnNames: ["Col2"], cancellationToken: Current.CancellationToken);
 
 		ms.ShouldNotBeNull();
-		using XLWorkbook wb = new(ms!);
+		using XLWorkbook wb = new(ms);
 		IXLWorksheet ws = wb.Worksheets.First();
 		ws.Cell(1, 1).Value.ToString().ShouldNotBe("Col2");
 		ws.LastColumnUsed()!.ColumnNumber().ShouldBe(1);
@@ -422,7 +422,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? ms = await dt.GenericExcelExport(sheetName: "   ", cancellationToken: Current.CancellationToken);
 
 		ms.ShouldNotBeNull();
-		ms!.Length.ShouldBeGreaterThan(0);
+		ms.Length.ShouldBeGreaterThan(0);
 		using XLWorkbook wb = new(ms);
 		wb.Worksheets.Any(ws => ws.Name == "Data").ShouldBeTrue();
 		await ms.DisposeAsync();
@@ -436,7 +436,7 @@ public sealed class ExportTests : IDisposable
 		MemoryStream? ms = await dt.GenericExcelExport(createTable: true, tableName: "   ", cancellationToken: Current.CancellationToken);
 
 		ms.ShouldNotBeNull();
-		ms!.Length.ShouldBeGreaterThan(0);
+		ms.Length.ShouldBeGreaterThan(0);
 		await ms.DisposeAsync();
 	}
 

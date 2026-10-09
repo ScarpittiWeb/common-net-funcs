@@ -12,8 +12,8 @@ public sealed class RestHelpersTests
 		FieldInfo? clientField = type.GetField("client", BindingFlags.Static | BindingFlags.NonPublic);
 		object? value = clientField?.GetValue(null);
 
-		value.ShouldBeOfType<HttpClient>();
-		((HttpClient)value!).Timeout.ShouldBe(Timeout.InfiniteTimeSpan);
+		HttpClient httpClient = value.ShouldBeOfType<HttpClient>();
+		httpClient.Timeout.ShouldBe(Timeout.InfiniteTimeSpan);
 	}
 
 	[Fact]
@@ -38,8 +38,7 @@ public sealed class RestHelpersTests
 		object? handlerValue = handlerField?.GetValue(null);
 
 		// Assert
-		handlerValue.ShouldBeOfType<SocketsHttpHandler>();
-		SocketsHttpHandler handler = (SocketsHttpHandler)handlerValue!;
+		SocketsHttpHandler handler = handlerValue.ShouldBeOfType<SocketsHttpHandler>();
 		handler.MaxConnectionsPerServer.ShouldBe(100);
 		handler.KeepAlivePingPolicy.ShouldBe(HttpKeepAlivePingPolicy.Always);
 		handler.KeepAlivePingDelay.ShouldBe(TimeSpan.FromSeconds(15));

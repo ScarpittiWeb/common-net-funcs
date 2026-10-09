@@ -78,7 +78,7 @@ public class PrioritizedEndpointQueue : IDisposable
 
 		logger.Debug("Enqueued task {TaskId} with priority {Priority} ({PriorityLevel}) for endpoint {EndpointKey}", queuedTask.Id, priority, priorityLevel, EndpointKey);
 
-		object? result = await queuedTask.CompletionSource.Task;
+		object? result = await queuedTask.CompletionSource.Task.ConfigureAwait(false);
 		return (T?)result;
 	}
 
@@ -97,7 +97,7 @@ public class PrioritizedEndpointQueue : IDisposable
 	{
 		int cancelledCount = 0;
 
-		await queueSemaphore.WaitAsync().ConfigureAwait(false);
+		await queueSemaphore.WaitAsync(cancellationTokenSource.Token).ConfigureAwait(false);
 		try
 		{
 			List<PrioritizedQueuedTask> tasksToCancel = new();
@@ -128,8 +128,8 @@ public class PrioritizedEndpointQueue : IDisposable
 
 			foreach (PrioritizedQueuedTask task in tasksToCancel)
 			{
-				await task.CancellationTokenSource.CancelAsync();
-				task.CompletionSource.SetCanceled();
+				await task.CancellationTokenSource.CancelAsync().ConfigureAwait(false);
+				task.CompletionSource.SetCanceled(cancellationTokenSource.Token);
 				cancelledCount++;
 			}
 
@@ -239,23 +239,7 @@ public class PrioritizedEndpointQueue : IDisposable
 
 					stopwatch.Stop();
 
-					lock (statsLock)
-					{
-						stats.TotalProcessedTasks++;
-						stats.LastProcessedAt = DateTime.UtcNow;
-
-						PriorityStats priorityStats = stats.PriorityBreakdown[currentTask.PriorityLevel];
-						priorityStats.ProcessedTasks++;
-						priorityStats.LastProcessedAt = DateTime.UtcNow;
-
-						List<TimeSpan> processingTimes = processingTimesByPriority[currentTask.PriorityLevel];
-						processingTimes.Add(stopwatch.Elapsed);
-
-						if (processingTimes.Count > processTimeWindow)
-						{
-							processingTimes.RemoveAt(0);
-						}
-					}
+					PrioritizedQueueStatsRecorder.RecordProcessedTask(stats, statsLock, processingTimesByPriority, processTimeWindow, currentTask.PriorityLevel, stopwatch.Elapsed);
 
 					logger.Debug("Completed task {TaskId} with priority {Priority} for endpoint {EndpointKey} in {Duration}ms", currentTask.Id, currentTask.Priority, EndpointKey, stopwatch.ElapsedMilliseconds);
 				}
@@ -385,7 +369,8 @@ public class PrioritizedEndpointQueue : IDisposable
 
 				try
 				{
-					processingTask?.Wait(TimeSpan.FromSeconds(5));
+					// Must not pass cancellationTokenSource.Token here: it was cancelled above, so Wait would throw immediately.
+					processingTask?.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
 				}
 				catch (AggregateException)
 				{

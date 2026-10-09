@@ -12,8 +12,8 @@ This project contains helper methods for executing SQL queries and commands agai
   - [Contents](#contents)
   - [DirectQuery](#directquery)
     - [DirectQuery Usage Examples](#directquery-usage-examples)
+      - [GetDataTable (Async)](#getdatatable-async)
       - [GetDataTable](#getdatatable)
-      - [GetDataTable](#getdatatable-1)
       - [RunUpdateQueryAsync](#runupdatequeryasync)
       - [RunUpdateQuery](#runupdatequery)
       - [GetDataStream](#getdatastream)
@@ -33,7 +33,7 @@ Helper methods for executing SQL queries and commands directly against an Postgr
 <details>
 <summary><h3>Usage Examples</h3></summary>
 
-#### GetDataTable
+#### GetDataTable (Async)
 
 Executes a SELECT query asynchronously and returns the results as a DataTable.
 

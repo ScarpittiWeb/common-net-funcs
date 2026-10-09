@@ -14,56 +14,6 @@ public static class HangfireJobHelpers
 {
 	private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
-	// /// <summary>
-	// /// Finds and cancels all jobs matching the given queue, method name, and parameters.
-	// /// Works for both Enqueued (waiting) and Processing (running) jobs.
-	// /// </summary>
-	// /// <param name="queueName">The Hangfire queue name, e.g. "reports"</param>
-	// /// <param name="methodName">The job method name, e.g. "GenerateReport"</param>
-	// /// <param name="matchParameters">
-	// ///   Key/value pairs to match against job arguments.
-	// ///   Keys are parameter names, values are the expected string representations.
-	// /// </param>
-	// /// <returns>List of cancelled job IDs</returns>
-	// /// <summary>
-	// /// Strongly-typed overload. Extracts the method name and argument values from the expression,
-	// /// so callers never have to pass parameter names as strings.
-	// /// </summary>
-	// /// <example>
-	// /// "my-queue".FindAndCancelJobs<IScanLibraryJob>(j => j.ExecuteScan(libraryId, userId, path));
-	// /// </example>
-	// public static List<string> FindAndCancelJobsOld<TJob>(this string queueName, Expression<Action<TJob>> jobExpression)
-	// {
-	// 	if (jobExpression.Body is not MethodCallExpression call)
-	// 	{
-	// 		throw new ArgumentException("Expression body must be a method call.", nameof(jobExpression));
-	// 	}
-
-	// 	string methodName = call.Method.Name;
-	// 	ParameterInfo[] paramInfos = call.Method.GetParameters();
-
-	// 	Dictionary<string, string> matchParameters = new(StringComparer.OrdinalIgnoreCase);
-	// 	for (int i = 0; i < call.Arguments.Count; i++)
-	// 	{
-	// 		// Skip arguments that are DefaultExpression nodes — these are either explicit default(T)
-	// 		// uses or optional parameters the compiler filled in with their default values.
-	// 		// Including them would cause mismatches (e.g. bool defaults to false, CancellationToken
-	// 		// defaults to a value whose ToString() returns the type name rather than its storage form).
-	// 		if (call.Arguments[i] is DefaultExpression)
-	// 		{
-	// 			continue;
-	// 		}
-
-	// 		object? value = Expression.Lambda(call.Arguments[i]).CompileFast().DynamicInvoke();
-	// 		if (value != null)
-	// 		{
-	// 			matchParameters[paramInfos[i].Name!] = value.ToString()!;
-	// 		}
-	// 	}
-
-	// 	return queueName.FindAndCancelJobs(methodName, matchParameters);
-	// }
-
 	/// <summary>
 	/// Finds and cancels all jobs matching the given queue, method name, and parameters.
 	/// Works for both Enqueued (waiting) and Processing (running) jobs.

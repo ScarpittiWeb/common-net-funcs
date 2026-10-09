@@ -9,12 +9,12 @@ This lightweight project contains helper methods for several common functions re
 ## Contents
 
 - [CommonNetFuncs.Web.Jwt](#commonnetfuncswebjwt)
-	- [Contents](#contents)
-	- [JwtManager](#jwtmanager)
-		- [JwtManager Usage Examples](#jwtmanager-usage-examples)
-			- [Authenticate](#authenticate)
-	- [Installation](#installation)
-	- [License](#license)
+  - [Contents](#contents)
+  - [JwtManager](#jwtmanager)
+    - [JwtManager Usage Examples](#jwtmanager-usage-examples)
+      - [Authenticate](#authenticate)
+  - [Installation](#installation)
+  - [License](#license)
 
 ---
 

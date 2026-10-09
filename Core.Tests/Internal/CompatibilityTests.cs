@@ -114,7 +114,7 @@ public sealed class DateTimeCompatTests
 		bool result = DateTimeCompat.TryParse("2024-01-15", CultureInfo.InvariantCulture, out DateTime parsed);
 
 		result.ShouldBeTrue();
-		parsed.ShouldBe(new DateTime(2024, 1, 15));
+		parsed.ShouldBe(new DateTime(2024, 1, 15, 0, 0, 0, DateTimeKind.Unspecified));
 	}
 
 	[Fact]
@@ -129,7 +129,7 @@ public sealed class DateTimeCompatTests
 	[Fact]
 	public void TryParse_NullValue_ReturnsFalse()
 	{
-		bool result = DateTimeCompat.TryParse(null, CultureInfo.InvariantCulture, out DateTime parsed);
+		bool result = DateTimeCompat.TryParse(null, CultureInfo.InvariantCulture, out DateTime _);
 		result.ShouldBeFalse();
 	}
 
@@ -173,7 +173,7 @@ public sealed class DateOnlyCompatTests
 	[Fact]
 	public void TryParse_Span_InvalidDate_ReturnsFalse()
 	{
-		bool result = DateOnlyCompat.TryParse("not-a-date".AsSpan(), CultureInfo.InvariantCulture, out DateOnly parsed);
+		bool result = DateOnlyCompat.TryParse("not-a-date".AsSpan(), CultureInfo.InvariantCulture, out DateOnly _);
 		result.ShouldBeFalse();
 	}
 }

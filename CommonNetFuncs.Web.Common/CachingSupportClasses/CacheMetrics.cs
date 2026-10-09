@@ -16,18 +16,12 @@ public sealed class CacheMetrics(ConcurrentDictionary<string, HashSet<string>>? 
   private long cacheHits;
   private long cacheMisses;
   private long currentCacheSize;
-  //private long evictedDueToExpired;
   private long evictedDueToCapacity;
-  //private long evictedDueToNone;
   private long evictedDueToRemoved;
-  //private long evictedDueToReplaced;
-  //private long evictedDueToTokenExpired;
   private long skippedDueToSize;
   private long currentCacheEntryCount;
 
   public ConcurrentDictionary<string, HashSet<string>> CacheTags { get; } = cacheTags ??= new(); //Key = tag, Value = All cache keys that have that tag
-
-  //public long EvictedDueToExpiration => Interlocked.Read(ref evictedDueToExpired);
 
   public long EvictedDueToCapacity()
   {
@@ -37,8 +31,6 @@ public sealed class CacheMetrics(ConcurrentDictionary<string, HashSet<string>>? 
     }
   }
 
-  //public long EvictedDueToNone => Interlocked.Read(ref evictedDueToNone);
-
   public long EvictedDueToRemoved()
   {
     lock (evictedDueToRemovedLock)
@@ -46,10 +38,6 @@ public sealed class CacheMetrics(ConcurrentDictionary<string, HashSet<string>>? 
       return evictedDueToRemoved;
     }
   }
-
-  //public long EvictedDueToReplaced => Interlocked.Read(ref evictedDueToReplaced);
-
-  //public long EvictedDueToExpired => Interlocked.Read(ref evictedDueToTokenExpired);
 
   public long SkippedDueToSize()
   {
@@ -67,28 +55,14 @@ public sealed class CacheMetrics(ConcurrentDictionary<string, HashSet<string>>? 
         lock (evictedDueToRemovedLock)
         {
           evictedDueToRemoved++;
-          //Interlocked.Increment(ref evictedDueToRemoved);
         }
         break;
       case EvictionReason.Capacity:
         lock (evictedDueToCapacityLock)
         {
           evictedDueToCapacity++;
-          //Interlocked.Increment(ref evictedDueToCapacity);
         }
         break;
-      //case EvictionReason.None:
-      //    //Interlocked.Increment(ref evictedDueToNone);
-      //    break;
-      //case EvictionReason.Replaced:
-      //    //Interlocked.Increment(ref evictedDueToReplaced);
-      //    break;
-      //case EvictionReason.Expired:
-      //    //Interlocked.Increment(ref evictedDueToExpired);
-      //    break;
-      //case EvictionReason.TokenExpired:
-      //    //Interlocked.Increment(ref evictedDueToTokenExpired);
-      //    break;
     }
   }
 

@@ -45,7 +45,7 @@ public sealed class OpenApiTransformerTests
 		operation.Parameters.ShouldContain(p => p.Name == "Accept" && p.In == ParameterLocation.Header);
 		IOpenApiParameter? acceptParam = operation.Parameters.FirstOrDefault(p => p.Name == "Accept");
 		acceptParam.ShouldNotBeNull();
-		acceptParam!.Required.ShouldBeTrue();
+		acceptParam.Required.ShouldBeTrue();
 		acceptParam.Schema.ShouldNotBeNull();
 		acceptParam.Schema.Type.ShouldBe(JsonSchemaType.String);
 		acceptParam.Schema.Default.ShouldNotBeNull();
@@ -81,8 +81,10 @@ public sealed class OpenApiTransformerTests
 
 		// Assert
 		document.Components.ShouldNotBeNull();
-		document.Components!.SecuritySchemes!.ShouldContainKey("Bearer");
-		IOpenApiSecurityScheme scheme = document.Components.SecuritySchemes!["Bearer"];
+		IDictionary<string, IOpenApiSecurityScheme>? securitySchemes = document.Components.SecuritySchemes;
+		securitySchemes.ShouldNotBeNull();
+		securitySchemes.ShouldContainKey("Bearer");
+		IOpenApiSecurityScheme scheme = securitySchemes["Bearer"];
 		scheme.Type.ShouldBe(SecuritySchemeType.Http);
 		scheme.Scheme.ShouldBe("bearer");
 		scheme.BearerFormat.ShouldBe("Json Web Token");

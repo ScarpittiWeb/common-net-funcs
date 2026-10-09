@@ -576,26 +576,6 @@ public sealed class RandomTests
 		exception.ParamName.ShouldBe("blacklistedCharacters");
 	}
 
-	// [Fact]
-	// public void GenerateRandomString_WhenBlacklistHasCharsOutsideRange_ThrowsNoAvailableCharsException()
-	// {
-	// 	// Arrange - Blacklist contains all chars IN the range plus extras OUTSIDE
-	// 	// This tests the defensive check that counts only blacklisted chars within the actual range
-	// 	HashSet<char> blacklist = new();
-	// 	blacklist.Add((char)65); // 'A' - in range
-	// 	blacklist.Add((char)66); // 'B' - in range
-	// 	blacklist.Add((char)97); // 'a' - outside range
-	// 	blacklist.Add((char)98); // 'b' - outside range
-
-	// 	// Act & Assert - With range 65-66 (2 chars 'A', 'B') and blacklist {65, 66, 97, 98}:
-	// 	// availableCharCount = 2 - 2 = 0 (only counts blacklist chars within range)
-	// 	// This hits the defensive check!
-	// 	ArgumentException exception = Should.Throw<ArgumentException>(() =>
-	// 		GenerateRandomString(10, lowerAsciiBound: 65, upperAsciiBound: 66, blacklistedCharacters: blacklist));
-	// 	exception.Message.ShouldContain("No available characters to use after applying blacklist");
-	// 	exception.ParamName.ShouldBe("blacklistedCharacters");
-	// }
-
 	[Theory]
 	[InlineData(-1, 126)]
 	[InlineData(0, 128)]
@@ -1921,7 +1901,7 @@ public sealed class RandomTests
 	public void GetRepeatableRandomBytes_WithSeed_FillsArrayOfCorrectLength(int quantity, string seed)
 	{
 		byte[] bytes = [];
-		byte[] result = GetRepeatableRandomBytes<object, string>(ref bytes, seed, quantity);
+		byte[] result = GetRepeatableRandomBytes(ref bytes, seed, quantity);
 		result.Length.ShouldBe(quantity);
 		bytes.Length.ShouldBe(quantity);
 		bytes.ShouldBeSameAs(result);
@@ -1932,8 +1912,8 @@ public sealed class RandomTests
 	{
 		byte[] bytes1 = [];
 		byte[] bytes2 = [];
-		byte[] result1 = GetRepeatableRandomBytes<object, string>(ref bytes1, "seed", 32);
-		byte[] result2 = GetRepeatableRandomBytes<object, string>(ref bytes2, "seed", 32);
+		byte[] result1 = GetRepeatableRandomBytes(ref bytes1, "seed", 32);
+		byte[] result2 = GetRepeatableRandomBytes(ref bytes2, "seed", 32);
 		result1.SequenceEqual(result2).ShouldBeTrue();
 	}
 
@@ -1941,7 +1921,7 @@ public sealed class RandomTests
 	public void GetRepeatableRandomBytes_WithDefaultQuantity_ReturnsSingleByte()
 	{
 		byte[] bytes = [];
-		byte[] result = GetRepeatableRandomBytes<object, string>(ref bytes, "seed");
+		byte[] result = GetRepeatableRandomBytes(ref bytes, "seed");
 		result.Length.ShouldBe(1);
 	}
 }

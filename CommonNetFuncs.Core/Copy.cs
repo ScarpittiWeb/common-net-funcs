@@ -1,8 +1,8 @@
-﻿using FastExpressionCompiler;
-using System.Collections;
+﻿using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
+using FastExpressionCompiler;
 using static CommonNetFuncs.Core.ReflectionCaches;
 
 namespace CommonNetFuncs.Core;
@@ -93,23 +93,33 @@ public static class Copy
 				return;
 			}
 
-			foreach ((Action<TDest, object?> Set, Func<TSource, object?> Get) in GetOrCreatePropertyMaps<TSource, TDest>().Values)
-			{
-				Set(dest, Get(source));
-			}
+			CopyMappedProperties(source, dest);
 		}
 		else
 		{
 			dest ??= Activator.CreateInstance<TDest>();
-			IEnumerable<PropertyInfo> sourceProps = GetOrAddPropertiesFromReflectionCache(typeof(TSource)).Where(x => x.CanRead && x.GetIndexParameters().Length == 0);
-			Dictionary<string, PropertyInfo> destPropDict = GetOrAddPropertiesFromReflectionCache(typeof(TDest)).Where(x => x.CanWrite && x.GetIndexParameters().Length == 0).ToDictionary(x => x.Name, x => x, StringComparer.Ordinal);
+			CopyMatchingPropertiesByReflection(source, dest);
+		}
+	}
 
-			foreach (PropertyInfo sourceProp in sourceProps)
+	private static void CopyMappedProperties<TSource, TDest>(TSource source, TDest dest) where TSource : class? where TDest : class?
+	{
+		foreach ((Action<TDest, object?> Set, Func<TSource, object?> Get) in GetOrCreatePropertyMaps<TSource, TDest>().Values)
+		{
+			Set(dest, Get(source));
+		}
+	}
+
+	private static void CopyMatchingPropertiesByReflection<TSource, TDest>(TSource source, TDest dest)
+	{
+		IEnumerable<PropertyInfo> sourceProps = GetOrAddPropertiesFromReflectionCache(typeof(TSource)).Where(x => x.CanRead && x.GetIndexParameters().Length == 0);
+		Dictionary<string, PropertyInfo> destPropDict = GetOrAddPropertiesFromReflectionCache(typeof(TDest)).Where(x => x.CanWrite && x.GetIndexParameters().Length == 0).ToDictionary(x => x.Name, x => x, StringComparer.Ordinal);
+
+		foreach (PropertyInfo sourceProp in sourceProps)
+		{
+			if (destPropDict.TryGetValue(sourceProp.Name, out PropertyInfo? destProp) && destProp.PropertyType == sourceProp.PropertyType)
 			{
-				if (destPropDict.TryGetValue(sourceProp.Name, out PropertyInfo? destProp) && destProp.PropertyType == sourceProp.PropertyType)
-				{
-					destProp.SetValue(dest, sourceProp.GetValue(source, null), null);
-				}
+				destProp.SetValue(dest, sourceProp.GetValue(source, null), null);
 			}
 		}
 	}
@@ -163,23 +173,11 @@ public static class Copy
 		TDest dest = new();
 		if (useCache)
 		{
-			foreach ((Action<TDest, object?> Set, Func<TSource, object?> Get) in GetOrCreatePropertyMaps<TSource, TDest>().Values)
-			{
-				Set(dest, Get(source));
-			}
+			CopyMappedProperties(source, dest);
 		}
 		else
 		{
-			IEnumerable<PropertyInfo> sourceProps = GetOrAddPropertiesFromReflectionCache(typeof(TSource)).Where(x => x.CanRead && x.GetIndexParameters().Length == 0);
-			Dictionary<string, PropertyInfo> destPropDict = GetOrAddPropertiesFromReflectionCache(typeof(TDest)).Where(x => x.CanWrite && x.GetIndexParameters().Length == 0).ToDictionary(x => x.Name, x => x, StringComparer.Ordinal);
-
-			foreach (PropertyInfo sourceProp in sourceProps)
-			{
-				if (destPropDict.TryGetValue(sourceProp.Name, out PropertyInfo? destProp) && destProp.PropertyType == sourceProp.PropertyType)
-				{
-					destProp.SetValue(dest, sourceProp.GetValue(source, null), null);
-				}
-			}
+			CopyMatchingPropertiesByReflection(source, dest);
 		}
 		return dest;
 	}
@@ -386,7 +384,21 @@ public static class Copy
 				valueIsSimpleType ??= value?.GetType().IsSimpleType();
 
 				object copiedKey = (bool)keyIsSimpleType ? key : CopyObject(key, destKeyType, 1, maxDepth)!;
-				object? copiedValue = value == null ? null : (bool)valueIsSimpleType! ? value : CopyObject(value, destValueType, 0, maxDepth);
+
+				object? copiedValue;
+				if (value == null)
+				{
+					copiedValue = null;
+				}
+				else if ((bool)valueIsSimpleType!)
+				{
+					copiedValue = value;
+				}
+				else
+				{
+					copiedValue = CopyObject(value, destValueType, 0, maxDepth);
+				}
+
 				destDictionary.Add(copiedKey, copiedValue);
 			}
 
@@ -403,7 +415,20 @@ public static class Copy
 			{
 				cancellationToken.ThrowIfCancellationRequested();
 				itemIsSimpleType ??= item?.GetType().IsSimpleType();
-				object? copiedItem = item == null ? null : (bool)itemIsSimpleType! ? item : CopyObject(item, elementType, 0, maxDepth);
+
+				object? copiedItem;
+				if (item == null)
+				{
+					copiedItem = null;
+				}
+				else if ((bool)itemIsSimpleType!)
+				{
+					copiedItem = item;
+				}
+				else
+				{
+					copiedItem = CopyObject(item, elementType, 0, maxDepth);
+				}
 
 				list.Add(copiedItem);
 			}

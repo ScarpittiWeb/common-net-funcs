@@ -2,6 +2,7 @@
 using CommonNetFuncs.ReinforcedTypings.Valibot;
 using Reinforced.Typings;
 using Reinforced.Typings.Fluent;
+using ReinforcedTypings.Tests.TestModels;
 using ReinforcedTypings.Tests.TestModels.Valibot;
 
 namespace ReinforcedTypings.Tests;
@@ -127,7 +128,7 @@ public sealed class ValibotSchemaGeneratorNodeTests
 			resolvedDir = (string?)OutputDirectoryField.GetValue(null);
 			resolvedDir.ShouldNotBeNull();
 			Path.GetFileName(resolvedDir).ShouldBe("TypeScriptModels");
-			File.Exists(Path.Combine(resolvedDir!, "FullValidationModel.schema.ts")).ShouldBeTrue();
+			File.Exists(Path.Combine(resolvedDir, "FullValidationModel.schema.ts")).ShouldBeTrue();
 		}
 		finally
 		{

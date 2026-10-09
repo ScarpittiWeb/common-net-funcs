@@ -191,7 +191,7 @@ public sealed class ManipulationTests : IDisposable
 			File.Exists(outputPath).ShouldBeTrue();
 			using SKCodec? codec = SKCodec.Create(outputPath);
 			codec.ShouldNotBeNull();
-			codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Jpeg);
+			codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Jpeg);
 		}
 		finally
 		{
@@ -223,7 +223,7 @@ public sealed class ManipulationTests : IDisposable
 		using SKData skData = SKData.CreateCopy(outputBytes);
 		using SKCodec? codec = SKCodec.Create(skData);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Jpeg);
+		codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Jpeg);
 	}
 
 	[RetryTheory(3)]
@@ -247,7 +247,7 @@ public sealed class ManipulationTests : IDisposable
 		using SKData skData = SKData.CreateCopy(outputBytes);
 		using SKCodec? codec = SKCodec.Create(skData);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Jpeg);
+		codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Jpeg);
 	}
 
 	[RetryTheory(3)]
@@ -284,7 +284,7 @@ public sealed class ManipulationTests : IDisposable
 			File.Exists(outputPath).ShouldBeTrue();
 			using SKCodec? codec = SKCodec.Create(outputPath);
 			codec.ShouldNotBeNull();
-			codec!.EncodedFormat.ShouldBe(format);
+			codec.EncodedFormat.ShouldBe(format);
 		}
 		finally
 		{
@@ -327,7 +327,7 @@ public sealed class ManipulationTests : IDisposable
 		using SKData skData = SKData.CreateCopy(outputBytes);
 		using SKCodec? codec = SKCodec.Create(skData);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(format);
+		codec.EncodedFormat.ShouldBe(format);
 	}
 
 	[RetryTheory(3)]
@@ -362,7 +362,7 @@ public sealed class ManipulationTests : IDisposable
 		using SKData skData = SKData.CreateCopy(outputBytes);
 		using SKCodec? codec = SKCodec.Create(skData);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(format);
+		codec.EncodedFormat.ShouldBe(format);
 	}
 
 	[RetryTheory(3)]
@@ -537,7 +537,7 @@ public sealed class ManipulationTests : IDisposable
 
 		// Assert
 		metadata.ShouldNotBeNull();
-		metadata!.HorizontalResolution.ShouldBeGreaterThan(0);
+		metadata.HorizontalResolution.ShouldBeGreaterThan(0);
 	}
 
 	[RetryTheory(3)]
@@ -556,7 +556,7 @@ public sealed class ManipulationTests : IDisposable
 
 		// Assert
 		metadata.ShouldNotBeNull();
-		metadata!.HorizontalResolution.ShouldBeGreaterThan(0);
+		metadata.HorizontalResolution.ShouldBeGreaterThan(0);
 	}
 
 	[RetryTheory(3)]
@@ -593,7 +593,7 @@ public sealed class ManipulationTests : IDisposable
 			File.Exists(outputPath).ShouldBeTrue();
 			using SKCodec? codec = SKCodec.Create(outputPath);
 			codec.ShouldNotBeNull();
-			codec!.EncodedFormat.ShouldBe(format);
+			codec.EncodedFormat.ShouldBe(format);
 		}
 		finally
 		{
@@ -636,7 +636,7 @@ public sealed class ManipulationTests : IDisposable
 		using SKData skData = SKData.CreateCopy(outputBytes);
 		using SKCodec? codec = SKCodec.Create(skData);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(format);
+		codec.EncodedFormat.ShouldBe(format);
 	}
 
 	[RetryTheory(3)]
@@ -865,7 +865,7 @@ public sealed class ManipulationTests : IDisposable
 			File.Exists(outputPath).ShouldBeTrue();
 			using SKCodec? codec = SKCodec.Create(outputPath);
 			codec.ShouldNotBeNull();
-			codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
+			codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
 		}
 		finally
 		{
@@ -898,7 +898,7 @@ public sealed class ManipulationTests : IDisposable
 		using SKData skData = SKData.CreateCopy(outputBytes);
 		using SKCodec? codec = SKCodec.Create(skData);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
+		codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
 	}
 
 	[RetryTheory(3)]
@@ -923,7 +923,7 @@ public sealed class ManipulationTests : IDisposable
 		using SKData skData = SKData.CreateCopy(outputBytes);
 		using SKCodec? codec = SKCodec.Create(skData);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
+		codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
 	}
 
 	[RetryTheory(3)]
@@ -948,7 +948,7 @@ public sealed class ManipulationTests : IDisposable
 			File.Exists(outputPath).ShouldBeTrue();
 			using SKCodec? codec = SKCodec.Create(outputPath);
 			codec.ShouldNotBeNull();
-			codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
+			codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
 		}
 		finally
 		{
@@ -981,7 +981,7 @@ public sealed class ManipulationTests : IDisposable
 		using SKData skData = SKData.CreateCopy(outputBytes);
 		using SKCodec? codec = SKCodec.Create(skData);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
+		codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
 	}
 
 	[RetryTheory(3)]
@@ -1271,9 +1271,9 @@ public sealed class ManipulationTests : IDisposable
 			using SKBitmap img = SKBitmap.Decode(invertedOutputPath);
 			img.ShouldNotBeNull();
 
-using SKCodec? codec = SKCodec.Create(invertedOutputPath);
+			using SKCodec? codec = SKCodec.Create(invertedOutputPath);
 			codec.ShouldNotBeNull();
-			codec!.EncodedFormat.ShouldBe(format);
+			codec.EncodedFormat.ShouldBe(format);
 
 			using SKBitmap orig = SKBitmap.Decode(outputPath);
 			orig.ShouldNotBeNull();
@@ -1316,9 +1316,9 @@ using SKCodec? codec = SKCodec.Create(invertedOutputPath);
 		result.ShouldBeTrue();
 		byte[] outputBytes = output.ToArray();
 		using SKData skData = SKData.CreateCopy(outputBytes);
-using SKCodec? codec = SKCodec.Create(skData);
+		using SKCodec? codec = SKCodec.Create(skData);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(format);
+		codec.EncodedFormat.ShouldBe(format);
 
 		using SKBitmap img = SKBitmap.Decode(output);
 		img.ShouldNotBeNull();
@@ -1346,7 +1346,7 @@ using SKCodec? codec = SKCodec.Create(skData);
 			// Act - with mutate (invert)
 			bool result = await Manipulation.ResizeImageAsync(inputPath, outputPath, width, height, mutate: InvertMutate);
 			// Act - without mutate (reference)
-			Manipulation.ResizeImage(inputPath, refOutputPath, width, height);
+			await Manipulation.ResizeImageAsync(inputPath, refOutputPath, width, height);
 
 			// Assert
 			result.ShouldBeTrue();
@@ -1382,7 +1382,7 @@ using SKCodec? codec = SKCodec.Create(skData);
 
 		// Act
 		bool result = await Manipulation.ResizeImageAsync(input, output, width, height, SKEncodedImageFormat.Jpeg, mutate: InvertMutate);
-		Manipulation.ResizeImage(input, nonInvertedOutput, width, height, SKEncodedImageFormat.Jpeg);
+		await Manipulation.ResizeImageAsync(input, nonInvertedOutput, width, height, SKEncodedImageFormat.Jpeg);
 
 		// Assert
 		result.ShouldBeTrue();
@@ -1688,7 +1688,7 @@ using SKCodec? codec = SKCodec.Create(skData);
 			File.Exists(testFilePath).ShouldBeTrue();
 			using SKCodec? codec = SKCodec.Create(testFilePath);
 			codec.ShouldNotBeNull();
-			codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Jpeg);
+			codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Jpeg);
 			using SKBitmap img = SKBitmap.Decode(testFilePath);
 			img.ShouldNotBeNull();
 			img.Width.ShouldBe(originalWidth);
@@ -1729,7 +1729,7 @@ using SKCodec? codec = SKCodec.Create(skData);
 			File.Exists(testFilePath).ShouldBeTrue();
 			using SKCodec? codec = SKCodec.Create(testFilePath);
 			codec.ShouldNotBeNull();
-			codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
+			codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
 			using SKBitmap img = SKBitmap.Decode(testFilePath);
 			img.ShouldNotBeNull();
 			img.Width.ShouldBe(originalWidth);
@@ -1770,7 +1770,7 @@ using SKCodec? codec = SKCodec.Create(skData);
 			File.Exists(testFilePath).ShouldBeTrue();
 			using SKCodec? codec = SKCodec.Create(testFilePath);
 			codec.ShouldNotBeNull();
-			codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Jpeg);
+			codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Jpeg);
 			using SKBitmap img = SKBitmap.Decode(testFilePath);
 			img.ShouldNotBeNull();
 			img.Width.ShouldBe(originalWidth);
@@ -1809,9 +1809,9 @@ using SKCodec? codec = SKCodec.Create(skData);
 			// Assert
 			result.ShouldBeTrue();
 			File.Exists(testFilePath).ShouldBeTrue();
-using SKCodec? codec = SKCodec.Create(testFilePath);
+			using SKCodec? codec = SKCodec.Create(testFilePath);
 			codec.ShouldNotBeNull();
-			codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
+			codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
 			using SKBitmap img = SKBitmap.Decode(testFilePath);
 			img.ShouldNotBeNull();
 			img.Width.ShouldBe(originalWidth);
@@ -2374,7 +2374,7 @@ using SKCodec? codec = SKCodec.Create(testFilePath);
 			result.ShouldBeTrue();
 			using SKCodec? codec = SKCodec.Create(outputPath);
 			codec.ShouldNotBeNull();
-			codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
+			codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
 			using SKBitmap output = SKBitmap.Decode(outputPath);
 			output.ShouldNotBeNull();
 			output.Width.ShouldBe(width);
@@ -2417,7 +2417,7 @@ using SKCodec? codec = SKCodec.Create(testFilePath);
 		using SKData data = SKData.CreateCopy(outputStream.ToArray());
 		using SKCodec? codec = SKCodec.Create(data);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
+		codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
 		outputStream.Position = 0;
 		using SKBitmap output = SKBitmap.Decode(outputStream);
 		output.ShouldNotBeNull();
@@ -2456,7 +2456,7 @@ using SKCodec? codec = SKCodec.Create(testFilePath);
 		using SKData data = SKData.CreateCopy(outputStream.ToArray());
 		using SKCodec? codec = SKCodec.Create(data);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
+		codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
 		outputStream.Position = 0;
 		using SKBitmap output = SKBitmap.Decode(outputStream);
 		output.ShouldNotBeNull();
@@ -2497,9 +2497,9 @@ using SKCodec? codec = SKCodec.Create(testFilePath);
 		{
 			bool result = await Manipulation.ReduceImageQualityAsync(inputPath, outputPath, SKEncodedImageFormat.Png, quality, width, height);
 			result.ShouldBeTrue();
-using SKCodec? codec = SKCodec.Create(outputPath);
+			using SKCodec? codec = SKCodec.Create(outputPath);
 			codec.ShouldNotBeNull();
-			codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
+			codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
 			using SKBitmap output = SKBitmap.Decode(outputPath);
 			output.ShouldNotBeNull();
 			output.Width.ShouldBe(width);
@@ -2540,9 +2540,9 @@ using SKCodec? codec = SKCodec.Create(outputPath);
 		result.ShouldBeTrue();
 		outputStream.Position.ShouldBe(0);
 		using SKData data = SKData.CreateCopy(outputStream.ToArray());
-using SKCodec? codec = SKCodec.Create(data);
+		using SKCodec? codec = SKCodec.Create(data);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
+		codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Png);
 		outputStream.Position = 0;
 		using SKBitmap output = SKBitmap.Decode(outputStream);
 		output.ShouldNotBeNull();
@@ -3039,9 +3039,9 @@ using SKCodec? codec = SKCodec.Create(data);
 		// Output stream should contain valid JPEG data
 		output.Position.ShouldBe(0);
 		output.Length.ShouldBeGreaterThan(0);
-using SKCodec? codec = SKCodec.Create(output);
+		using SKCodec? codec = SKCodec.Create(output);
 		codec.ShouldNotBeNull();
-		codec!.EncodedFormat.ShouldBe(SKEncodedImageFormat.Jpeg);
+		codec.EncodedFormat.ShouldBe(SKEncodedImageFormat.Jpeg);
 	}
 
 	[RetryTheory(3)]
