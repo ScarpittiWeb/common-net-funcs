@@ -16,7 +16,7 @@ internal static class ValidationAttributeHelpers
 			throw new InvalidOperationException("Regex pattern cannot be null or empty");
 		}
 
-		return matchTimeoutInMilliseconds == -1 ? new Regex(pattern, RegexOptions.Compiled) : new Regex(pattern, RegexOptions.Compiled, TimeSpan.FromMilliseconds(matchTimeoutInMilliseconds));
+		return matchTimeoutInMilliseconds == -1 ? new Regex(pattern, RegexOptions.Compiled, TimeSpan.FromSeconds(5)) : new Regex(pattern, RegexOptions.Compiled, TimeSpan.FromMilliseconds(matchTimeoutInMilliseconds));
 	}
 
 	// We are looking for an exact match, not just a search hit. This matches what the RegularExpressionValidator control does
