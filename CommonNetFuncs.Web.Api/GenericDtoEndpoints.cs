@@ -143,7 +143,7 @@ public sealed class GenericDtoEndpoints : ControllerBase
 		where TModel : class?, new() where TContext : DbContext where TOutDto : class?, new()
 	{
 		TModel? dbModel = await baseAppDbContextActions.GetByKey(primaryKey).ConfigureAwait(false);
-		return await PatchInternal<TModel, TContext, TOutDto>(dbModel, patch, baseAppDbContextActions).ConfigureAwait(false);
+		return ToActionResult(await PatchInternal<TModel, TContext, TOutDto>(dbModel, patch, baseAppDbContextActions).ConfigureAwait(false));
 	}
 
 	/// <summary>
@@ -160,7 +160,7 @@ public sealed class GenericDtoEndpoints : ControllerBase
 		where TModel : class?, new() where TContext : DbContext where TOutDto : class?, new()
 	{
 		TModel? dbModel = await baseAppDbContextActions.GetByKey(primaryKey).ConfigureAwait(false);
-		return await PatchInternal<TModel, TContext, TOutDto>(dbModel, patch, baseAppDbContextActions).ConfigureAwait(false);
+		return ToActionResult(await PatchInternal<TModel, TContext, TOutDto>(dbModel, patch, baseAppDbContextActions).ConfigureAwait(false));
 	}
 
 	/// <summary>
@@ -173,50 +173,11 @@ public sealed class GenericDtoEndpoints : ControllerBase
 	/// <param name="patch">Patch document containing the updates to be made to the entity.</param>
 	/// <param name="baseAppDbContextActions">Instance of baseAppDbContextActions to use.</param>
 	/// <returns>Ok if successful, otherwise NoContent.</returns>
-	private async Task<ActionResult<TOutDto>> PatchInternal<TModel, TContext, TOutDto>(TModel? dbModel, JsonPatchDocument<TModel> patch, IBaseDbContextActions<TModel, TContext> baseAppDbContextActions)
+	private static Task<EntityUpdateResult<TOutDto>> PatchInternal<TModel, TContext, TOutDto>(TModel? dbModel, JsonPatchDocument<TModel> patch, IBaseDbContextActions<TModel, TContext> baseAppDbContextActions)
 		where TModel : class?, new() where TContext : DbContext where TOutDto : class?, new()
 	{
-		try
-		{
-			if (dbModel == null)
-			{
-				return NoContent();
-			}
-
-			if (patch.Operations.Count == 0)
-			{
-				return Ok(dbModel.FastMap<TModel, TOutDto>());
-			}
-
-			TModel updateModel = dbModel.DeepClone();
-
-			patch.ApplyTo(updateModel);
-
-			List<ValidationResult> failedValidations = [];
-			Validator.TryValidateObject(updateModel, new(updateModel), failedValidations);
-			if (failedValidations.AnyFast())
-			{
-				ActionResult result = ValidationProblem(ModelState);
-				if (result is ObjectResult objectResult)
-				{
-					objectResult.StatusCode = (int)HttpStatusCode.BadRequest;
-				}
-				return result;
-			}
-
-			updateModel.CopyPropertiesTo(dbModel);
-			baseAppDbContextActions.Update(dbModel);
-			if (await baseAppDbContextActions.SaveChanges().ConfigureAwait(false))
-			{
-				return Ok(dbModel.FastMap<TModel, TOutDto>());
-			}
-		}
-		catch (Exception ex)
-		{
-			logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
-
-		}
-		return NoContent();
+		return EndpointUpdateHelper.UpdateAndSave(dbModel, patch.Operations.Count > 0, patch.ApplyTo, baseAppDbContextActions,
+			static x => x.FastMap<TModel, TOutDto>());
 	}
 
 	/// <summary>
@@ -235,7 +196,7 @@ public sealed class GenericDtoEndpoints : ControllerBase
 		where TModel : class?, new() where TContext : DbContext where TInDto : class, new() where TOutDto : class?, new()
 	{
 		TModel? dbModel = await baseAppDbContextActions.GetByKey(primaryKey).ConfigureAwait(false);
-		return await UpdateInternal<TModel, TContext, TInDto, TOutDto>(dbModel, inDto, baseAppDbContextActions).ConfigureAwait(false);
+		return ToActionResult(await UpdateInternal<TModel, TContext, TInDto, TOutDto>(dbModel, inDto, baseAppDbContextActions).ConfigureAwait(false));
 	}
 
 	/// <summary>
@@ -253,7 +214,7 @@ public sealed class GenericDtoEndpoints : ControllerBase
 		where TModel : class?, new() where TContext : DbContext where TInDto : class, new() where TOutDto : class?, new()
 	{
 		TModel? dbModel = await baseAppDbContextActions.GetByKey(primaryKey).ConfigureAwait(false);
-		return await UpdateInternal<TModel, TContext, TInDto, TOutDto>(dbModel, inDto, baseAppDbContextActions).ConfigureAwait(false);
+		return ToActionResult(await UpdateInternal<TModel, TContext, TInDto, TOutDto>(dbModel, inDto, baseAppDbContextActions).ConfigureAwait(false));
 	}
 
 	/// <summary>
@@ -267,43 +228,25 @@ public sealed class GenericDtoEndpoints : ControllerBase
 	/// <param name="inDto">Input DTO with updated values</param>
 	/// <param name="baseAppDbContextActions">Instance of baseAppDbContextActions to use.</param>
 	/// <returns>Ok if successful, otherwise NoContent.</returns>
-	private async Task<ActionResult<TOutDto>> UpdateInternal<TModel, TContext, TInDto, TOutDto>(TModel? dbModel, TInDto? inDto, IBaseDbContextActions<TModel, TContext> baseAppDbContextActions)
+	private static Task<EntityUpdateResult<TOutDto>> UpdateInternal<TModel, TContext, TInDto, TOutDto>(TModel? dbModel, TInDto? inDto, IBaseDbContextActions<TModel, TContext> baseAppDbContextActions)
 		where TModel : class?, new() where TContext : DbContext where TInDto : class, new() where TOutDto : class?, new()
 	{
-		try
+		return EndpointUpdateHelper.UpdateAndSave(dbModel, true, updateModel => inDto.CopyPropertiesTo(updateModel), baseAppDbContextActions,
+			static x => x.FastMap<TModel, TOutDto>());
+	}
+
+	private ActionResult<TOutDto> ToActionResult<TOutDto>(EntityUpdateResult<TOutDto> result) where TOutDto : class?, new()
+	{
+		if (result.Status == EntityUpdateStatus.ValidationFailed)
 		{
-			if (dbModel == null)
+			ActionResult problem = ValidationProblem(ModelState);
+			if (problem is ObjectResult objectResult)
 			{
-				return NoContent();
+				objectResult.StatusCode = (int)HttpStatusCode.BadRequest;
 			}
-
-			TModel updateModel = dbModel.DeepClone();
-			inDto.CopyPropertiesTo(updateModel);
-
-			List<ValidationResult> failedValidations = [];
-			Validator.TryValidateObject(updateModel, new(updateModel), failedValidations);
-			if (failedValidations.AnyFast())
-			{
-				ActionResult result = ValidationProblem(ModelState);
-				if (result is ObjectResult objectResult)
-				{
-					objectResult.StatusCode = (int)HttpStatusCode.BadRequest;
-				}
-				return result;
-			}
-
-			updateModel.CopyPropertiesTo(dbModel);
-			baseAppDbContextActions.Update(dbModel);
-			if (await baseAppDbContextActions.SaveChanges().ConfigureAwait(false))
-			{
-				return Ok(dbModel.FastMap<TModel, TOutDto>());
-			}
+			return problem;
 		}
-		catch (Exception ex)
-		{
-			logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
 
-		}
-		return NoContent();
+		return result.Status == EntityUpdateStatus.Ok ? Ok(result.Value) : NoContent();
 	}
 }

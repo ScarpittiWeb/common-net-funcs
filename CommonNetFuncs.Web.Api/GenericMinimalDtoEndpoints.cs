@@ -176,42 +176,8 @@ public static class GenericMinimalDtoEndpoints
 	private static async Task<Results<Ok<TOutDto>, NoContent, ValidationProblem>> PatchInternal<TModel, TContext, TOutDto>(TModel? dbModel, JsonPatchDocument<TModel> patch, IBaseDbContextActions<TModel, TContext> baseAppDbContextActions)
 		where TModel : class?, new() where TContext : DbContext where TOutDto : class?, new()
 	{
-		try
-		{
-			if (dbModel == null)
-			{
-				return TypedResults.NoContent();
-			}
-
-			if (patch.Operations.Count == 0)
-			{
-				return TypedResults.Ok(dbModel.FastMap<TModel, TOutDto>());
-			}
-
-			TModel updateModel = dbModel.DeepClone();
-
-			patch.ApplyTo(updateModel);
-
-			List<ValidationResult> failedValidations = [];
-			if (!Validator.TryValidateObject(updateModel, new(updateModel), failedValidations))
-			{
-				Dictionary<string, string[]> result = failedValidations.ToDictionary(x => x.MemberNames.FirstOrDefault() ?? "Error", x => new string[] { x.ErrorMessage! });
-				return TypedResults.ValidationProblem(result);
-			}
-
-			updateModel.CopyPropertiesTo(dbModel);
-			baseAppDbContextActions.Update(dbModel);
-			if (await baseAppDbContextActions.SaveChanges().ConfigureAwait(false))
-			{
-				return TypedResults.Ok(dbModel.FastMap<TModel, TOutDto>());
-			}
-		}
-		catch (Exception ex)
-		{
-			logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
-
-		}
-		return TypedResults.NoContent();
+		return EndpointUpdateHelper.ToTypedResult(await EndpointUpdateHelper.UpdateAndSave<TModel, TContext, TOutDto>(dbModel, patch.Operations.Count > 0, updateModel => patch.ApplyTo(updateModel), baseAppDbContextActions,
+			static x => x.FastMap<TModel, TOutDto>()).ConfigureAwait(false));
 	}
 
 	/// <summary>
@@ -265,35 +231,7 @@ public static class GenericMinimalDtoEndpoints
 	private static async Task<Results<Ok<TOutDto>, NoContent, ValidationProblem>> UpdateInternal<TModel, TContext, TInDto, TOutDto>(TModel? dbModel, TInDto? inDto, IBaseDbContextActions<TModel, TContext> baseAppDbContextActions)
 		where TModel : class?, new() where TContext : DbContext where TInDto : class, new() where TOutDto : class?, new()
 	{
-		try
-		{
-			if (dbModel == null)
-			{
-				return TypedResults.NoContent();
-			}
-
-			TModel updateModel = dbModel.DeepClone();
-			inDto.CopyPropertiesTo(updateModel);
-
-			List<ValidationResult> failedValidations = [];
-			if (!Validator.TryValidateObject(updateModel, new(updateModel), failedValidations))
-			{
-				Dictionary<string, string[]> result = failedValidations.ToDictionary(x => x.MemberNames.FirstOrDefault() ?? "Error", x => new string[] { x.ErrorMessage! });
-				return TypedResults.ValidationProblem(result);
-			}
-
-			updateModel.CopyPropertiesTo(dbModel);
-			baseAppDbContextActions.Update(dbModel);
-			if (await baseAppDbContextActions.SaveChanges().ConfigureAwait(false))
-			{
-				return TypedResults.Ok(dbModel.FastMap<TModel, TOutDto>());
-			}
-		}
-		catch (Exception ex)
-		{
-			logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
-
-		}
-		return TypedResults.NoContent();
+		return EndpointUpdateHelper.ToTypedResult(await EndpointUpdateHelper.UpdateAndSave<TModel, TContext, TOutDto>(dbModel, true, updateModel => inDto.CopyPropertiesTo(updateModel), baseAppDbContextActions,
+			static x => x.FastMap<TModel, TOutDto>()).ConfigureAwait(false));
 	}
 }

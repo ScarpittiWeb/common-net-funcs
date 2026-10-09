@@ -321,32 +321,7 @@ public static class Export
 					y++;
 				}
 
-				if (!createTable)
-				{
-					ws.Range(1, 1, 1, props.Length).SetAutoFilter();
-				}
-				else
-				{
-					IXLTable table = ws.Range(1, 1, y - 1, props.Length).CreateTable();
-					table.ShowTotalsRow = false;
-					table.ShowRowStripes = true;
-					table.Theme = XLTableTheme.FromName(tableStyle.ToString());
-					table.ShowAutoFilter = true;
-					table.Name = tableName;
-				}
-
-				try
-				{
-					for (int i = 1; i <= props.Length; i++)
-					{
-						ws.Column(i).AdjustToContents();
-					}
-				}
-				catch (Exception ex)
-				{
-					logger.Error(ex, "Error using ClosedXML AdjustToContents in {Class}.{Method}", nameof(Export), nameof(ExcelExport));
-					logger.Warn("libgdiplus library required to use ClosedXML AdjustToContents method");
-				}
+				FinalizeWorksheet(ws, createTable, y - 1, props.Length, tableName, tableStyle);
 			}
 			return true;
 		}
@@ -449,32 +424,7 @@ public static class Export
 
 				int totalCols = columnNames.Count;
 
-				if (!createTable)
-				{
-					ws.Range(1, 1, 1, totalCols).SetAutoFilter();
-				}
-				else
-				{
-					IXLTable table = ws.Range(1, 1, y - 1, totalCols).CreateTable();
-					table.ShowTotalsRow = false;
-					table.ShowRowStripes = true;
-					table.Theme = XLTableTheme.FromName(tableStyle.ToString());
-					table.ShowAutoFilter = true;
-					table.Name = tableName;
-				}
-
-				try
-				{
-					for (int i = 1; i <= totalCols; i++)
-					{
-						ws.Column(i).AdjustToContents();
-					}
-				}
-				catch (Exception ex)
-				{
-					logger.Error(ex, "Error using ClosedXML AdjustToContents in {Class}.{Method}", nameof(Export), nameof(ExcelExport));
-					logger.Warn("libgdiplus library required to use ClosedXML AdjustToContents method");
-				}
+				FinalizeWorksheet(ws, createTable, y - 1, totalCols, tableName, tableStyle);
 			}
 			return true;
 		}
@@ -486,6 +436,36 @@ public static class Export
 		{
 			logger.Error(ex, ErrorLocationTemplate, nameof(Export), nameof(ExcelExport));
 			return false;
+		}
+	}
+
+	private static void FinalizeWorksheet(IXLWorksheet ws, bool createTable, int lastRow, int totalCols, string tableName, ETableStyle tableStyle)
+	{
+		if (!createTable)
+		{
+			ws.Range(1, 1, 1, totalCols).SetAutoFilter();
+		}
+		else
+		{
+			IXLTable table = ws.Range(1, 1, lastRow, totalCols).CreateTable();
+			table.ShowTotalsRow = false;
+			table.ShowRowStripes = true;
+			table.Theme = XLTableTheme.FromName(tableStyle.ToString());
+			table.ShowAutoFilter = true;
+			table.Name = tableName;
+		}
+
+		try
+		{
+			for (int i = 1; i <= totalCols; i++)
+			{
+				ws.Column(i).AdjustToContents();
+			}
+		}
+		catch (Exception ex)
+		{
+			logger.Error(ex, "Error using ClosedXML AdjustToContents in {Class}.{Method}", nameof(Export), nameof(ExcelExport));
+			logger.Warn("libgdiplus library required to use ClosedXML AdjustToContents method");
 		}
 	}
 

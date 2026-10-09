@@ -16,28 +16,17 @@ public static class RunBatches
 	{
 		ThrowHelper.ThrowIfNull(itemsToProcess, nameof(itemsToProcess));
 		ThrowHelper.ThrowIfNull(processor, nameof(processor));
-		ThrowHelper.ThrowIfNegativeOrZero(batchSize, nameof(batchSize));
-
-		// Materialize distinct items once - use HashSet directly to avoid double materialization
-		List<T> distinctItems = new(new HashSet<T>(itemsToProcess));
-		int totalBatches = (int)MathHelpers.Ceiling((decimal)distinctItems.Count / batchSize, 1);
+		List<T> distinctItems = PrepareBatches(itemsToProcess, batchSize, out int totalBatches);
 		bool success = true;
 
 		for (int i = 0; i < totalBatches; i++)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			int start = i * batchSize;
-			int count = Math.Min(batchSize, distinctItems.Count - start);
-			IReadOnlyList<T> batch = distinctItems.GetRange(start, count);
+			IReadOnlyList<T> batch = GetBatch(distinctItems, i, batchSize);
 
 			success &= await processor(batch).ConfigureAwait(false);
 
-			if (logProgress)
-			{
-				logger.Info("Process {CurrentBatch}/{TotalBatches} complete", i + 1, totalBatches);
-			}
-
-			if (!success && breakOnFail)
+			if (ShouldStopAfterBatch(success, breakOnFail, logProgress, i, totalBatches))
 			{
 				break;
 			}
@@ -62,28 +51,17 @@ public static class RunBatches
 	{
 		ThrowHelper.ThrowIfNull(itemsToProcess, nameof(itemsToProcess));
 		ThrowHelper.ThrowIfNull(processor, nameof(processor));
-		ThrowHelper.ThrowIfNegativeOrZero(batchSize, nameof(batchSize));
-
-		// Materialize distinct items once - use HashSet directly to avoid double materialization
-		List<T> distinctItems = new(new HashSet<T>(itemsToProcess));
-		int totalBatches = (int)MathHelpers.Ceiling((decimal)distinctItems.Count / batchSize, 1);
+		List<T> distinctItems = PrepareBatches(itemsToProcess, batchSize, out int totalBatches);
 		bool success = true;
 
 		for (int i = 0; i < totalBatches; i++)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			int start = i * batchSize;
-			int count = Math.Min(batchSize, distinctItems.Count - start);
-			IReadOnlyList<T> batch = distinctItems.GetRange(start, count);
+			IReadOnlyList<T> batch = GetBatch(distinctItems, i, batchSize);
 
 			success &= processor(batch);
 
-			if (logProgress)
-			{
-				logger.Info("Process {CurrentBatch}/{TotalBatches} complete", i + 1, totalBatches);
-			}
-
-			if (!success && breakOnFail)
+			if (ShouldStopAfterBatch(success, breakOnFail, logProgress, i, totalBatches))
 			{
 				break;
 			}
@@ -99,5 +77,32 @@ public static class RunBatches
 		ThrowHelper.ThrowIfNull(listProcessor, nameof(listProcessor));
 		// Adapt the List processor to work with IEnumerable - batch from GetRange is always List<TNumber>
 		return RunBatchedProcess(itemsToProcess, batch => listProcessor((List<T>)batch), batchSize, breakOnFail, logProgress, cancellationToken);
+	}
+
+	private static List<T> PrepareBatches<T>(IEnumerable<T> itemsToProcess, int batchSize, out int totalBatches)
+	{
+		ThrowHelper.ThrowIfNegativeOrZero(batchSize, nameof(batchSize));
+
+		// Materialize distinct items once - use HashSet directly to avoid double materialization
+		List<T> distinctItems = new(new HashSet<T>(itemsToProcess));
+		totalBatches = (int)MathHelpers.Ceiling((decimal)distinctItems.Count / batchSize, 1);
+		return distinctItems;
+	}
+
+	private static List<T> GetBatch<T>(List<T> items, int batchIndex, int batchSize)
+	{
+		int start = batchIndex * batchSize;
+		return items.GetRange(start, Math.Min(batchSize, items.Count - start));
+	}
+
+	// Returns true when processing should stop because a batch failed and breakOnFail is set.
+	private static bool ShouldStopAfterBatch(bool success, bool breakOnFail, bool logProgress, int batchIndex, int totalBatches)
+	{
+		if (logProgress)
+		{
+			logger.Info("Process {CurrentBatch}/{TotalBatches} complete", batchIndex + 1, totalBatches);
+		}
+
+		return !success && breakOnFail;
 	}
 }

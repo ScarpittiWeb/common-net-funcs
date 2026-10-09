@@ -230,16 +230,8 @@ public static class Inspect
 			return "null";
 		}
 
-		HashAlgorithm algorithm = hashAlgorithm switch
-		{
-			EHashAlgorithm.SHA1 => SHA1.Create(),
-			EHashAlgorithm.MD5 => MD5.Create(),
-			EHashAlgorithm.SHA256 => SHA256.Create(),
-			EHashAlgorithm.SHA384 => SHA384.Create(),
-			_ => SHA512.Create()
-		};
-
-		IOrderedEnumerable<PropertyInfo> properties = GetOrAddPropertiesFromReflectionCache(typeof(T)).Where(x => x.CanRead).OrderBy(x => x.Name);
+		HashAlgorithm algorithm = CreateHashAlgorithm(hashAlgorithm);
+		IOrderedEnumerable<PropertyInfo> properties = GetReadablePropertiesOrderedByName(typeof(T));
 
 		using MemoryStream ms = new();
 		using BinaryWriter writer = new(ms);
@@ -268,16 +260,8 @@ public static class Inspect
 			return "null";
 		}
 
-		HashAlgorithm algorithm = hashAlgorithm switch
-		{
-			EHashAlgorithm.SHA1 => SHA1.Create(),
-			EHashAlgorithm.MD5 => MD5.Create(),
-			EHashAlgorithm.SHA256 => SHA256.Create(),
-			EHashAlgorithm.SHA384 => SHA384.Create(),
-			_ => SHA512.Create()
-		};
-
-		IOrderedEnumerable<PropertyInfo> properties = GetOrAddPropertiesFromReflectionCache(typeof(T)).Where(x => x.CanRead).OrderBy(x => x.Name);
+		HashAlgorithm algorithm = CreateHashAlgorithm(hashAlgorithm);
+		IOrderedEnumerable<PropertyInfo> properties = GetReadablePropertiesOrderedByName(typeof(T));
 
 		await using MemoryStream ms = new();
 		await using BinaryWriter writer = new(ms);
@@ -292,6 +276,42 @@ public static class Inspect
 		await ms.FlushAsync().ConfigureAwait(false);
 		ms.Position = 0; // Reset stream position for reading
 		return HashCompat.ToHexStringLower(await algorithm.ComputeHashAsync(ms).ConfigureAwait(false));
+	}
+
+	private static HashAlgorithm CreateHashAlgorithm(EHashAlgorithm hashAlgorithm)
+	{
+		return hashAlgorithm switch
+		{
+			EHashAlgorithm.SHA1 => SHA1.Create(),
+			EHashAlgorithm.MD5 => MD5.Create(),
+			EHashAlgorithm.SHA256 => SHA256.Create(),
+			EHashAlgorithm.SHA384 => SHA384.Create(),
+			_ => SHA512.Create()
+		};
+	}
+
+	private static IOrderedEnumerable<PropertyInfo> GetReadablePropertiesOrderedByName(Type type)
+	{
+		return GetOrAddPropertiesFromReflectionCache(type).Where(x => x.CanRead).OrderBy(x => x.Name);
+	}
+
+	// Sorts the hashes so the collection's hash doesn't depend on element order.
+	private static void WriteSortedItemHashes(BinaryWriter writer, List<string> itemHashes)
+	{
+		itemHashes.Sort();
+
+		writer.Write("[");
+		foreach (string itemHash in itemHashes)
+		{
+			writer.Write(itemHash);
+			writer.Write(",");
+		}
+		writer.Write("]");
+	}
+
+	private static bool IsSimpleValue(Type type, object value)
+	{
+		return type.IsPrimitive || (value is string) || (value is decimal);
 	}
 
 	/// <summary>
@@ -322,29 +342,19 @@ public static class Inspect
 				itemHashes.Add(BitConverter.ToString(HashCompat.Md5HashData(itemMs.ToArray())));
 			}
 
-			// Sort the hashes to ensure order independence
-			itemHashes.Sort();
-
-			// Write the sorted collection
-			writer.Write("[");
-			foreach (string itemHash in itemHashes)
-			{
-				writer.Write(itemHash);
-				writer.Write(",");
-			}
-			writer.Write("]");
+			WriteSortedItemHashes(writer, itemHashes);
 			return;
 		}
 
 		// Handle primitive types and strings
-		if (type.IsPrimitive || (value is string) || (value is decimal))
+		if (IsSimpleValue(type, value))
 		{
 			writer.Write(value.ToString()!);
 			return;
 		}
 
 		// Handle complex objects recursively
-		IOrderedEnumerable<PropertyInfo> properties = GetOrAddPropertiesFromReflectionCache(type).Where(x => x.CanRead).OrderBy(x => x.Name);
+		IOrderedEnumerable<PropertyInfo> properties = GetReadablePropertiesOrderedByName(type);
 
 		writer.Write("{");
 		foreach (PropertyInfo property in properties)
@@ -385,29 +395,19 @@ public static class Inspect
 				itemHashes.Add(BitConverter.ToString(await HashCompat.Md5HashDataAsync(itemMs).ConfigureAwait(false)));
 			}
 
-			// Sort the hashes to ensure order independence
-			itemHashes.Sort();
-
-			// Write the sorted collection
-			writer.Write("[");
-			foreach (string itemHash in itemHashes)
-			{
-				writer.Write(itemHash);
-				writer.Write(",");
-			}
-			writer.Write("]");
+			WriteSortedItemHashes(writer, itemHashes);
 			return;
 		}
 
 		// Handle primitive types and strings
-		if (type.IsPrimitive || (value is string) || (value is decimal))
+		if (IsSimpleValue(type, value))
 		{
 			writer.Write(value.ToString()!);
 			return;
 		}
 
 		// Handle complex objects recursively
-		IOrderedEnumerable<PropertyInfo> properties = GetOrAddPropertiesFromReflectionCache(type).Where(x => x.CanRead).OrderBy(x => x.Name);
+		IOrderedEnumerable<PropertyInfo> properties = GetReadablePropertiesOrderedByName(type);
 
 		writer.Write("{");
 		foreach (PropertyInfo property in properties)

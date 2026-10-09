@@ -32,55 +32,10 @@ public static class Export
 	/// <param name="createTable">If <see langword="true"/>, will format the exported data into an Excel table.</param>
 	/// <param name="skipColumnNames">List of columns to not include in export</param>
 	/// <returns>MemoryStream containing en excel file with a tabular representation of dataList set to position 0</returns>
-	public static async Task<MemoryStream?> GenericExcelExport<T>(this IEnumerable<T> dataList, MemoryStream? memoryStream = null, bool createTable = false,
+	public static Task<MemoryStream?> GenericExcelExport<T>(this IEnumerable<T> dataList, MemoryStream? memoryStream = null, bool createTable = false,
 			string sheetName = "Data", string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false, CancellationToken cancellationToken = default)
 	{
-		try
-		{
-			if (string.IsNullOrWhiteSpace(sheetName))
-			{
-				sheetName = "Data";
-			}
-
-			if (string.IsNullOrWhiteSpace(tableName))
-			{
-				tableName = "Data";
-			}
-
-			if (sheetName.Length > 31)
-			{
-				throw new ArgumentOutOfRangeException(nameof(sheetName), "Sheet name cannot be longer than 31 characters");
-			}
-
-			if (tableName.Length > 31)
-			{
-				throw new ArgumentOutOfRangeException(nameof(tableName), TableNameLengthError);
-			}
-
-			memoryStream ??= new();
-
-			using SXSSFWorkbook wb = new();
-			ISheet ws = wb.CreateSheet(sheetName);
-			if (!dataList.ExcelExport(wb, ws, createTable, tableName, skipColumnNames, wrapText, cancellationToken))
-			{
-				return null;
-			}
-
-			await memoryStream.WriteFileToMemoryStreamAsync(wb, cancellationToken).ConfigureAwait(false);
-			wb.Close();
-
-			return memoryStream;
-		}
-		catch (OperationCanceledException)
-		{
-			throw new TaskCanceledException($"{nameof(Export)}.{nameof(GenericExcelExport)} was canceled");
-		}
-		catch (Exception ex)
-		{
-			logger.Error(ex, ErrorLocationTemplate, $"{nameof(Export)}.{nameof(GenericExcelExport)}");
-		}
-
-		return new();
+		return ExportToMemoryStreamAsync(memoryStream, sheetName, tableName, (wb, ws, normalizedTableName) => dataList.ExcelExport(wb, ws, createTable, normalizedTableName, skipColumnNames, wrapText, cancellationToken), cancellationToken);
 	}
 
 	/// <summary>
@@ -92,8 +47,14 @@ public static class Export
 	/// <param name="createTable">If <see langword="true"/>, will format the exported data into an Excel table.</param>
 	/// <param name="skipColumnNames">List of columns to not include in export</param>
 	/// <returns>MemoryStream containing en excel file with a tabular representation of dataList set to position 0</returns>
-	public static async Task<MemoryStream?> GenericExcelExport(this DataTable datatable, MemoryStream? memoryStream = null, bool createTable = false,
+	public static Task<MemoryStream?> GenericExcelExport(this DataTable datatable, MemoryStream? memoryStream = null, bool createTable = false,
 			string sheetName = "Data", string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false, CancellationToken cancellationToken = default)
+	{
+		return ExportToMemoryStreamAsync(memoryStream, sheetName, tableName, (wb, ws, normalizedTableName) => datatable.ExcelExport(wb, ws, createTable, normalizedTableName, skipColumnNames, wrapText, cancellationToken), cancellationToken);
+	}
+
+	private static async Task<MemoryStream?> ExportToMemoryStreamAsync(MemoryStream? memoryStream, string sheetName, string tableName, Func<SXSSFWorkbook, ISheet, string, bool> exportData,
+		CancellationToken cancellationToken)
 	{
 		try
 		{
@@ -121,7 +82,7 @@ public static class Export
 
 			using SXSSFWorkbook wb = new();
 			ISheet ws = wb.CreateSheet(sheetName);
-			if (!datatable.ExcelExport(wb, ws, createTable, tableName, skipColumnNames, wrapText, cancellationToken))
+			if (!exportData(wb, ws, tableName))
 			{
 				return null;
 			}

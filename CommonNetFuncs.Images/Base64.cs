@@ -83,36 +83,9 @@ public static partial class Base64
 	/// </summary>
 	/// <param name="ms">Memory stream containing image data to convert into a base 64 string</param>
 	/// <returns>Base 64 string representation of image</returns>
-	public static async Task<string?> ConvertImageFileToBase64Async(this MemoryStream ms)
+	public static Task<string?> ConvertImageFileToBase64Async(this MemoryStream ms)
 	{
-		try
-		{
-			if (ms.Length > 0)
-			{
-				if (!ms.CanRead)
-				{
-					throw new NotSupportedException("Memory stream must be readable to convert to base 64");
-				}
-
-				if (ms.CanSeek && ms.Position != 0)
-				{
-					ms.Position = 0;
-				}
-
-				SKImageInfo bounds = SKBitmap.DecodeBounds(ms);
-				if (bounds.Height > 0 && bounds.Width > 0)
-				{
-					ReadOnlySpan<byte> imageBytes = ms.ToArray();
-					return ToBase64String(imageBytes);
-				}
-			}
-		}
-		catch (Exception ex)
-		{
-			logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
-		}
-
-		return null;
+		return Task.FromResult(ms.ConvertImageFileToBase64());
 	}
 
 	/// <summary>

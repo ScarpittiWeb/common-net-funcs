@@ -207,25 +207,11 @@ public static class Export
 				int colCount = properties.Length;
 
 				// Pre-compute column letter strings (e.g. "A", "B", ..., "AJ") once
-				string[] colLetters = new string[colCount];
-				for (int i = 0; i < colCount; i++)
-				{
-					colLetters[i] = CellReference.NumberToColumnName((uint)(i + 1));
-				}
+				string[] colLetters = CreateColumnLetters(colCount);
 
 				// Set up shared-string table with O(1) dictionary lookup.
 				// The original approach called InsertSharedStringItem per cell, which did an O(n) linear scan and called SharedStringTable.Save() after every single insertion
-				WorkbookPart workbookPart = document.WorkbookPart ?? throw new InvalidOperationException("WorkbookPart is missing.");
-				SharedStringTablePart sharedStringPart = workbookPart.GetPartsOfType<SharedStringTablePart>().FirstOrDefault() ?? workbookPart.AddNewPart<SharedStringTablePart>();
-				sharedStringPart.SharedStringTable ??= new SharedStringTable();
-				SharedStringTable sharedStringTable = sharedStringPart.SharedStringTable;
-
-				Dictionary<string, int> sharedStringCache = new(StringComparer.Ordinal);
-				int ssCount = 0;
-				foreach (SharedStringItem item in sharedStringTable.Elements<SharedStringItem>())
-				{
-					sharedStringCache[item.InnerText] = ssCount++;
-				}
+				SharedStringTable sharedStringTable = LoadSharedStringTable(document, out Dictionary<string, int> sharedStringCache, out int ssCount);
 
 				// Track maximum column widths inline during the write pass so that the second full-cell pass of AutoFitColumns() (which also repeated the tree traversals and shared-string lookups) is avoided entirely.
 				double[] colWidths = new double[colCount];
@@ -238,20 +224,7 @@ public static class Export
 				for (int i = 0; i < colCount; i++)
 				{
 					string text = properties[i].Name;
-					int ssIdx = GetOrAddSharedString(text, sharedStringCache, sharedStringTable, ref ssCount);
-					headerRow.AppendChild(new Cell
-					{
-						CellReference = colLetters[i] + y,
-						StyleIndex = headerStyleId,
-						DataType = CellValues.SharedString,
-						CellValue = new CellValue(ssIdx.ToString())
-					});
-
-					double w = CalculateWidth(text, headerStyleId);
-					if (w > colWidths[i])
-					{
-						colWidths[i] = w;
-					}
+					AppendSharedStringCell(headerRow, colLetters[i] + y, text, headerStyleId, sharedStringCache, sharedStringTable, ref ssCount, colWidths, i);
 				}
 				sheetData.AppendChild(headerRow);
 				y++;
@@ -264,45 +237,13 @@ public static class Export
 					for (int i = 0; i < colCount; i++)
 					{
 						string text = properties[i].GetValue(item)?.ToString() ?? string.Empty;
-						int ssIdx = GetOrAddSharedString(text, sharedStringCache, sharedStringTable, ref ssCount);
-						dataRow.AppendChild(new Cell
-						{
-							CellReference = colLetters[i] + y,
-							StyleIndex = bodyStyleId,
-							DataType = CellValues.SharedString,
-							CellValue = new CellValue(ssIdx.ToString())
-						});
-						double w = CalculateWidth(text, bodyStyleId);
-						if (w > colWidths[i])
-						{
-							colWidths[i] = w;
-						}
+						AppendSharedStringCell(dataRow, colLetters[i] + y, text, bodyStyleId, sharedStringCache, sharedStringTable, ref ssCount, colWidths, i);
 					}
 					sheetData.AppendChild(dataRow);
 					y++;
 				}
 
-				// Save shared-string table exactly once instead of once per cell
-				sharedStringTable.Save();
-
-				// Apply column widths from the inline-tracked array — no second pass needed
-				Columns columns = worksheet.GetColumns();
-				for (int i = 0; i < colCount; i++)
-				{
-					if (colWidths[i] > 0)
-					{
-						columns.AppendChild(new Column { Min = (uint)(i + 1), Max = (uint)(i + 1), Width = Math.Min(colWidths[i], 100), CustomWidth = true });
-					}
-				}
-
-				if (exportSettings.CreateTable)
-				{
-					worksheet.CreateTable(1, 1, y - 1, (uint)colCount, exportSettings.TableName);
-				}
-				else
-				{
-					worksheet.SetAutoFilter(1, 1, y - 1, (uint)colCount);
-				}
+				FinishWorksheet(worksheet, sharedStringTable, colWidths, y - 1, exportSettings);
 			}
 			return true;
 		}
@@ -343,24 +284,10 @@ public static class Export
 				int totalCols = data.Columns.Count;
 
 				// Pre-compute column letter strings once
-				string[] colLetters = new string[totalCols];
-				for (int i = 0; i < totalCols; i++)
-				{
-					colLetters[i] = CellReference.NumberToColumnName((uint)(i + 1));
-				}
+				string[] colLetters = CreateColumnLetters(totalCols);
 
 				// Set up shared-string table with O(1) dictionary lookup
-				WorkbookPart workbookPart = document.WorkbookPart ?? throw new InvalidOperationException("WorkbookPart is missing.");
-				SharedStringTablePart sharedStringPart = workbookPart.GetPartsOfType<SharedStringTablePart>().FirstOrDefault() ?? workbookPart.AddNewPart<SharedStringTablePart>();
-				sharedStringPart.SharedStringTable ??= new SharedStringTable();
-				SharedStringTable sharedStringTable = sharedStringPart.SharedStringTable;
-
-				Dictionary<string, int> sharedStringCache = new(StringComparer.Ordinal);
-				int ssCount = 0;
-				foreach (SharedStringItem item in sharedStringTable.Elements<SharedStringItem>())
-				{
-					sharedStringCache[item.InnerText] = ssCount++;
-				}
+				SharedStringTable sharedStringTable = LoadSharedStringTable(document, out Dictionary<string, int> sharedStringCache, out int ssCount);
 
 				// Build skip set using 0-based column indices (HashSet for O(1) lookup vs the
 				// original List<uint> which was O(n) per Contains call)
@@ -388,20 +315,7 @@ public static class Export
 					}
 
 					string text = data.Columns[i].ColumnName;
-					int ssIdx = GetOrAddSharedString(text, sharedStringCache, sharedStringTable, ref ssCount);
-					headerRow.AppendChild(new Cell
-					{
-						CellReference = colLetters[i] + y,
-						StyleIndex = headerStyleId,
-						DataType = CellValues.SharedString,
-						CellValue = new CellValue(ssIdx.ToString())
-					});
-
-					double w = CalculateWidth(text, headerStyleId);
-					if (w > colWidths[i])
-					{
-						colWidths[i] = w;
-					}
+					AppendSharedStringCell(headerRow, colLetters[i] + y, text, headerStyleId, sharedStringCache, sharedStringTable, ref ssCount, colWidths, i);
 				}
 				sheetData.AppendChild(headerRow);
 				y++;
@@ -419,45 +333,13 @@ public static class Export
 							continue;
 						}
 						string text = items[i]!.ToString() ?? string.Empty;
-						int ssIdx = GetOrAddSharedString(text, sharedStringCache, sharedStringTable, ref ssCount);
-						dataRow.AppendChild(new Cell
-						{
-							CellReference = colLetters[i] + y,
-							StyleIndex = bodyStyleId,
-							DataType = CellValues.SharedString,
-							CellValue = new CellValue(ssIdx.ToString())
-						});
-						double w = CalculateWidth(text, bodyStyleId);
-						if (w > colWidths[i])
-						{
-							colWidths[i] = w;
-						}
+						AppendSharedStringCell(dataRow, colLetters[i] + y, text, bodyStyleId, sharedStringCache, sharedStringTable, ref ssCount, colWidths, i);
 					}
 					sheetData.AppendChild(dataRow);
 					y++;
 				}
 
-				// Save shared-string table exactly once
-				sharedStringTable.Save();
-
-				// Apply column widths from the inline-tracked array
-				Columns columns = worksheet.GetColumns();
-				for (int i = 0; i < totalCols; i++)
-				{
-					if (colWidths[i] > 0)
-					{
-						columns.AppendChild(new Column { Min = (uint)(i + 1), Max = (uint)(i + 1), Width = Math.Min(colWidths[i], 100), CustomWidth = true });
-					}
-				}
-
-				if (exportSettings.CreateTable)
-				{
-					worksheet.CreateTable(1, 1, y - 1, (uint)totalCols, exportSettings.TableName);
-				}
-				else
-				{
-					worksheet.SetAutoFilter(1, 1, y - 1, (uint)totalCols);
-				}
+				FinishWorksheet(worksheet, sharedStringTable, colWidths, y - 1, exportSettings);
 			}
 			return true;
 		}
@@ -587,11 +469,7 @@ public static class Export
 				uint bodyStyleId = document.GetStandardCellStyle(EStyle.Body, wrapText: exportSettings.WrapText);
 
 				int totalCols = data.Columns.Count;
-				string[] colLetters = new string[totalCols];
-				for (int i = 0; i < totalCols; i++)
-				{
-					colLetters[i] = CellReference.NumberToColumnName((uint)(i + 1));
-				}
+				string[] colLetters = CreateColumnLetters(totalCols);
 
 				HashSet<int> skipColumnIndices = [];
 				for (int i = 0; i < totalCols; i++)
@@ -938,6 +816,77 @@ public static class Export
 		await writer.WriteEndElementAsync().ConfigureAwait(false); // Text
 		await writer.WriteEndElementAsync().ConfigureAwait(false); // InlineString
 		await writer.WriteEndElementAsync().ConfigureAwait(false); // Cell
+	}
+
+	private static string[] CreateColumnLetters(int columnCount)
+	{
+		string[] colLetters = new string[columnCount];
+		for (int i = 0; i < columnCount; i++)
+		{
+			colLetters[i] = CellReference.NumberToColumnName((uint)(i + 1));
+		}
+		return colLetters;
+	}
+
+	// Builds an O(1) lookup of the existing shared strings so cells don't need a linear scan per insertion.
+	private static SharedStringTable LoadSharedStringTable(SpreadsheetDocument document, out Dictionary<string, int> sharedStringCache, out int ssCount)
+	{
+		WorkbookPart workbookPart = document.WorkbookPart ?? throw new InvalidOperationException("WorkbookPart is missing.");
+		SharedStringTablePart sharedStringPart = workbookPart.GetPartsOfType<SharedStringTablePart>().FirstOrDefault() ?? workbookPart.AddNewPart<SharedStringTablePart>();
+		sharedStringPart.SharedStringTable ??= new SharedStringTable();
+		SharedStringTable sharedStringTable = sharedStringPart.SharedStringTable;
+
+		sharedStringCache = new(StringComparer.Ordinal);
+		ssCount = 0;
+		foreach (SharedStringItem item in sharedStringTable.Elements<SharedStringItem>())
+		{
+			sharedStringCache[item.InnerText] = ssCount++;
+		}
+		return sharedStringTable;
+	}
+
+	// Writes a shared-string cell and tracks the widest value per column so no second pass is needed to auto-fit.
+	private static void AppendSharedStringCell(Row row, string cellReference, string text, uint styleId, Dictionary<string, int> sharedStringCache, SharedStringTable sharedStringTable,
+		ref int ssCount, double[] colWidths, int colIndex)
+	{
+		int ssIdx = GetOrAddSharedString(text, sharedStringCache, sharedStringTable, ref ssCount);
+		row.AppendChild(new Cell
+		{
+			CellReference = cellReference,
+			StyleIndex = styleId,
+			DataType = CellValues.SharedString,
+			CellValue = new CellValue(ssIdx.ToString())
+		});
+
+		double w = CalculateWidth(text, styleId);
+		if (w > colWidths[colIndex])
+		{
+			colWidths[colIndex] = w;
+		}
+	}
+
+	private static void FinishWorksheet(Worksheet worksheet, SharedStringTable sharedStringTable, double[] colWidths, uint lastRow, ExportSettings exportSettings)
+	{
+		// Save shared-string table exactly once instead of once per cell
+		sharedStringTable.Save();
+
+		Columns columns = worksheet.GetColumns();
+		for (int i = 0; i < colWidths.Length; i++)
+		{
+			if (colWidths[i] > 0)
+			{
+				columns.AppendChild(new Column { Min = (uint)(i + 1), Max = (uint)(i + 1), Width = Math.Min(colWidths[i], 100), CustomWidth = true });
+			}
+		}
+
+		if (exportSettings.CreateTable)
+		{
+			worksheet.CreateTable(1, 1, lastRow, (uint)colWidths.Length, exportSettings.TableName);
+		}
+		else
+		{
+			worksheet.SetAutoFilter(1, 1, lastRow, (uint)colWidths.Length);
+		}
 	}
 
 	/// <summary>

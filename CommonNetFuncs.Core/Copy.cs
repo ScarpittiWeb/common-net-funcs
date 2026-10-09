@@ -93,23 +93,33 @@ public static class Copy
 				return;
 			}
 
-			foreach ((Action<TDest, object?> Set, Func<TSource, object?> Get) in GetOrCreatePropertyMaps<TSource, TDest>().Values)
-			{
-				Set(dest, Get(source));
-			}
+			CopyMappedProperties(source, dest);
 		}
 		else
 		{
 			dest ??= Activator.CreateInstance<TDest>();
-			IEnumerable<PropertyInfo> sourceProps = GetOrAddPropertiesFromReflectionCache(typeof(TSource)).Where(x => x.CanRead && x.GetIndexParameters().Length == 0);
-			Dictionary<string, PropertyInfo> destPropDict = GetOrAddPropertiesFromReflectionCache(typeof(TDest)).Where(x => x.CanWrite && x.GetIndexParameters().Length == 0).ToDictionary(x => x.Name, x => x, StringComparer.Ordinal);
+			CopyMatchingPropertiesByReflection(source, dest);
+		}
+	}
 
-			foreach (PropertyInfo sourceProp in sourceProps)
+	private static void CopyMappedProperties<TSource, TDest>(TSource source, TDest dest) where TSource : class? where TDest : class?
+	{
+		foreach ((Action<TDest, object?> Set, Func<TSource, object?> Get) in GetOrCreatePropertyMaps<TSource, TDest>().Values)
+		{
+			Set(dest, Get(source));
+		}
+	}
+
+	private static void CopyMatchingPropertiesByReflection<TSource, TDest>(TSource source, TDest dest)
+	{
+		IEnumerable<PropertyInfo> sourceProps = GetOrAddPropertiesFromReflectionCache(typeof(TSource)).Where(x => x.CanRead && x.GetIndexParameters().Length == 0);
+		Dictionary<string, PropertyInfo> destPropDict = GetOrAddPropertiesFromReflectionCache(typeof(TDest)).Where(x => x.CanWrite && x.GetIndexParameters().Length == 0).ToDictionary(x => x.Name, x => x, StringComparer.Ordinal);
+
+		foreach (PropertyInfo sourceProp in sourceProps)
+		{
+			if (destPropDict.TryGetValue(sourceProp.Name, out PropertyInfo? destProp) && destProp.PropertyType == sourceProp.PropertyType)
 			{
-				if (destPropDict.TryGetValue(sourceProp.Name, out PropertyInfo? destProp) && destProp.PropertyType == sourceProp.PropertyType)
-				{
-					destProp.SetValue(dest, sourceProp.GetValue(source, null), null);
-				}
+				destProp.SetValue(dest, sourceProp.GetValue(source, null), null);
 			}
 		}
 	}
@@ -163,23 +173,11 @@ public static class Copy
 		TDest dest = new();
 		if (useCache)
 		{
-			foreach ((Action<TDest, object?> Set, Func<TSource, object?> Get) in GetOrCreatePropertyMaps<TSource, TDest>().Values)
-			{
-				Set(dest, Get(source));
-			}
+			CopyMappedProperties(source, dest);
 		}
 		else
 		{
-			IEnumerable<PropertyInfo> sourceProps = GetOrAddPropertiesFromReflectionCache(typeof(TSource)).Where(x => x.CanRead && x.GetIndexParameters().Length == 0);
-			Dictionary<string, PropertyInfo> destPropDict = GetOrAddPropertiesFromReflectionCache(typeof(TDest)).Where(x => x.CanWrite && x.GetIndexParameters().Length == 0).ToDictionary(x => x.Name, x => x, StringComparer.Ordinal);
-
-			foreach (PropertyInfo sourceProp in sourceProps)
-			{
-				if (destPropDict.TryGetValue(sourceProp.Name, out PropertyInfo? destProp) && destProp.PropertyType == sourceProp.PropertyType)
-				{
-					destProp.SetValue(dest, sourceProp.GetValue(source, null), null);
-				}
-			}
+			CopyMatchingPropertiesByReflection(source, dest);
 		}
 		return dest;
 	}

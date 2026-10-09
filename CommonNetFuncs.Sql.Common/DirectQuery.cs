@@ -399,6 +399,61 @@ public static class DirectQuery
 		}
 	}
 
+	// Shared by the provider-specific DirectQuery classes so each doesn't need its own copy of the retry loop.
+	internal static async IAsyncEnumerable<T> GetDataStreamWithRetryAsync<T>(DbConnection conn, DbCommand cmd, int commandTimeoutSeconds, int maxRetry, bool useCache,
+		[EnumeratorCancellation] CancellationToken cancellationToken = default) where T : class, new()
+	{
+		IAsyncEnumerator<T>? enumeratedReader = null;
+		for (int i = 0; i < maxRetry; i++)
+		{
+			try
+			{
+				enumeratedReader = GetDataStreamAsync<T>(conn, cmd, commandTimeoutSeconds, useCache, cancellationToken).GetAsyncEnumerator(cancellationToken);
+				break;
+			}
+			catch (DbException ex)
+			{
+				logger.Error(ex, "DB Error @ {ErrorLocation}", ex.GetLocationOfException());
+			}
+			catch (Exception ex)
+			{
+				logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
+			}
+		}
+
+		if (enumeratedReader != null)
+		{
+			while (await enumeratedReader.MoveNextAsync().ConfigureAwait(false))
+			{
+				yield return enumeratedReader.Current;
+			}
+		}
+	}
+
+	internal static IEnumerable<T> GetDataStreamWithRetry<T>(DbConnection conn, DbCommand cmd, int commandTimeoutSeconds, int maxRetry, bool useCache, CancellationToken cancellationToken = default)
+		where T : class, new()
+	{
+		IEnumerable<T>? results = null;
+		for (int i = 0; i < maxRetry; i++)
+		{
+			try
+			{
+				results = GetDataStream<T>(conn, cmd, commandTimeoutSeconds, useCache, cancellationToken);
+				break;
+			}
+			catch (DbException ex)
+			{
+				logger.Error(ex, "DB Error @ {ErrorLocation}", ex.GetLocationOfException());
+			}
+			catch (Exception ex)
+			{
+				logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
+			}
+		}
+
+		return results ?? [];
+	}
+
 	/// <summary>
 	/// Retrieves data from the database using the provided connection and command, mapping each record to an instance of type <typeparamref name="T"/> and returning the results as an IEnumerable containing a list.
 	/// </summary>

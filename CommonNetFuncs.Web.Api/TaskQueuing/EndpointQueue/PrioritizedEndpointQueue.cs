@@ -239,23 +239,7 @@ public class PrioritizedEndpointQueue : IDisposable
 
 					stopwatch.Stop();
 
-					lock (statsLock)
-					{
-						stats.TotalProcessedTasks++;
-						stats.LastProcessedAt = DateTime.UtcNow;
-
-						PriorityStats priorityStats = stats.PriorityBreakdown[currentTask.PriorityLevel];
-						priorityStats.ProcessedTasks++;
-						priorityStats.LastProcessedAt = DateTime.UtcNow;
-
-						List<TimeSpan> processingTimes = processingTimesByPriority[currentTask.PriorityLevel];
-						processingTimes.Add(stopwatch.Elapsed);
-
-						if (processingTimes.Count > processTimeWindow)
-						{
-							processingTimes.RemoveAt(0);
-						}
-					}
+					PrioritizedQueueStatsRecorder.RecordProcessedTask(stats, statsLock, processingTimesByPriority, processTimeWindow, currentTask.PriorityLevel, stopwatch.Elapsed);
 
 					logger.Debug("Completed task {TaskId} with priority {Priority} for endpoint {EndpointKey} in {Duration}ms", currentTask.Id, currentTask.Priority, EndpointKey, stopwatch.ElapsedMilliseconds);
 				}

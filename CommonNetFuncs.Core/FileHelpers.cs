@@ -423,56 +423,9 @@ public static partial class FileHelpers
 	/// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
 	/// <typeparam name="TReturn">Type of the return value.</typeparam>
 	/// <returns>A tuple with a success flag and the appropriate return value based on the outcome of the operation, or null if not provided.</returns>
-	public static async Task<(bool success, TReturn? result)> ReadFileFromPipe<TReturn>(this PipeReader reader, Stream outputStream, TReturn? successReturn = default,
+	public static Task<(bool success, TReturn? result)> ReadFileFromPipe<TReturn>(this PipeReader reader, Stream outputStream, TReturn? successReturn = default,
 		Func<Exception, TReturn?>? errorReturn = default, CancellationToken cancellationToken = default)
 	{
-		while (true)
-		{
-			try
-			{
-				ReadResult readResult = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
-				ReadOnlySequence<byte> data = readResult.Buffer;
-
-				if (data.IsEmpty && readResult.IsCompleted)
-				{
-					break;
-				}
-
-				// Write directly without ToArray() allocation
-				if (data.IsSingleSegment)
-				{
-					await outputStream.WriteAsync(data.First, cancellationToken).ConfigureAwait(false);
-				}
-				else
-				{
-					foreach (ReadOnlyMemory<byte> segment in data)
-					{
-						await outputStream.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
-					}
-				}
-
-				reader.AdvanceTo(data.End);
-
-				if (readResult.IsCompleted)
-				{
-					break;
-				}
-			}
-			catch (Exception ex)
-			{
-				if (errorReturn != null)
-				{
-					return (false, errorReturn(ex));
-				}
-				throw new FileLoadException("Error reading file from pipe", ex);
-			}
-		}
-
-		await outputStream.FlushAsync(cancellationToken).ConfigureAwait(false);
-		if (outputStream.CanSeek)
-		{
-			outputStream.Position = 0;
-		}
-		return (true, successReturn);
+		return reader.ReadFileFromPipe(outputStream, long.MaxValue, successReturn, default(TReturn), errorReturn, cancellationToken);
 	}
 }
