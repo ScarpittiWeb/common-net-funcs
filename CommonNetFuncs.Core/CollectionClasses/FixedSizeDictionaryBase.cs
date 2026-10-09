@@ -62,7 +62,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 #if NET9_0_OR_GREATER
 				return dictionary.Keys;
 #else
-				return order.Select(static x => x.Key).ToList();
+				return order.Select(static x => x.Key).ToArray();
 #endif
 			}
 			finally
@@ -83,7 +83,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 #if NET9_0_OR_GREATER
 				return dictionary.Values;
 #else
-				return order.Select(static x => x.Value).ToList();
+				return order.Select(static x => x.Value).ToArray();
 #endif
 			}
 			finally
