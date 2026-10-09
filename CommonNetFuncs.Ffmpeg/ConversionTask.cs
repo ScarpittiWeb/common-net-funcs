@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using Xabe.FFmpeg;
 using Xabe.FFmpeg.Exceptions;
 using static CommonNetFuncs.Core.Collections;
@@ -195,9 +196,9 @@ public static class ConversionTask
 		{
 			logger.Error(cex, "Conversion task failed!");
 		}
-		catch (Exception ex) when (cancellationTokenSource.IsCancellationRequested && ex is OperationCanceledException or ArgumentException)
+		catch (Exception ex) when (cancellationTokenSource.IsCancellationRequested && ex is OperationCanceledException or ArgumentException or JsonException)
 		{
-			//Cancelling while ffprobe is still reading the file makes Xabe throw ArgumentException("Invalid file...") instead of OperationCanceledException
+			//Cancelling while ffprobe is still reading the file makes Xabe throw ArgumentException("Invalid file...") or JsonException (empty ffprobe output) instead of OperationCanceledException
 			logger.Warn(ex, $"Conversion of file [{fileToConvert.Name}] canceled before ffmpeg started.");
 			conversionFailed = true;
 		}
