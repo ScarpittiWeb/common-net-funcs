@@ -195,6 +195,12 @@ public static class ConversionTask
 		{
 			logger.Error(cex, "Conversion task failed!");
 		}
+		catch (Exception ex) when (cancellationTokenSource.IsCancellationRequested && ex is OperationCanceledException or ArgumentException)
+		{
+			//Cancelling while ffprobe is still reading the file makes Xabe throw ArgumentException("Invalid file...") instead of OperationCanceledException
+			logger.Warn(ex, $"Conversion of file [{fileToConvert.Name}] canceled before ffmpeg started.");
+			conversionFailed = true;
+		}
 		finally
 		{
 			fpsDict.Remove(conversionIndex, out _); //Remove FPS item for completed conversions
