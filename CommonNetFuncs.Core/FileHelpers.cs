@@ -23,7 +23,7 @@ public static partial class FileHelpers
 	[GeneratedRegex(@"\(([^)]*)\)$")]
 	private static partial Regex IncrementedFileNameRegex();
 #else
-	private static readonly Regex incrementedFileNameRegexInstance = new(@"\(([^)]*)\)$", RegexOptions.Compiled);
+	private static readonly Regex incrementedFileNameRegexInstance = new(@"\(([^)]*)\)$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex IncrementedFileNameRegex() => incrementedFileNameRegexInstance;
 #endif
 

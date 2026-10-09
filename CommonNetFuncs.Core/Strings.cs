@@ -56,7 +56,7 @@ public static partial class Strings
 	[GeneratedRegex(@"\s+")]
 	private static partial Regex MultiSpaceRegex();
 #else
-	private static readonly Regex multiSpaceRegexInstance = new(@"\s+", RegexOptions.Compiled);
+	private static readonly Regex multiSpaceRegexInstance = new(@"\s+", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex MultiSpaceRegex() => multiSpaceRegexInstance;
 #endif
 
@@ -64,7 +64,7 @@ public static partial class Strings
 	[GeneratedRegex("^[a-zA-Z0-9]*$")]
 	private static partial Regex AlphanumericRegex();
 #else
-	private static readonly Regex alphanumericRegexInstance = new("^[a-zA-Z0-9]*$", RegexOptions.Compiled);
+	private static readonly Regex alphanumericRegexInstance = new("^[a-zA-Z0-9]*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex AlphanumericRegex() => alphanumericRegexInstance;
 #endif
 
@@ -72,7 +72,7 @@ public static partial class Strings
 	[GeneratedRegex(@"^[a-zA-Z0-9\s]*$")]
 	private static partial Regex AlphanumericWithSpacesRegex();
 #else
-	private static readonly Regex alphanumericWithSpacesRegexInstance = new(@"^[a-zA-Z0-9\s]*$", RegexOptions.Compiled);
+	private static readonly Regex alphanumericWithSpacesRegexInstance = new(@"^[a-zA-Z0-9\s]*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex AlphanumericWithSpacesRegex() => alphanumericWithSpacesRegexInstance;
 #endif
 
@@ -80,7 +80,7 @@ public static partial class Strings
 	[GeneratedRegex("^[a-zA-Z]*$")]
 	private static partial Regex AlphaOnlyRegex();
 #else
-	private static readonly Regex alphaOnlyRegexInstance = new("^[a-zA-Z]*$", RegexOptions.Compiled);
+	private static readonly Regex alphaOnlyRegexInstance = new("^[a-zA-Z]*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex AlphaOnlyRegex() => alphaOnlyRegexInstance;
 #endif
 
@@ -88,7 +88,7 @@ public static partial class Strings
 	[GeneratedRegex(@"^[a-zA-Z\s]*$")]
 	private static partial Regex AlphaOnlyWithSpacesRegex();
 #else
-	private static readonly Regex alphaOnlyWithSpacesRegexInstance = new(@"^[a-zA-Z\s]*$", RegexOptions.Compiled);
+	private static readonly Regex alphaOnlyWithSpacesRegexInstance = new(@"^[a-zA-Z\s]*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex AlphaOnlyWithSpacesRegex() => alphaOnlyWithSpacesRegexInstance;
 #endif
 
@@ -96,7 +96,7 @@ public static partial class Strings
 	[GeneratedRegex("^[0-9]*$")]
 	private static partial Regex NumericOnlyRegex();
 #else
-	private static readonly Regex numericOnlyRegexInstance = new("^[0-9]*$", RegexOptions.Compiled);
+	private static readonly Regex numericOnlyRegexInstance = new("^[0-9]*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex NumericOnlyRegex() => numericOnlyRegexInstance;
 #endif
 
@@ -104,7 +104,7 @@ public static partial class Strings
 	[GeneratedRegex(@"^[0-9\s]*$")]
 	private static partial Regex NumericOnlyWithSpacesRegex();
 #else
-	private static readonly Regex numericOnlyWithSpacesRegexInstance = new(@"^[0-9\s]*$", RegexOptions.Compiled);
+	private static readonly Regex numericOnlyWithSpacesRegexInstance = new(@"^[0-9\s]*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex NumericOnlyWithSpacesRegex() => numericOnlyWithSpacesRegexInstance;
 #endif
 
@@ -112,7 +112,7 @@ public static partial class Strings
 	[GeneratedRegex(@"\D+")]
 	private static partial Regex ExtractNumbersRegex();
 #else
-	private static readonly Regex extractNumbersRegexInstance = new(@"\D+", RegexOptions.Compiled);
+	private static readonly Regex extractNumbersRegexInstance = new(@"\D+", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex ExtractNumbersRegex() => extractNumbersRegexInstance;
 #endif
 
@@ -120,7 +120,7 @@ public static partial class Strings
 	[GeneratedRegex(@"(\d{3})(\d{4})")]
 	private static partial Regex SevenDigitPhoneNumberRegex();
 #else
-	private static readonly Regex sevenDigitPhoneNumberRegexInstance = new(@"(\d{3})(\d{4})", RegexOptions.Compiled);
+	private static readonly Regex sevenDigitPhoneNumberRegexInstance = new(@"(\d{3})(\d{4})", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex SevenDigitPhoneNumberRegex() => sevenDigitPhoneNumberRegexInstance;
 #endif
 
@@ -128,7 +128,7 @@ public static partial class Strings
 	[GeneratedRegex(@"(\d{3})(\d{3})(\d{4})")]
 	private static partial Regex TenDigitPhoneNumberRegex();
 #else
-	private static readonly Regex tenDigitPhoneNumberRegexInstance = new(@"(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled);
+	private static readonly Regex tenDigitPhoneNumberRegexInstance = new(@"(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex TenDigitPhoneNumberRegex() => tenDigitPhoneNumberRegexInstance;
 #endif
 
@@ -136,7 +136,7 @@ public static partial class Strings
 	[GeneratedRegex(@"(\d{1})(\d{3})(\d{3})(\d{4})")]
 	private static partial Regex ElevenDigitPhoneNumberRegex();
 #else
-	private static readonly Regex elevenDigitPhoneNumberRegexInstance = new(@"(\d{1})(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled);
+	private static readonly Regex elevenDigitPhoneNumberRegexInstance = new(@"(\d{1})(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex ElevenDigitPhoneNumberRegex() => elevenDigitPhoneNumberRegexInstance;
 #endif
 
@@ -144,7 +144,7 @@ public static partial class Strings
 	[GeneratedRegex(@"(\d{2})(\d{3})(\d{3})(\d{4})")]
 	private static partial Regex TwelveDigitPhoneNumberRegex();
 #else
-	private static readonly Regex twelveDigitPhoneNumberRegexInstance = new(@"(\d{2})(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled);
+	private static readonly Regex twelveDigitPhoneNumberRegexInstance = new(@"(\d{2})(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex TwelveDigitPhoneNumberRegex() => twelveDigitPhoneNumberRegexInstance;
 #endif
 
@@ -152,7 +152,7 @@ public static partial class Strings
 	[GeneratedRegex("[A-Za-z]")]
 	internal static partial Regex RemoveLettersRegex();
 #else
-	private static readonly Regex removeLettersRegexInstance = new("[A-Za-z]", RegexOptions.Compiled);
+	private static readonly Regex removeLettersRegexInstance = new("[A-Za-z]", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	internal static Regex RemoveLettersRegex() => removeLettersRegexInstance;
 #endif
 
@@ -160,7 +160,7 @@ public static partial class Strings
 	[GeneratedRegex("[0-9]")]
 	private static partial Regex RemoveNumbersRegex();
 #else
-	private static readonly Regex removeNumbersRegexInstance = new("[0-9]", RegexOptions.Compiled);
+	private static readonly Regex removeNumbersRegexInstance = new("[0-9]", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex RemoveNumbersRegex() => removeNumbersRegexInstance;
 #endif
 
@@ -168,7 +168,7 @@ public static partial class Strings
 	[GeneratedRegex("[A-Za-z ]")]
 	private static partial Regex LettersOnlyRegex();
 #else
-	private static readonly Regex lettersOnlyRegexInstance = new("[A-Za-z ]", RegexOptions.Compiled);
+	private static readonly Regex lettersOnlyRegexInstance = new("[A-Za-z ]", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex LettersOnlyRegex() => lettersOnlyRegexInstance;
 #endif
 
@@ -176,7 +176,7 @@ public static partial class Strings
 	[GeneratedRegex(@"[0-9]*\.?[0-9]+")]
 	private static partial Regex NumbersOnlyRegex();
 #else
-	private static readonly Regex numbersOnlyRegexInstance = new(@"[0-9]*\.?[0-9]+", RegexOptions.Compiled);
+	private static readonly Regex numbersOnlyRegexInstance = new(@"[0-9]*\.?[0-9]+", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex NumbersOnlyRegex() => numbersOnlyRegexInstance;
 #endif
 
@@ -184,7 +184,7 @@ public static partial class Strings
 	[GeneratedRegex(@"[0-9 ]*\.?[0-9]+((\/|\\)[0-9 ]*\.?[0-9]+)?")]
 	private static partial Regex NumbersWithFractionsOnlyRegex();
 #else
-	private static readonly Regex numbersWithFractionsOnlyRegexInstance = new(@"[0-9 ]*\.?[0-9]+((\/|\\)[0-9 ]*\.?[0-9]+)?", RegexOptions.Compiled);
+	private static readonly Regex numbersWithFractionsOnlyRegexInstance = new(@"[0-9 ]*\.?[0-9]+((\/|\\)[0-9 ]*\.?[0-9]+)?", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex NumbersWithFractionsOnlyRegex() => numbersWithFractionsOnlyRegexInstance;
 #endif
 
@@ -192,7 +192,7 @@ public static partial class Strings
 	[GeneratedRegex(@"(\s+|[^\w\s])")]
 	private static partial Regex TitleCaseSplitRegex();
 #else
-	private static readonly Regex titleCaseSplitRegexInstance = new(@"(\s+|[^\w\s])", RegexOptions.Compiled);
+	private static readonly Regex titleCaseSplitRegexInstance = new(@"(\s+|[^\w\s])", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex TitleCaseSplitRegex() => titleCaseSplitRegexInstance;
 #endif
 
@@ -200,7 +200,7 @@ public static partial class Strings
 	[GeneratedRegex(@"\w")]
 	private static partial Regex TitleCaseWordRegex();
 #else
-	private static readonly Regex titleCaseWordRegexInstance = new(@"\w", RegexOptions.Compiled);
+	private static readonly Regex titleCaseWordRegexInstance = new(@"\w", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex TitleCaseWordRegex() => titleCaseWordRegexInstance;
 #endif
 

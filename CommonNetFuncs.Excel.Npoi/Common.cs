@@ -227,7 +227,7 @@ public static partial class Common
 	[GeneratedRegex("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")]
 	private static partial Regex HexColorRegex();
 #else
-	private static readonly Regex hexColorRegexInstance = new("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", RegexOptions.Compiled);
+	private static readonly Regex hexColorRegexInstance = new("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex HexColorRegex() => hexColorRegexInstance;
 #endif
 

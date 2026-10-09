@@ -15,7 +15,7 @@ public static partial class HtmlEmailBuilder
 	[GeneratedRegex(@"https?://[^\n\t< ]+", RegexOptions.IgnoreCase, "en-US")]
 	private static partial Regex UrlRegex();
 #else
-	private static readonly Regex urlRegexInstance = new(@"https?://[^\n\t< ]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+	private static readonly Regex urlRegexInstance = new(@"https?://[^\n\t< ]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex UrlRegex() => urlRegexInstance;
 #endif
 

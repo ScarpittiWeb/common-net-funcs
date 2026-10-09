@@ -17,7 +17,7 @@ public static partial class Base64
 	[GeneratedRegex(@"data:image\/([^;]+);base64,([^'"")\s]+)|base64([^'"")\s]+)")]
 	private static partial Regex ExtractBase64Regex();
 #else
-	private static readonly Regex extractBase64RegexInstance = new(@"data:image\/([^;]+);base64,([^'"")\s]+)|base64([^'"")\s]+)", RegexOptions.Compiled);
+	private static readonly Regex extractBase64RegexInstance = new(@"data:image\/([^;]+);base64,([^'"")\s]+)|base64([^'"")\s]+)", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 	private static Regex ExtractBase64Regex() => extractBase64RegexInstance;
 #endif
 

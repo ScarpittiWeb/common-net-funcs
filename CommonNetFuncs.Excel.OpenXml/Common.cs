@@ -3737,7 +3737,7 @@ public static partial class Common
 		[GeneratedRegex(@"([A-Z]+)(\d+)")]
 		private static partial Regex CellRefRegex();
 #else
-		private static readonly Regex cellRefRegexInstance = new(@"([A-Z]+)(\d+)", RegexOptions.Compiled);
+		private static readonly Regex cellRefRegexInstance = new(@"([A-Z]+)(\d+)", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
 		private static Regex CellRefRegex() => cellRefRegexInstance;
 #endif
 
