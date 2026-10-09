@@ -19,6 +19,8 @@ using NPOI.XSSF.UserModel;
 using SkiaSharp;
 using static System.Convert;
 using static System.Math;
+
+
 #if !NET6_0_OR_GREATER
 using CommonNetFuncs.Excel.Npoi.Internal;
 #endif
@@ -1295,10 +1297,10 @@ public static partial class Common
 
 			decimal scale = (rangeAspect < imgAspect) ? ((rangeWidth - 3m) / imgWidth) : (rangeHeight - 3m) / imgHeight;
 
-			int resizeWidth = (int)MathCompat.Round(imgWidth * scale, 0);
-			int resizeHeight = (int)MathCompat.Round(imgHeight * scale, 0);
-			int xMargin = (int)MathCompat.Round((rangeWidth - resizeWidth) * Units.EMU_PER_PIXEL / 2.0, 0);
-			int yMargin = (int)MathCompat.Round((rangeHeight - resizeHeight) * Units.EMU_PER_PIXEL * 1.75 / 2.0, 0);
+			int resizeWidth = (int)Round(imgWidth * scale, 0);
+			int resizeHeight = (int)Round(imgHeight * scale, 0);
+			int xMargin = (int)Round((rangeWidth - resizeWidth) * Units.EMU_PER_PIXEL / 2.0, 0);
+			int yMargin = (int)Round((rangeHeight - resizeHeight) * Units.EMU_PER_PIXEL * 1.75 / 2.0, 0);
 
 			anchor.AnchorType = anchorType;
 			anchor.Col1 = area.FirstColumn;
@@ -1367,7 +1369,7 @@ public static partial class Common
 			}
 			totalWidth += columnWidth;
 		}
-		return (int)MathCompat.Round(totalWidth, 0);
+		return (int)Round(totalWidth, 0);
 	}
 
 	/// <summary>
@@ -1391,7 +1393,7 @@ public static partial class Common
 			totalHeight += ws.GetRow(i)?.HeightInPoints ?? 0;
 		}
 
-		return (int)MathCompat.Round(totalHeight * Units.EMU_PER_POINT / Units.EMU_PER_PIXEL, 0); //Approximation of point to px
+		return (int)Round(totalHeight * Units.EMU_PER_POINT / Units.EMU_PER_PIXEL, 0); //Approximation of point to px
 	}
 
 	/// <summary>
