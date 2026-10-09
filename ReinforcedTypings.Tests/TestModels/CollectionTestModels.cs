@@ -1,5 +1,6 @@
 ﻿using CommonNetFuncs.ReinforcedTypings.Collections;
 using Reinforced.Typings.Attributes;
+using ReinforcedTypings.Tests.TestModels.Other;
 
 namespace ReinforcedTypings.Tests.TestModels;
 

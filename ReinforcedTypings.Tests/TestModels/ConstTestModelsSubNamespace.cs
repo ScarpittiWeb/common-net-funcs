@@ -1,6 +1,6 @@
 ﻿using CommonNetFuncs.ReinforcedTypings.Constants;
 
-namespace ReinforcedTypings.Tests.TestModels;
+namespace ReinforcedTypings.Tests.TestModels.Sub;
 
 [TsConst]
 public static class NamespacedConsts

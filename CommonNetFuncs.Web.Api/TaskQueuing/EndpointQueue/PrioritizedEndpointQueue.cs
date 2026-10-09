@@ -369,7 +369,8 @@ public class PrioritizedEndpointQueue : IDisposable
 
 				try
 				{
-					processingTask?.Wait(TimeSpan.FromSeconds(5), cancellationTokenSource.Token);
+					// Must not pass cancellationTokenSource.Token here: it was cancelled above, so Wait would throw immediately.
+					processingTask?.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
 				}
 				catch (AggregateException)
 				{
