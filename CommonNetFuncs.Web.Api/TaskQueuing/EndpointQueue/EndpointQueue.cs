@@ -158,7 +158,7 @@ public class EndpointQueue : IDisposable
 
 				try
 				{
-					processingTask.Wait(TimeSpan.FromSeconds(5), cancellationTokenSource.Token);
+					processingTask.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
 				}
 				catch (Exception ex)
 				{
