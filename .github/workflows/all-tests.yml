@@ -252,6 +252,16 @@ jobs:
         working-directory: ./${{ matrix.test-suite }}
         shell: bash
 
+      # SonarQube Community Edition only analyzes the main branch, so only keep raw coverage for pushes to it.
+      - name: Upload Coverage for SonarQube
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ matrix.test-suite }}
+          path: ./${{ matrix.test-suite }}/coverage/net*/coverage.cobertura.*.xml
+          if-no-files-found: ignore
+          retention-days: 1
+
       - name: Coveralls Parallel
         if: always()
         uses: coverallsapp/github-action@v2.3.6
@@ -276,6 +286,97 @@ jobs:
           parallel-finished: true
           carryforward: ${{ join(fromJson(needs.discover-tests.outputs.all-projects), ',') }} # Prevents Coveralls issues with unsubmitted coverage reports when some test suites were skipped due to no changes
 
+  # Community Edition has no branch/PR analysis, so this only runs for pushes to main.
+  sonarqube:
+    needs: [discover-tests, test]
+    if: ${{ always() && needs.discover-tests.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    env:
+      SONAR_HOST_URL: https://sonarqube.scarpittiweb.com/
+      SONAR_PROJECT_KEY: ScarpittiWeb_common-net-funcs_a79e7fda-e70a-42a2-a982-8b9afa743668
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # Full history gives SonarQube accurate blame / new-code data
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+            8.0.x
+
+      # SonarQube replaces coverage on every analysis, so suites skipped this run (no changes) must keep their last
+      # known coverage. The cache is restored from the newest previous run and re-saved (under a new key) at job end.
+      - name: Restore Previous Coverage
+        uses: actions/cache@v6
+        with:
+          path: sonar-coverage
+          key: sonar-coverage-${{ github.run_id }}
+          restore-keys: sonar-coverage-
+
+      - name: Download Coverage From This Run
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-*
+          path: coverage-artifacts
+
+      - name: Build SonarQube Coverage Report
+        id: coverage
+        shell: bash
+        run: |
+          shopt -s nullglob
+          mkdir -p sonar-coverage
+          for dir in coverage-artifacts/coverage-*/; do
+            suite=$(basename "$dir")
+            suite="${suite#coverage-}"
+            rm -rf "sonar-coverage/$suite"
+            cp -r "$dir" "sonar-coverage/$suite"
+          done
+
+          if [ -z "$(find sonar-coverage -name 'coverage.cobertura.*.xml' -print -quit)" ]; then
+            echo "No coverage reports available - analysis will run without coverage."
+            echo "has-coverage=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # The test jobs run in a container where the workspace is /__w/<repo>/<repo>; point <source> at this runner's checkout.
+          repo="${{ github.event.repository.name }}"
+          find sonar-coverage -name '*.xml' -exec sed -i "s#/__w/${repo}/${repo}#${GITHUB_WORKSPACE}#g" {} +
+
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          "$HOME/.dotnet/tools/reportgenerator" -reports:"sonar-coverage/**/coverage.cobertura.*.xml" -targetdir:"coverage/sonar" -reporttypes:SonarQube
+          echo "has-coverage=true" >> "$GITHUB_OUTPUT"
+
+      - name: SonarQube Analysis
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          dotnet tool install -g dotnet-sonarscanner
+          export PATH="$PATH:$HOME/.dotnet/tools"
+
+          args=(
+            /k:"$SONAR_PROJECT_KEY"
+            /d:sonar.host.url="$SONAR_HOST_URL"
+            /d:sonar.token="$SONAR_TOKEN"
+            /d:sonar.exclusions="coverage/**"
+            /d:sonar.coverage.exclusions="BenchmarkSuite/**"
+          )
+          if [ "${{ steps.coverage.outputs.has-coverage }}" = "true" ]; then
+            args+=(/d:sonar.coverageReportPaths="$GITHUB_WORKSPACE/coverage/sonar/SonarQube.xml")
+          fi
+
+          dotnet sonarscanner begin "${args[@]}"
+          dotnet build common-net-funcs.slnx --no-incremental
+          dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
 # # This workflow will build a .NET project
 # # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net

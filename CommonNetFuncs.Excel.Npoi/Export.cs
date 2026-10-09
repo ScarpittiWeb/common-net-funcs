@@ -11,7 +11,7 @@ using static CommonNetFuncs.Core.ReflectionCaches;
 namespace CommonNetFuncs.Excel.Npoi;
 
 /// <summary>
-/// Export data to an excel data using NPOI
+/// Export data to an excel file using NPOI
 /// </summary>
 public static class Export
 {
@@ -313,7 +313,6 @@ public static class Export
 				IRow currentRow = ws.GetRow(y) ?? ws.CreateRow(y);
 				foreach (string propName in props.Select(x => x.Name))
 				{
-					//ICell? c = ws.GetCellFromCoordinates(x, y);
 					ICell? c = currentRow.GetCell(x) ?? currentRow.CreateCell(x);
 					if (c != null)
 					{
@@ -340,7 +339,6 @@ public static class Export
 					{
 						object value = prop.GetValue(item) ?? string.Empty;
 
-						//ICell? c = ws.GetCellFromCoordinates(x, y);
 						ICell? c = currentRow.GetCell(x) ?? currentRow.CreateCell(x);
 						if (c != null)
 						{
@@ -372,7 +370,6 @@ public static class Export
 				{
 					for (int i = 0; i < props.Length; i++)
 					{
-						// ws.AutoSizeColumn(x, true);
 						ws.SetColumnWidth(x, (maxColumnWidths[x] <= MaxCellWidthInExcelUnits) ? maxColumnWidths[x] : MaxCellWidthInExcelUnits);
 						x++;
 					}
@@ -437,7 +434,6 @@ public static class Export
 				{
 					if (!skipColumnNames.Contains(column.ColumnName, StringComparer.InvariantCultureIgnoreCase))
 					{
-						//ICell? c = ws.GetCellFromCoordinates(x, y);
 						ICell? c = currentRow.GetCell(x) ?? currentRow.CreateCell(x);
 						if (c != null)
 						{
@@ -465,7 +461,6 @@ public static class Export
 					{
 						if ((value != null) && !skipColumns.Contains(x))
 						{
-							//ICell? c = ws.GetCellFromCoordinates(x, y);
 							ICell? c = currentRow.GetCell(x) ?? currentRow.CreateCell(x);
 							if (c != null)
 							{
@@ -498,7 +493,6 @@ public static class Export
 				{
 					for (int i = 0; i < data.Columns.Count; i++)
 					{
-						// ws.AutoSizeColumn(x, true);
 						ws.SetColumnWidth(x, (maxColumnWidths[x] + (Units.EMU_PER_PIXEL * 3) <= MaxCellWidthInExcelUnits) ? (maxColumnWidths[x] + (Units.EMU_PER_PIXEL * 3)) : MaxCellWidthInExcelUnits);
 						x++;
 					}

@@ -21,7 +21,7 @@ public sealed class MsgPackOutputFilter(MessagePackSerializerOptions options) : 
 
 	public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
 	{
-		object? result = await next(context);
+		object? result = await next(context).ConfigureAwait(false);
 
 		// Skip if the client did not request MsgPack.
 		// Iterate StringValues directly instead of calling .ToString(), which allocates

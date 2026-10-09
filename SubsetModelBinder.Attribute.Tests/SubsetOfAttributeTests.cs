@@ -160,7 +160,7 @@ public class SubsetOfAttributeTests
 
 		// Assert
 		usageAttribute.ShouldNotBeNull();
-		usageAttribute!.ValidOn.ShouldBe(AttributeTargets.Class);
+		usageAttribute.ValidOn.ShouldBe(AttributeTargets.Class);
 	}
 
 	[Fact]
@@ -174,7 +174,7 @@ public class SubsetOfAttributeTests
 
 		// Assert
 		usageAttribute.ShouldNotBeNull();
-		usageAttribute!.Inherited.ShouldBeFalse();
+		usageAttribute.Inherited.ShouldBeFalse();
 	}
 
 	[Fact]
@@ -188,7 +188,7 @@ public class SubsetOfAttributeTests
 
 		// Assert
 		usageAttribute.ShouldNotBeNull();
-		usageAttribute!.AllowMultiple.ShouldBeFalse();
+		usageAttribute.AllowMultiple.ShouldBeFalse();
 	}
 
 	[Fact]
@@ -304,7 +304,7 @@ public class SubsetOfAttributeTests
 
 		// Assert
 		attribute.ShouldNotBeNull();
-		attribute!.SourceType.ShouldBe(typeof(string));
+		attribute.SourceType.ShouldBe(typeof(string));
 		attribute.IsMvcApp.ShouldBeTrue();
 		attribute.AllowInheritedProperties.ShouldBeFalse();
 		attribute.IgnoreType.ShouldBeTrue();

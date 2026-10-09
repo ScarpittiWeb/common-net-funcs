@@ -12,7 +12,7 @@ using static CommonNetFuncs.FastMap.FastMapper;
 
 namespace CommonNetFuncs.Web.Api;
 
-public sealed class GenericMinimalDtoEndpoints
+public static class GenericMinimalDtoEndpoints
 {
 	private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 

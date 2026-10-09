@@ -97,7 +97,7 @@ public static class Optimizer
 			}
 			else
 			{
-				logger.Warn("Unsupported file extension for optimization: {extension}", extension);
+				logger.Warn("Unsupported file extension for optimization: {Extension}", extension);
 				return;
 			}
 
@@ -118,7 +118,7 @@ public static class Optimizer
 				}
 				else
 				{
-					logger.Warn("Image compression failed for [{file}] with exit code {ExitCode}", file, result.ExitCode);
+					logger.Warn("Image compression failed for [{File}] with exit code {ExitCode}", file, result.ExitCode);
 				}
 			}
 		}
@@ -130,7 +130,7 @@ public static class Optimizer
 			}
 			catch (Exception ex)
 			{
-				logger.Error(ex, "Failed to delete temporary file: {file}", workingFile);
+				logger.Error(ex, "Failed to delete temporary file: {File}", workingFile);
 			}
 		}
 	}

@@ -108,13 +108,6 @@ public static class PatchCreator
 
 			if (origType == JTokenType.Date)
 			{
-				//DateTime origDate = origProp.Value.Value<DateTime>();
-				//DateTime modDate = modProp.Value.Value<DateTime>();
-				//if (origDate != modDate)
-				//{
-				//    patch.Replace($"{path}{modProp.Name}", modProp.Value);
-				//}
-
 				object? origVal = origProp.Value.ToObject<object>();
 				object? modVal = modProp.Value.ToObject<object>();
 
@@ -128,16 +121,6 @@ public static class PatchCreator
 					continue;
 				}
 
-				// if (origVal is DateOnly origDo && modVal is DateOnly modDo)
-				// {
-				// 	if (origDo != modDo)
-				// 	{
-				// 		patch.Replace($"{path}{modProp.Name}", modProp.Value);
-				// 	}
-
-				// 	continue;
-				// }
-
 				if (origVal is DateTimeOffset origDto && modVal is DateTimeOffset modDto)
 				{
 					if (origDto != modDto)
@@ -147,12 +130,6 @@ public static class PatchCreator
 
 					continue;
 				}
-
-				// // Fallback: compare as string if unknown date type
-				// if (!Equals(origVal?.ToString(), modVal?.ToString()))
-				// {
-				// 	patch.Replace($"{path}{modProp.Name}", modProp.Value);
-				// }
 			}
 		}
 	}

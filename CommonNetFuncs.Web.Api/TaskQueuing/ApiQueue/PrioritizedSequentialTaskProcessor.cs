@@ -85,7 +85,7 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 			semaphore.Release();
 		}
 
-		return (T?)await queuedTask.CompletionSource.Task;
+		return (T?)await queuedTask.CompletionSource.Task.ConfigureAwait(false);
 	}
 
 	protected override async Task ExecuteAsync(CancellationToken stoppingToken) // Stopping token used here to match the BackgroundService base class

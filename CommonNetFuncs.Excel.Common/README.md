@@ -9,11 +9,11 @@ This project contains constants used for other excel related CommonNetFuncs pack
 ## Contents
 
 - [CommonNetFuncs.Excel.Common](#commonnetfuncsexcelcommon)
-	- [Contents](#contents)
-	- [Constants](#constants)
-		- [Constants Usage Examples](#constants-usage-examples)
-	- [Installation](#installation)
-	- [License](#license)
+  - [Contents](#contents)
+  - [Constants](#constants)
+    - [Constants Usage Examples](#constants-usage-examples)
+  - [Installation](#installation)
+  - [License](#license)
 
 ---
 

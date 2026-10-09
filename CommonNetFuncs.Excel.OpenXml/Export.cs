@@ -12,8 +12,16 @@ using static CommonNetFuncs.Excel.OpenXml.Common;
 
 namespace CommonNetFuncs.Excel.OpenXml;
 
+public class ExportSettings(bool createTable = false, string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false)
+{
+	public bool CreateTable { get; set; } = createTable;
+	public string TableName { get; set; } = tableName;
+	public List<string>? SkipColumnNames { get; set; } = skipColumnNames;
+	public bool WrapText { get; set; } = wrapText;
+}
+
 /// <summary>
-/// Export data to an excel data using NPOI
+/// Export data to an excel file using OpenXML
 /// </summary>
 public static class Export
 {
@@ -29,8 +37,7 @@ public static class Export
 	/// <param name="memoryStream">Output memory stream (will be created if one is not provided)</param>
 	/// <param name="createTable">If <see langword="true"/>, will format the exported data into an Excel table.</param>
 	/// <returns>MemoryStream containing en excel file with a tabular representation of dataList</returns>
-	public static MemoryStream? GenericExcelExport<T>(this IEnumerable<T> dataList, MemoryStream? memoryStream = null, bool createTable = false,
-			string sheetName = "Data", string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false)
+	public static MemoryStream? GenericExcelExport<T>(this IEnumerable<T> dataList, MemoryStream? memoryStream = null, string sheetName = "Data", ExportSettings? exportSettings = null)
 	{
 		try
 		{
@@ -41,7 +48,7 @@ public static class Export
 			uint newSheetId = document.InitializeExcelFile(sheetName);
 			Worksheet? worksheet = document.GetWorksheetById(newSheetId);
 
-			if ((worksheet != null) && !ExportFromTable(document, worksheet, dataList, createTable, tableName, skipColumnNames, wrapText))
+			if ((worksheet != null) && !ExportFromTable(document, worksheet, dataList, exportSettings))
 			{
 				return null;
 			}
@@ -67,8 +74,7 @@ public static class Export
 	/// <param name="memoryStream">Output memory stream (will be created if one is not provided)</param>
 	/// <param name="createTable">If <see langword="true"/>, will format the exported data into an Excel table.</param>
 	/// <returns>MemoryStream containing en excel file with a tabular representation of dataList</returns>
-	public static MemoryStream? GenericExcelExport(this DataTable datatable, MemoryStream? memoryStream = null, bool createTable = false,
-			string sheetName = "Data", string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false)
+	public static MemoryStream? GenericExcelExport(this DataTable datatable, MemoryStream? memoryStream = null, string sheetName = "Data", ExportSettings? exportSettings = null)
 	{
 		try
 		{
@@ -78,7 +84,7 @@ public static class Export
 			uint newSheetId = document.InitializeExcelFile(sheetName);
 			Worksheet? worksheet = document.GetWorksheetById(newSheetId);
 
-			if ((worksheet != null) && !ExportFromTable(document, worksheet, datatable, createTable, tableName, skipColumnNames, wrapText))
+			if ((worksheet != null) && !ExportFromTable(document, worksheet, datatable, exportSettings))
 			{
 				return null;
 			}
@@ -107,9 +113,9 @@ public static class Export
 	/// <param name="createTable">If <see langword="true"/>, will format the inserted data into an Excel table.</param>
 	/// <param name="tableName">Name of the table in Excel</param>
 	/// <returns><see langword="true"/> if data was successfully added to the workbook</returns>
-	public static bool AddGenericTable<T>(this SpreadsheetDocument document, IEnumerable<T> data, string sheetName, bool createTable = false, string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false)
+	public static bool AddGenericTable<T>(this SpreadsheetDocument document, IEnumerable<T> data, string sheetName, ExportSettings? exportSettings = null)
 	{
-		return document.AddGenericTableInternal<T>(data, typeof(IEnumerable<T>), sheetName, createTable, tableName, skipColumnNames, wrapText);
+		return document.AddGenericTableInternal<T>(data, typeof(IEnumerable<T>), sheetName, exportSettings);
 	}
 
 	/// <summary>
@@ -121,9 +127,9 @@ public static class Export
 	/// <param name="createTable">If <see langword="true"/>, will format the inserted data into an Excel table.</param>
 	/// <param name="tableName">Name of the table in Excel</param>
 	/// <returns><see langword="true"/> if data was successfully added to the workbook</returns>
-	public static bool AddGenericTable(this SpreadsheetDocument document, DataTable data, string sheetName, bool createTable = false, string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false)
+	public static bool AddGenericTable(this SpreadsheetDocument document, DataTable data, string sheetName, ExportSettings? exportSettings = null)
 	{
-		return document.AddGenericTableInternal<char>(data, typeof(DataTable), sheetName, createTable, tableName, skipColumnNames, wrapText);
+		return document.AddGenericTableInternal<char>(data, typeof(DataTable), sheetName, exportSettings);
 	}
 
 	/// <summary>
@@ -137,8 +143,7 @@ public static class Export
 	/// <param name="createTable">If <see langword="true"/>, will format the inserted data into an Excel table.</param>
 	/// <param name="tableName">Name of the table in Excel</param>
 	/// <returns><see langword="true"/> if data was successfully added to the workbook</returns>
-	private static bool AddGenericTableInternal<T>(this SpreadsheetDocument document, object? data, Type dataType, string sheetName, bool createTable = false,
-		string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false)
+	private static bool AddGenericTableInternal<T>(this SpreadsheetDocument document, object? data, Type dataType, string sheetName, ExportSettings? exportSettings)
 	{
 		document.InitializeExcelFile();
 
@@ -158,11 +163,11 @@ public static class Export
 			{
 				if (dataType == typeof(IEnumerable<T>))
 				{
-					success = ExportFromTable(document, worksheet, (IEnumerable<T>)data, createTable, tableName, skipColumnNames, wrapText);
+					success = ExportFromTable(document, worksheet, (IEnumerable<T>)data, exportSettings);
 				}
 				else if (dataType == typeof(DataTable))
 				{
-					success = ExportFromTable(document, worksheet, (DataTable)data, createTable, tableName, skipColumnNames, wrapText);
+					success = ExportFromTable(document, worksheet, (DataTable)data, exportSettings);
 				}
 			}
 		}
@@ -184,19 +189,20 @@ public static class Export
 	/// <param name="tableName">Name of the table when createTable is true</param>
 	/// <returns><see langword="true"/> if excel file was created successfully</returns>
 	/// <exception cref="ArgumentException"></exception>
-	public static bool ExportFromTable<T>(SpreadsheetDocument document, Worksheet worksheet, IEnumerable<T> data, bool createTable = false, string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false, CancellationToken cancellationToken = default)
+	public static bool ExportFromTable<T>(SpreadsheetDocument document, Worksheet worksheet, IEnumerable<T> data, ExportSettings? exportSettings = null, CancellationToken cancellationToken = default)
 	{
 		try
 		{
 			if (data?.Any() == true)
 			{
+				exportSettings ??= new ExportSettings();
 				SheetData sheetData = worksheet.GetFirstChild<SheetData>() ?? throw new ArgumentException("The worksheet does not contain sheetData, which is required for this operation.");
 
-				uint headerStyleId = document.GetStandardCellStyle(EStyle.Header, wrapText: wrapText);
-				uint bodyStyleId = document.GetStandardCellStyle(EStyle.Body, wrapText: wrapText);
+				uint headerStyleId = document.GetStandardCellStyle(EStyle.Header, wrapText: exportSettings.WrapText);
+				uint bodyStyleId = document.GetStandardCellStyle(EStyle.Body, wrapText: exportSettings.WrapText);
 
 				PropertyInfo[] properties = GetOrAddPropertiesFromReflectionCache(typeof(T))
-					.Where(x => (skipColumnNames == null) || (skipColumnNames.Count == 0) || !skipColumnNames.Contains(x.Name, StringComparer.InvariantCultureIgnoreCase))
+					.Where(x => (exportSettings.SkipColumnNames == null) || (exportSettings.SkipColumnNames.Count == 0) || !exportSettings.SkipColumnNames.Contains(x.Name, StringComparer.InvariantCultureIgnoreCase))
 					.ToArray();
 				int colCount = properties.Length;
 
@@ -233,13 +239,13 @@ public static class Export
 				{
 					string text = properties[i].Name;
 					int ssIdx = GetOrAddSharedString(text, sharedStringCache, sharedStringTable, ref ssCount);
-					headerRow.Append((OpenXmlElement[])[new Cell
+					headerRow.AppendChild(new Cell
 					{
 						CellReference = colLetters[i] + y,
 						StyleIndex = headerStyleId,
 						DataType = CellValues.SharedString,
 						CellValue = new CellValue(ssIdx.ToString())
-					}]);
+					});
 
 					double w = CalculateWidth(text, headerStyleId);
 					if (w > colWidths[i])
@@ -247,7 +253,7 @@ public static class Export
 						colWidths[i] = w;
 					}
 				}
-				sheetData.Append((OpenXmlElement[])[headerRow]);
+				sheetData.AppendChild(headerRow);
 				y++;
 
 				// Write data rows
@@ -259,20 +265,20 @@ public static class Export
 					{
 						string text = properties[i].GetValue(item)?.ToString() ?? string.Empty;
 						int ssIdx = GetOrAddSharedString(text, sharedStringCache, sharedStringTable, ref ssCount);
-						dataRow.Append((OpenXmlElement[])[new Cell
+						dataRow.AppendChild(new Cell
 						{
 							CellReference = colLetters[i] + y,
 							StyleIndex = bodyStyleId,
 							DataType = CellValues.SharedString,
 							CellValue = new CellValue(ssIdx.ToString())
-						}]);
+						});
 						double w = CalculateWidth(text, bodyStyleId);
 						if (w > colWidths[i])
 						{
 							colWidths[i] = w;
 						}
 					}
-					sheetData.Append((OpenXmlElement[])[dataRow]);
+					sheetData.AppendChild(dataRow);
 					y++;
 				}
 
@@ -285,13 +291,13 @@ public static class Export
 				{
 					if (colWidths[i] > 0)
 					{
-						columns.Append((OpenXmlElement[])[new Column { Min = (uint)(i + 1), Max = (uint)(i + 1), Width = Math.Min(colWidths[i], 100), CustomWidth = true }]);
+						columns.AppendChild(new Column { Min = (uint)(i + 1), Max = (uint)(i + 1), Width = Math.Min(colWidths[i], 100), CustomWidth = true });
 					}
 				}
 
-				if (createTable)
+				if (exportSettings.CreateTable)
 				{
-					worksheet.CreateTable(1, 1, y - 1, (uint)colCount, tableName);
+					worksheet.CreateTable(1, 1, y - 1, (uint)colCount, exportSettings.TableName);
 				}
 				else
 				{
@@ -321,7 +327,7 @@ public static class Export
 	/// <param name="tableName">Name of the table when createTable is true</param>
 	/// <returns><see langword="true"/> if excel file was created successfully</returns>
 	/// <exception cref="ArgumentException"></exception>
-	public static bool ExportFromTable(SpreadsheetDocument document, Worksheet worksheet, DataTable data, bool createTable = false, string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false, CancellationToken cancellationToken = default)
+	public static bool ExportFromTable(SpreadsheetDocument document, Worksheet worksheet, DataTable data, ExportSettings? exportSettings = null, CancellationToken cancellationToken = default)
 	{
 		try
 		{
@@ -329,8 +335,10 @@ public static class Export
 			{
 				SheetData sheetData = worksheet.GetFirstChild<SheetData>() ?? throw new ArgumentException("The worksheet does not contain sheetData, which is required for this operation.");
 
-				uint headerStyleId = document.GetStandardCellStyle(EStyle.Header, wrapText: wrapText);
-				uint bodyStyleId = document.GetStandardCellStyle(EStyle.Body, wrapText: wrapText);
+				exportSettings ??= new();
+
+				uint headerStyleId = document.GetStandardCellStyle(EStyle.Header, wrapText: exportSettings.WrapText);
+				uint bodyStyleId = document.GetStandardCellStyle(EStyle.Body, wrapText: exportSettings.WrapText);
 
 				int totalCols = data.Columns.Count;
 
@@ -359,7 +367,7 @@ public static class Export
 				HashSet<int> skipColumnIndices = [];
 				for (int i = 0; i < totalCols; i++)
 				{
-					if (skipColumnNames?.Contains(data.Columns[i].ColumnName, StringComparer.InvariantCultureIgnoreCase) == true)
+					if (exportSettings.SkipColumnNames?.Contains(data.Columns[i].ColumnName, StringComparer.InvariantCultureIgnoreCase) == true)
 					{
 						skipColumnIndices.Add(i);
 					}
@@ -381,20 +389,21 @@ public static class Export
 
 					string text = data.Columns[i].ColumnName;
 					int ssIdx = GetOrAddSharedString(text, sharedStringCache, sharedStringTable, ref ssCount);
-					headerRow.Append((OpenXmlElement[])[new Cell
+					headerRow.AppendChild(new Cell
 					{
 						CellReference = colLetters[i] + y,
 						StyleIndex = headerStyleId,
 						DataType = CellValues.SharedString,
 						CellValue = new CellValue(ssIdx.ToString())
-					}]);
+					});
+
 					double w = CalculateWidth(text, headerStyleId);
 					if (w > colWidths[i])
 					{
 						colWidths[i] = w;
 					}
 				}
-				sheetData.Append((OpenXmlElement[])[headerRow]);
+				sheetData.AppendChild(headerRow);
 				y++;
 
 				// Write data rows
@@ -411,20 +420,20 @@ public static class Export
 						}
 						string text = items[i]!.ToString() ?? string.Empty;
 						int ssIdx = GetOrAddSharedString(text, sharedStringCache, sharedStringTable, ref ssCount);
-						dataRow.Append((OpenXmlElement[])[new Cell
+						dataRow.AppendChild(new Cell
 						{
 							CellReference = colLetters[i] + y,
 							StyleIndex = bodyStyleId,
 							DataType = CellValues.SharedString,
 							CellValue = new CellValue(ssIdx.ToString())
-						}]);
+						});
 						double w = CalculateWidth(text, bodyStyleId);
 						if (w > colWidths[i])
 						{
 							colWidths[i] = w;
 						}
 					}
-					sheetData.Append((OpenXmlElement[])[dataRow]);
+					sheetData.AppendChild(dataRow);
 					y++;
 				}
 
@@ -437,13 +446,13 @@ public static class Export
 				{
 					if (colWidths[i] > 0)
 					{
-						columns.Append((OpenXmlElement[])[new Column { Min = (uint)(i + 1), Max = (uint)(i + 1), Width = Math.Min(colWidths[i], 100), CustomWidth = true }]);
+						columns.AppendChild(new Column { Min = (uint)(i + 1), Max = (uint)(i + 1), Width = Math.Min(colWidths[i], 100), CustomWidth = true });
 					}
 				}
 
-				if (createTable)
+				if (exportSettings.CreateTable)
 				{
-					worksheet.CreateTable(1, 1, y - 1, (uint)totalCols, tableName);
+					worksheet.CreateTable(1, 1, y - 1, (uint)totalCols, exportSettings.TableName);
 				}
 				else
 				{
@@ -466,8 +475,8 @@ public static class Export
 	/// Unlike <see cref="GenericExcelExport{T}"/>, this never builds an in-memory DOM, so memory stays constant regardless of how many rows are written.
 	/// Column widths are estimated from header text only.
 	/// </summary>
-	public static async Task GenericExcelExportAsync<T>(this IEnumerable<T> dataList, Stream outputStream, bool createTable = false, string sheetName = "Data",
-		string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false, CancellationToken cancellationToken = default)
+	public static async Task GenericExcelExportAsync<T>(this IEnumerable<T> dataList, Stream outputStream, string sheetName = "Data",
+		ExportSettings? exportSettings = null, CancellationToken cancellationToken = default)
 	{
 		try
 		{
@@ -475,7 +484,7 @@ public static class Export
 			document.CompressionOption = CompressionOption.Normal;
 			WorkbookPart workbookPart = document.InitializeExcelFile();
 			WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
-			await ExportFromTableSaxCoreAsync<T>(document, worksheetPart, dataList, null, createTable, tableName, skipColumnNames, wrapText, cancellationToken);
+			await ExportFromTableSaxCoreAsync<T>(document, worksheetPart, dataList, null, exportSettings, cancellationToken).ConfigureAwait(false);
 			RegisterSaxSheet(workbookPart, worksheetPart, sheetName);
 			workbookPart.Workbook!.Save();
 		}
@@ -495,8 +504,8 @@ public static class Export
 	/// Rows are written directly from the async source without ever buffering a list in RAM.
 	/// /// Column widths are estimated from header text only.
 	/// </summary>
-	public static async Task GenericExcelExportAsync<T>(this IAsyncEnumerable<T> dataList, Stream outputStream, bool createTable = false, string sheetName = "Data",
-		string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false, CancellationToken cancellationToken = default)
+	public static async Task GenericExcelExportAsync<T>(this IAsyncEnumerable<T> dataList, Stream outputStream, string sheetName = "Data",
+		ExportSettings? exportSettings = null, CancellationToken cancellationToken = default)
 	{
 		try
 		{
@@ -504,7 +513,7 @@ public static class Export
 			document.CompressionOption = CompressionOption.Normal;
 			WorkbookPart workbookPart = document.InitializeExcelFile();
 			WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
-			await ExportFromTableSaxCoreAsync<T>(document, worksheetPart, null, dataList, createTable, tableName, skipColumnNames, wrapText, cancellationToken);
+			await ExportFromTableSaxCoreAsync<T>(document, worksheetPart, null, dataList, exportSettings, cancellationToken).ConfigureAwait(false);
 			RegisterSaxSheet(workbookPart, worksheetPart, sheetName);
 			workbookPart.Workbook!.Save();
 		}
@@ -522,9 +531,8 @@ public static class Export
 	/// Streams a <see cref="DataTable"/> to <paramref name="outputStream"/> as an xlsx file using the OpenXML SAX engine.
 	/// Column widths are estimated from header text only.
 	/// </summary>
-	public static async Task GenericExcelExportAsync(this DataTable datatable, Stream outputStream, bool createTable = false,
-		string sheetName = "Data", string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false,
-		CancellationToken cancellationToken = default)
+	public static async Task GenericExcelExportAsync(this DataTable datatable, Stream outputStream, string sheetName = "Data",
+		ExportSettings? exportSettings = null, CancellationToken cancellationToken = default)
 	{
 		try
 		{
@@ -532,7 +540,7 @@ public static class Export
 			document.CompressionOption = CompressionOption.Normal;
 			WorkbookPart workbookPart = document.InitializeExcelFile();
 			WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
-			await ExportFromTableSaxAsync(document, worksheetPart, datatable, createTable, tableName, skipColumnNames, wrapText, cancellationToken);
+			await ExportFromTableSaxAsync(document, worksheetPart, datatable, exportSettings, cancellationToken).ConfigureAwait(false);
 			RegisterSaxSheet(workbookPart, worksheetPart, sheetName);
 			workbookPart.Workbook!.Save();
 		}
@@ -550,55 +558,54 @@ public static class Export
 	/// Writes <paramref name="data"/> into <paramref name="worksheetPart"/> using the OpenXML SAX engine.
 	/// The caller is responsible for registering the sheet in the workbook after this call.
 	/// </summary>
-	public static async Task ExportFromTableSaxAsync<T>(SpreadsheetDocument document, WorksheetPart worksheetPart, IEnumerable<T> data,
-		bool createTable = false, string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false,
-		CancellationToken cancellationToken = default)
+	public static async Task ExportFromTableSaxAsync<T>(SpreadsheetDocument document, WorksheetPart worksheetPart, IEnumerable<T> data, ExportSettings? exportSettings = null, CancellationToken cancellationToken = default)
 	{
-		await ExportFromTableSaxCoreAsync<T>(document, worksheetPart, data, null, createTable, tableName, skipColumnNames, wrapText, cancellationToken);
+		await ExportFromTableSaxCoreAsync<T>(document, worksheetPart, data, null, exportSettings, cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
 	/// Writes data from an <see cref="IAsyncEnumerable{T}"/> source into <paramref name="worksheetPart"/> using the OpenXML SAX engine.
 	/// The caller is responsible for registering the sheet in the workbook after this call.
 	/// </summary>
-	public static async Task ExportFromTableSaxAsync<T>(SpreadsheetDocument document, WorksheetPart worksheetPart, IAsyncEnumerable<T> data,
-		bool createTable = false, string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false,
-		CancellationToken cancellationToken = default)
+	public static async Task ExportFromTableSaxAsync<T>(SpreadsheetDocument document, WorksheetPart worksheetPart, IAsyncEnumerable<T> data, ExportSettings? exportSettings = null, CancellationToken cancellationToken = default)
 	{
-		await ExportFromTableSaxCoreAsync<T>(document, worksheetPart, null, data, createTable, tableName, skipColumnNames, wrapText, cancellationToken);
+		await ExportFromTableSaxCoreAsync<T>(document, worksheetPart, null, data, exportSettings, cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
 	/// Writes a <see cref="DataTable"/> into <paramref name="worksheetPart"/> using the OpenXML SAX engine.
 	/// The caller is responsible for registering the sheet in the workbook after this call.
 	/// </summary>
-	public static Task ExportFromTableSaxAsync(SpreadsheetDocument document, WorksheetPart worksheetPart, DataTable data,
-		bool createTable = false, string tableName = "Data", List<string>? skipColumnNames = null, bool wrapText = false,
-		CancellationToken cancellationToken = default)
+	public static Task ExportFromTableSaxAsync(SpreadsheetDocument document, WorksheetPart worksheetPart, DataTable data, ExportSettings? exportSettings = null, CancellationToken cancellationToken = default)
 	{
 		try
 		{
 			if (data?.Rows.Count > 0)
 			{
-				uint headerStyleId = document.GetStandardCellStyle(EStyle.Header, wrapText: wrapText);
-				uint bodyStyleId = document.GetStandardCellStyle(EStyle.Body, wrapText: wrapText);
+				exportSettings ??= new();
+				uint headerStyleId = document.GetStandardCellStyle(EStyle.Header, wrapText: exportSettings.WrapText);
+				uint bodyStyleId = document.GetStandardCellStyle(EStyle.Body, wrapText: exportSettings.WrapText);
 
 				int totalCols = data.Columns.Count;
 				string[] colLetters = new string[totalCols];
 				for (int i = 0; i < totalCols; i++)
+				{
 					colLetters[i] = CellReference.NumberToColumnName((uint)(i + 1));
+				}
 
 				HashSet<int> skipColumnIndices = [];
 				for (int i = 0; i < totalCols; i++)
 				{
-					if (skipColumnNames?.Contains(data.Columns[i].ColumnName, StringComparer.InvariantCultureIgnoreCase) == true)
+					if (exportSettings.SkipColumnNames?.Contains(data.Columns[i].ColumnName, StringComparer.InvariantCultureIgnoreCase) == true)
+					{
 						skipColumnIndices.Add(i);
+					}
 				}
 
 				// Pre-add table definition part before opening the SAX writer so the relationship ID is known
 				TableDefinitionPart? tableDefPart = null;
 				string? tableRId = null;
-				if (createTable)
+				if (exportSettings.CreateTable)
 				{
 					tableDefPart = worksheetPart.AddNewPart<TableDefinitionPart>();
 					tableRId = worksheetPart.GetIdOfPart(tableDefPart);
@@ -613,10 +620,17 @@ public static class Export
 					writer.WriteStartElement(new Columns());
 					for (int i = 0; i < totalCols; i++)
 					{
-						if (skipColumnIndices.Contains(i)) continue;
+						if (skipColumnIndices.Contains(i))
+						{
+							continue;
+						}
+
 						double w = CalculateWidth(data.Columns[i].ColumnName, headerStyleId);
+
 						if (w > 0)
+						{
 							writer.WriteElement(new Column { Min = (uint)(i + 1), Max = (uint)(i + 1), Width = Math.Min(w, 100), CustomWidth = true });
+						}
 					}
 					writer.WriteEndElement(); // Columns
 
@@ -626,7 +640,10 @@ public static class Export
 					writer.WriteStartElement(new Row { RowIndex = y });
 					for (int i = 0; i < totalCols; i++)
 					{
-						if (skipColumnIndices.Contains(i)) continue;
+						if (skipColumnIndices.Contains(i))
+						{
+							continue;
+						}
 						WriteSaxInlineStringCell(writer, colLetters[i] + y, data.Columns[i].ColumnName, headerStyleId);
 					}
 					writer.WriteEndElement(); // Row
@@ -640,7 +657,10 @@ public static class Export
 						object?[] items = row.ItemArray;
 						for (int i = 0; i < items.Length; i++)
 						{
-							if (skipColumnIndices.Contains(i)) continue;
+							if (skipColumnIndices.Contains(i))
+							{
+								continue;
+							}
 							WriteSaxInlineStringCell(writer, colLetters[i] + y, items[i]?.ToString() ?? string.Empty, bodyStyleId);
 						}
 						writer.WriteEndElement(); // Row
@@ -650,7 +670,7 @@ public static class Export
 					writer.WriteEndElement(); // SheetData
 
 					string rangeRef = $"{new CellReference(1u, 1u)}:{new CellReference((uint)totalCols, y - 1)}";
-					if (createTable && tableRId != null)
+					if (exportSettings.CreateTable && tableRId != null)
 					{
 						writer.WriteStartElement(new TableParts { Count = 1 });
 						writer.WriteElement(new TablePart { Id = tableRId });
@@ -665,22 +685,25 @@ public static class Export
 				}
 
 				// Populate the table definition after the SAX writer is flushed
-				if (createTable && tableDefPart != null)
+				if (exportSettings.CreateTable && tableDefPart != null)
 				{
 					uint visibleCount = (uint)(totalCols - skipColumnIndices.Count);
 					TableColumns tableColumns = new() { Count = visibleCount };
 					uint colId = 1;
 					for (int i = 0; i < totalCols; i++)
 					{
-						if (skipColumnIndices.Contains(i)) continue;
-						tableColumns.Append(new TableColumn { Id = colId++, Name = data.Columns[i].ColumnName });
+						if (skipColumnIndices.Contains(i))
+						{
+							continue;
+						}
+						tableColumns.AppendChild(new TableColumn { Id = colId++, Name = data.Columns[i].ColumnName });
 					}
 					string tableRef = $"{new CellReference(1u, 1u)}:{new CellReference((uint)totalCols, y - 1)}";
 					tableDefPart.Table = new Table
 					{
 						Id = 1,
-						Name = tableName,
-						DisplayName = tableName,
+						Name = exportSettings.TableName,
+						DisplayName = exportSettings.TableName,
 						Reference = tableRef,
 						TotalsRowShown = false,
 						HeaderRowCount = 1,
@@ -716,122 +739,138 @@ public static class Export
 	/// Core SAX writer shared by both the sync (<see cref="IEnumerable{T}"/>) and async (<see cref="IAsyncEnumerable{T}"/>) generic overloads.
 	/// Writes the worksheet XML directly to <paramref name="worksheetPart"/> stream without building a DOM.
 	/// </summary>
-	private static async Task ExportFromTableSaxCoreAsync<T>(SpreadsheetDocument document, WorksheetPart worksheetPart,
-		IEnumerable<T>? syncData, IAsyncEnumerable<T>? asyncData,
-		bool createTable, string tableName, List<string>? skipColumnNames, bool wrapText, CancellationToken cancellationToken)
+	private static async Task ExportFromTableSaxCoreAsync<T>(SpreadsheetDocument document, WorksheetPart worksheetPart, IEnumerable<T>? syncData, IAsyncEnumerable<T>? asyncData,
+		ExportSettings? exportSettings, CancellationToken cancellationToken)
 	{
 		try
 		{
-			uint headerStyleId = document.GetStandardCellStyle(EStyle.Header, wrapText: wrapText);
-			uint bodyStyleId = document.GetStandardCellStyle(EStyle.Body, wrapText: wrapText);
+			exportSettings ??= new();
+			uint headerStyleId = document.GetStandardCellStyle(EStyle.Header, wrapText: exportSettings.WrapText);
+			uint bodyStyleId = document.GetStandardCellStyle(EStyle.Body, wrapText: exportSettings.WrapText);
 
 			PropertyInfo[] properties = GetOrAddPropertiesFromReflectionCache(typeof(T))
-				.Where(x => (skipColumnNames == null) || (skipColumnNames.Count == 0) || !skipColumnNames.Contains(x.Name, StringComparer.InvariantCultureIgnoreCase))
+				.Where(x => (exportSettings.SkipColumnNames == null) || (exportSettings.SkipColumnNames.Count == 0) || !exportSettings.SkipColumnNames.Contains(x.Name, StringComparer.InvariantCultureIgnoreCase))
 				.ToArray();
 			int colCount = properties.Length;
 
 			string[] colLetters = new string[colCount];
 			for (int i = 0; i < colCount; i++)
+			{
 				colLetters[i] = CellReference.NumberToColumnName((uint)(i + 1));
+			}
 
 			// Pre-add the table definition part now to obtain its relationship ID before the SAX writer is opened
 			TableDefinitionPart? tableDefPart = null;
 			string? tableRId = null;
-			if (createTable && colCount > 0)
+			if (exportSettings.CreateTable && colCount > 0)
 			{
 				tableDefPart = worksheetPart.AddNewPart<TableDefinitionPart>();
 				tableRId = worksheetPart.GetIdOfPart(tableDefPart);
 			}
 
 			uint y = 1;
-			using (OpenXmlWriter writer = OpenXmlWriter.Create(worksheetPart))
+			// Async = true is required for the *Async writer methods; OpenXmlWriter.Create(part) leaves it off
+			using OpenXmlWriter writer = new OpenXmlPartWriter(worksheetPart, new OpenXmlPartWriterSettings { Async = true });
+			await writer.WriteStartElementAsync(new Worksheet()).ConfigureAwait(false);
+
+			// <cols> must precede <sheetData> per ECMA-376; widths estimated from header text only in SAX streaming mode
+			if (colCount > 0)
 			{
-				writer.WriteStartElement(new Worksheet());
-
-				// <cols> must precede <sheetData> per ECMA-376; widths estimated from header text only in SAX streaming mode
-				if (colCount > 0)
+				await writer.WriteStartElementAsync(new Columns()).ConfigureAwait(false);
+				for (int i = 0; i < colCount; i++)
 				{
-					writer.WriteStartElement(new Columns());
-					for (int i = 0; i < colCount; i++)
+					double w = CalculateWidth(properties[i].Name, headerStyleId);
+					if (w > 0)
 					{
-						double w = CalculateWidth(properties[i].Name, headerStyleId);
-						if (w > 0)
-							writer.WriteElement(new Column { Min = (uint)(i + 1), Max = (uint)(i + 1), Width = Math.Min(w, 100), CustomWidth = true });
-					}
-					writer.WriteEndElement(); // Columns
-				}
-
-				writer.WriteStartElement(new SheetData());
-
-				if (colCount > 0)
-				{
-					// Header row
-					writer.WriteStartElement(new Row { RowIndex = y });
-					for (int i = 0; i < colCount; i++)
-						WriteSaxInlineStringCell(writer, colLetters[i] + y, properties[i].Name, headerStyleId);
-					writer.WriteEndElement(); // Row
-					y++;
-
-					// Data rows
-					if (asyncData != null)
-					{
-						await foreach (T item in asyncData.WithCancellation(cancellationToken))
-						{
-							if (item.ToNString().IsNullOrEmpty()) continue;
-							writer.WriteStartElement(new Row { RowIndex = y });
-							for (int i = 0; i < colCount; i++)
-								WriteSaxInlineStringCell(writer, colLetters[i] + y, properties[i].GetValue(item)?.ToString() ?? string.Empty, bodyStyleId);
-							writer.WriteEndElement(); // Row
-							y++;
-						}
-					}
-					else if (syncData != null)
-					{
-						foreach (T item in syncData.Where(x => !x.ToNString().IsNullOrEmpty()))
-						{
-							cancellationToken.ThrowIfCancellationRequested();
-							writer.WriteStartElement(new Row { RowIndex = y });
-							for (int i = 0; i < colCount; i++)
-								WriteSaxInlineStringCell(writer, colLetters[i] + y, properties[i].GetValue(item)?.ToString() ?? string.Empty, bodyStyleId);
-							writer.WriteEndElement(); // Row
-							y++;
-						}
+						await writer.WriteElementAsync(new Column { Min = (uint)(i + 1), Max = (uint)(i + 1), Width = Math.Min(w, 100), CustomWidth = true }).ConfigureAwait(false);
 					}
 				}
-
-				writer.WriteEndElement(); // SheetData
-
-				if (colCount > 0)
-				{
-					string rangeRef = $"{new CellReference(1u, 1u)}:{new CellReference((uint)colCount, y - 1)}";
-					if (createTable && tableRId != null)
-					{
-						writer.WriteStartElement(new TableParts { Count = 1 });
-						writer.WriteElement(new TablePart { Id = tableRId });
-						writer.WriteEndElement(); // TableParts
-					}
-					else
-					{
-						writer.WriteElement(new AutoFilter { Reference = rangeRef });
-					}
-				}
-
-				writer.WriteEndElement(); // Worksheet
+				await writer.WriteEndElementAsync().ConfigureAwait(false); // Columns
 			}
 
+			await writer.WriteStartElementAsync(new SheetData()).ConfigureAwait(false);
+
+			if (colCount > 0)
+			{
+				// Header row
+				await writer.WriteStartElementAsync(new Row { RowIndex = y }).ConfigureAwait(false);
+				for (int i = 0; i < colCount; i++)
+				{
+					await WriteSaxInlineStringCellAsync(writer, colLetters[i] + y, properties[i].Name, headerStyleId).ConfigureAwait(false);
+				}
+				await writer.WriteEndElementAsync().ConfigureAwait(false); // Row
+				y++;
+
+				// Data rows
+				if (asyncData != null)
+				{
+					await foreach (T item in asyncData.WithCancellation(cancellationToken))
+					{
+						if (item.ToNString().IsNullOrEmpty())
+						{
+							continue;
+						}
+
+						await writer.WriteStartElementAsync(new Row { RowIndex = y }).ConfigureAwait(false);
+						for (int i = 0; i < colCount; i++)
+						{
+							await WriteSaxInlineStringCellAsync(writer, colLetters[i] + y, properties[i].GetValue(item)?.ToString() ?? string.Empty, bodyStyleId).ConfigureAwait(false);
+						}
+						await writer.WriteEndElementAsync().ConfigureAwait(false); // Row
+						y++;
+					}
+				}
+				else if (syncData != null)
+				{
+					foreach (T item in syncData.Where(x => !x.ToNString().IsNullOrEmpty()))
+					{
+						cancellationToken.ThrowIfCancellationRequested();
+						await writer.WriteStartElementAsync(new Row { RowIndex = y }).ConfigureAwait(false);
+						for (int i = 0; i < colCount; i++)
+						{
+							await WriteSaxInlineStringCellAsync(writer, colLetters[i] + y, properties[i].GetValue(item)?.ToString() ?? string.Empty, bodyStyleId).ConfigureAwait(false);
+						}
+						await writer.WriteEndElementAsync().ConfigureAwait(false); // Row
+						y++;
+					}
+				}
+			}
+
+			await writer.WriteEndElementAsync().ConfigureAwait(false); // SheetData
+
+			if (colCount > 0)
+			{
+				string rangeRef = $"{new CellReference(1u, 1u)}:{new CellReference((uint)colCount, y - 1)}";
+				if (exportSettings.CreateTable && tableRId != null)
+				{
+					await writer.WriteStartElementAsync(new TableParts { Count = 1 }).ConfigureAwait(false);
+					await writer.WriteElementAsync(new TablePart { Id = tableRId }).ConfigureAwait(false);
+					await writer.WriteEndElementAsync().ConfigureAwait(false); // TableParts
+				}
+				else
+				{
+					await writer.WriteElementAsync(new AutoFilter { Reference = rangeRef }).ConfigureAwait(false);
+				}
+			}
+
+			await writer.WriteEndElementAsync().ConfigureAwait(false); // Worksheet
+
+
 			// Populate the table definition after the SAX writer is flushed and the worksheet XML is final
-			if (createTable && tableDefPart != null && colCount > 0)
+			if (exportSettings.CreateTable && tableDefPart != null && colCount > 0)
 			{
 				TableColumns tableColumns = new() { Count = (uint)colCount };
 				for (int i = 0; i < colCount; i++)
-					tableColumns.Append(new TableColumn { Id = (uint)i + 1, Name = properties[i].Name });
+				{
+					tableColumns.AppendChild(new TableColumn { Id = (uint)i + 1, Name = properties[i].Name });
+				}
 
 				string tableRef = $"{new CellReference(1u, 1u)}:{new CellReference((uint)colCount, y - 1)}";
 				tableDefPart.Table = new Table
 				{
 					Id = 1,
-					Name = tableName,
-					DisplayName = tableName,
+					Name = exportSettings.TableName,
+					DisplayName = exportSettings.TableName,
 					Reference = tableRef,
 					TotalsRowShown = false,
 					HeaderRowCount = 1,
@@ -866,12 +905,12 @@ public static class Export
 	/// </summary>
 	private static void RegisterSaxSheet(WorkbookPart workbookPart, WorksheetPart worksheetPart, string sheetName)
 	{
-		Sheets sheets = workbookPart.Workbook!.GetFirstChild<Sheets>() ?? workbookPart.Workbook!.AppendChild(new Sheets());
+		Sheets sheets = workbookPart.Workbook!.GetFirstChild<Sheets>() ?? workbookPart.Workbook.AppendChild(new Sheets());
 		string partId = workbookPart.GetIdOfPart(worksheetPart);
 		uint sheetId = sheets.Elements<Sheet>().Any()
 			? (sheets.Elements<Sheet>().Max(x => x.SheetId?.Value) + 1) ?? ((uint)sheets.Elements<Sheet>().Count() + 1)
 			: 1u;
-		sheets.Append(new Sheet { Id = partId, SheetId = sheetId, Name = sheetName });
+		sheets.AppendChild(new Sheet { Id = partId, SheetId = sheetId, Name = sheetName });
 	}
 
 	/// <summary>
@@ -885,6 +924,20 @@ public static class Export
 		writer.WriteElement(new Text(text));
 		writer.WriteEndElement(); // InlineString
 		writer.WriteEndElement(); // Cell
+	}
+
+	/// <summary>
+	/// Async counterpart of <see cref="WriteSaxInlineStringCell"/>. Writes the text explicitly because <c>WriteElementAsync</c> drops child content.
+	/// </summary>
+	private static async Task WriteSaxInlineStringCellAsync(OpenXmlWriter writer, string cellRef, string text, uint styleId)
+	{
+		await writer.WriteStartElementAsync(new Cell { CellReference = cellRef, StyleIndex = styleId, DataType = CellValues.InlineString }).ConfigureAwait(false);
+		await writer.WriteStartElementAsync(new InlineString()).ConfigureAwait(false);
+		await writer.WriteStartElementAsync(new Text()).ConfigureAwait(false);
+		await writer.WriteStringAsync(text).ConfigureAwait(false);
+		await writer.WriteEndElementAsync().ConfigureAwait(false); // Text
+		await writer.WriteEndElementAsync().ConfigureAwait(false); // InlineString
+		await writer.WriteEndElementAsync().ConfigureAwait(false); // Cell
 	}
 
 	/// <summary>

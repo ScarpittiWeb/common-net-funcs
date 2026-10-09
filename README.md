@@ -1,8 +1,10 @@
+# CommonNetFuncs
+
 [![License](https://img.shields.io/github/license/NickScarpitti/common-net-funcs.svg)](http://opensource.org/licenses/MIT)
 [![Coverage Status](https://coveralls.io/repos/github/NickScarpitti/common-net-funcs/badge.svg?branch=main)](https://coveralls.io/github/NickScarpitti/common-net-funcs?branch=main)
 [![All Tests](https://github.com/NickScarpitti/common-net-funcs/actions/workflows/all-tests.yml/badge.svg)](https://github.com/NickScarpitti/common-net-funcs/actions/workflows/all-tests.yml)
 
-# CommonNetFuncs is a collection of helper classes and methods that aim to make coding in C# easier with less boilerplate code
+#### CommonNetFuncs is a collection of helper classes and methods that aim to make coding in C# easier with less boilerplate code
 
 ## Included Packages
 

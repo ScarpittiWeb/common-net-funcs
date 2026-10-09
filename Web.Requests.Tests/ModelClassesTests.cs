@@ -184,7 +184,7 @@ public sealed class ModelClassesTests
 
 		// Assert
 		restObject.Result.ShouldBe(testList);
-		restObject.Result!.Count.ShouldBe(3);
+		restObject.Result.Count.ShouldBe(3);
 	}
 
 	[Fact]

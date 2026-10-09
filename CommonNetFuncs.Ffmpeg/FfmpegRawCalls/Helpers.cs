@@ -20,7 +20,7 @@ internal static partial class Helpers
 		// Use ffprobe to get media information
 		ProcessStartInfo startInfo = new()
 		{
-			FileName = "ffprobe",
+			FileName = "ffprobe", // Expects ffprobe to be available in the system's PATH
 			Arguments = $"-v quiet -print_format json -show_format -show_streams \"{filePath}\"",
 			UseShellExecute = false,
 			RedirectStandardOutput = true,

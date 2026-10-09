@@ -111,7 +111,7 @@ public class DirectQuery(Func<string, SqlConnection>? connectionFactory = null) 
 		{
 			while (await enumeratedReader.MoveNextAsync().ConfigureAwait(false))
 			{
-				yield return enumeratedReader!.Current;
+				yield return enumeratedReader.Current;
 			}
 		}
 		else

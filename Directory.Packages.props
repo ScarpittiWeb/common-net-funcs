@@ -74,8 +74,8 @@
 		<PackageVersion Include="System.Text.Json" Version="10.0.12" />
 		<PackageVersion Include="Xabe.FFmpeg" Version="6.1.1" />
 		<PackageVersion Include="xRetry.v3" Version="1.0.0" />
-		<PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
-		<PackageVersion Include="xunit.v3" Version="4.0.1" />
+		<PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+		<PackageVersion Include="xunit.v3" Version="4.0.2" />
 		<PackageVersion Include="Z.EntityFramework.Extensions.EFCore" Version="10.105.8" />
 		<PackageVersion Include="Z.EntityFramework.Plus.EFCore" Version="10.105.8" />
 		<PackageVersion Include="ZLinq" Version="1.5.6" />

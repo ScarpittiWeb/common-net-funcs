@@ -7,6 +7,10 @@ namespace Sql.Common.Tests;
 
 public sealed class PostgreSqlDebugTests
 {
+	// NpgsqlDbType is not a [Flags] enum, but Npgsql composes array types with a bitwise OR
+	private const NpgsqlDbType TextArray = (NpgsqlDbType)((int)NpgsqlDbType.Array | (int)NpgsqlDbType.Text);
+	private const NpgsqlDbType IntegerArray = (NpgsqlDbType)((int)NpgsqlDbType.Array | (int)NpgsqlDbType.Integer);
+
 	[Fact]
 	public void RenderCommandAsScript_ShouldRenderCommandText_WhenNoParameters()
 	{
@@ -23,12 +27,12 @@ public sealed class PostgreSqlDebugTests
 	public void RenderCommandAsScript_ShouldInlineStringParameter_WithAtSignPlaceholder()
 	{
 		using NpgsqlCommand cmd = new("SELECT * FROM test_table WHERE name = @name");
-		cmd.Parameters.Add(new NpgsqlParameter("name", NpgsqlDbType.Varchar) { Value = "O'Brien" });
+		cmd.Parameters.Add(new NpgsqlParameter("name", NpgsqlDbType.Varchar) { Value = "O'Brian" });
 
 		string result = PostgreSqlDebug.RenderCommandAsScript(cmd);
 
-		result.ShouldContain("-- @name [varchar(unbounded)] = 'O''Brien'");
-		result.ShouldContain("SELECT * FROM test_table WHERE name = 'O''Brien'");
+		result.ShouldContain("-- @name [varchar(unbounded)] = 'O''Brian'");
+		result.ShouldContain("SELECT * FROM test_table WHERE name = 'O''Brian'");
 	}
 
 	[Fact]
@@ -105,7 +109,7 @@ public sealed class PostgreSqlDebugTests
 	public void RenderCommandAsScript_ShouldFormatDateTimeValue_WithTimestampCast()
 	{
 		using NpgsqlCommand cmd = new("SELECT @createdDate");
-		DateTime date = new(2024, 5, 17, 13, 45, 30, 123);
+		DateTime date = new(2024, 5, 17, 13, 45, 30, 123, DateTimeKind.Unspecified);
 		cmd.Parameters.Add(new NpgsqlParameter("createdDate", NpgsqlDbType.Timestamp) { Value = date });
 
 		string result = PostgreSqlDebug.RenderCommandAsScript(cmd);
@@ -229,7 +233,7 @@ public sealed class PostgreSqlDebugTests
 	public void RenderCommandAsScript_ShouldInlineStringArrayParameter_AsArrayLiteral()
 	{
 		using NpgsqlCommand cmd = new("SELECT * FROM t WHERE name = ANY(@names)");
-		cmd.Parameters.Add(new NpgsqlParameter("names", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = new[] { "it's", "a,b" } });
+		cmd.Parameters.Add(new NpgsqlParameter("names", TextArray) { Value = new[] { "it's", "a,b" } });
 
 		string result = PostgreSqlDebug.RenderCommandAsScript(cmd);
 
@@ -241,7 +245,7 @@ public sealed class PostgreSqlDebugTests
 	public void RenderCommandAsScript_ShouldNotNestArrayLiteral_WhenSqlWrapsPlaceholderInArray()
 	{
 		using NpgsqlCommand cmd = new("SELECT * FROM t WHERE id::text LIKE ANY(ARRAY[@ids])");
-		cmd.Parameters.Add(new NpgsqlParameter("ids", NpgsqlDbType.Array | NpgsqlDbType.Integer) { Value = new[] { 1, 2 } });
+		cmd.Parameters.Add(new NpgsqlParameter("ids", IntegerArray) { Value = new[] { 1, 2 } });
 
 		string result = PostgreSqlDebug.RenderCommandAsScript(cmd);
 
@@ -253,7 +257,7 @@ public sealed class PostgreSqlDebugTests
 	public void RenderCommandAsScript_ShouldInlineEmptyArray_AsEmptyArrayLiteral()
 	{
 		using NpgsqlCommand cmd = new("SELECT * FROM t WHERE name = ANY(@names)");
-		cmd.Parameters.Add(new NpgsqlParameter("names", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = Array.Empty<string>() });
+		cmd.Parameters.Add(new NpgsqlParameter("names", TextArray) { Value = Array.Empty<string>() });
 
 		string result = PostgreSqlDebug.RenderCommandAsScript(cmd);
 
@@ -295,7 +299,7 @@ public sealed class PostgreSqlDebugTests
 	}
 
 	[Fact]
-	public void RenderCommandAsScript_ShouldNotResubstitute_PlaceholderTextInsideValue()
+	public void RenderCommandAsScript_ShouldNotReSubstitute_PlaceholderTextInsideValue()
 	{
 		using NpgsqlCommand cmd = new("SELECT * FROM t WHERE a = @a AND b = @b");
 		cmd.Parameters.Add(new NpgsqlParameter("a", NpgsqlDbType.Text) { Value = "@b" });

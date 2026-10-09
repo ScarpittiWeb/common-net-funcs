@@ -1605,9 +1605,9 @@ public sealed class CopyTests
 		result.ShouldNotBeNull();
 		result.Level.ShouldBe(1);
 		result.Next.ShouldNotBeNull();
-		result.Next!.Level.ShouldBe(2);
+		result.Next.Level.ShouldBe(2);
 		result.Next.Next.ShouldNotBeNull();
-		result.Next.Next!.Level.ShouldBe(3);
+		result.Next.Next.Level.ShouldBe(3);
 		// Note: maxDepth is checked as (depth >= maxDepth), so at depth 2, we can still copy
 		// The actual limit prevents copying at depth 3 and beyond
 	}

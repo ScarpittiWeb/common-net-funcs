@@ -9,26 +9,26 @@ This project contains helper methods and utilities for integrating Hangfire back
 ## Contents
 
 - [CommonNetFuncs.Hangfire](#commonnetfuncshangfire)
-	- [Contents](#contents)
-	- [HangfireAuthorizationFilter](#hangfireauthorizationfilter)
-		- [HangfireAuthorizationFilter Usage Examples](#hangfireauthorizationfilter-usage-examples)
-			- [Basic Setup with Roles](#basic-setup-with-roles)
-			- [Authentication Only (No Role Restrictions)](#authentication-only-no-role-restrictions)
-	- [HangfireJobException](#hangfirejobexception)
-		- [HangfireJobException Usage Examples](#hangfirejobexception-usage-examples)
-			- [Basic Job Exception](#basic-job-exception)
-			- [Exception with Retry Control](#exception-with-retry-control)
-			- [Exception with Operation Context](#exception-with-operation-context)
-			- [Full Context Exception](#full-context-exception)
-	- [HangfireShutdownMonitor](#hangfireshutdownmonitor)
-		- [HangfireShutdownMonitor Usage Examples](#hangfireshutdownmonitor-usage-examples)
-			- [Register Shutdown Monitor](#register-shutdown-monitor)
-	- [WaitForHangfireJobsToComplete](#waitforhangfirejobstocomplete)
-		- [WaitForHangfireJobsToComplete Usage Examples](#waitforhangfirejobstocomplete-usage-examples)
-			- [Wait for Jobs with Defaults](#wait-for-jobs-with-defaults)
-			- [Wait for Jobs with Custom Settings](#wait-for-jobs-with-custom-settings)
-	- [Installation](#installation)
-	- [License](#license)
+  - [Contents](#contents)
+  - [HangfireAuthorizationFilter](#hangfireauthorizationfilter)
+    - [HangfireAuthorizationFilter Usage Examples](#hangfireauthorizationfilter-usage-examples)
+      - [Basic Setup with Roles](#basic-setup-with-roles)
+      - [Authentication Only (No Role Restrictions)](#authentication-only-no-role-restrictions)
+  - [HangfireJobException](#hangfirejobexception)
+    - [HangfireJobException Usage Examples](#hangfirejobexception-usage-examples)
+      - [Basic Job Exception](#basic-job-exception)
+      - [Exception with Retry Control](#exception-with-retry-control)
+      - [Exception with Operation Context](#exception-with-operation-context)
+      - [Full Context Exception](#full-context-exception)
+  - [HangfireShutdownMonitor](#hangfireshutdownmonitor)
+    - [HangfireShutdownMonitor Usage Examples](#hangfireshutdownmonitor-usage-examples)
+      - [Register Shutdown Monitor](#register-shutdown-monitor)
+  - [WaitForHangfireJobsToComplete](#waitforhangfirejobstocomplete)
+    - [WaitForHangfireJobsToComplete Usage Examples](#waitforhangfirejobstocomplete-usage-examples)
+      - [Wait for Jobs with Defaults](#wait-for-jobs-with-defaults)
+      - [Wait for Jobs with Custom Settings](#wait-for-jobs-with-custom-settings)
+  - [Installation](#installation)
+  - [License](#license)
 
 ---
 
@@ -86,6 +86,7 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 Custom exception for Hangfire background jobs that provides context about the job operation and controls retry behavior.
 
 **Properties:**
+
 - `OperationName` - The name of the operation that failed
 - `EntityId` - The ID of the entity being processed when the failure occurred
 - `AllowRetry` - Whether Hangfire should retry the job (defaults to `true`)
@@ -199,6 +200,7 @@ public async Task UpdateCustomerData(int customerId)
 Monitors Hangfire jobs during application shutdown to ensure graceful termination and log pending jobs.
 
 **Features:**
+
 - Logs pending job counts during shutdown (processing, enqueued, scheduled)
 - Properly disposes of the BackgroundJobServer
 - Handles errors gracefully during shutdown
@@ -229,11 +231,14 @@ builder.Services.AddHangfireServer();
 ```
 
 The monitor will automatically log pending jobs when the application shuts down:
-```
+
+```text
 [INFO] Application shutting down with no pending Hangfire jobs
 ```
+
 or
-```
+
+```text
 [WARN] Application shutting down with 5 pending Hangfire job(s): 2 processing, 2 enqueued, 1 scheduled.
        Jobs will be persisted in database and resumed by next instance.
 ```
@@ -247,6 +252,7 @@ or
 Utility method to wait for all Hangfire jobs to complete before continuing execution. Useful for graceful shutdown scenarios or integration tests.
 
 **Parameters:**
+
 - `checkIntervalSeconds` - How often to check job status (default: 5 seconds)
 - `maxWaitMinutes` - Maximum time to wait for jobs (default: 60 minutes)
 
@@ -297,14 +303,16 @@ public async Task RunIntegrationTest()
 ```
 
 The method logs progress while waiting:
-```
+
+```text
 [INFO] Waiting for 3 Hangfire job(s): 2 enqueued, 1 processing, 0 scheduled
 [INFO] Waiting for 1 Hangfire job(s): 0 enqueued, 1 processing, 0 scheduled
 [INFO] No pending Hangfire jobs found
 ```
 
 If the timeout is exceeded:
-```
+
+```text
 [WARN] Maximum wait time of 10 minutes exceeded. Some jobs may still be pending.
 ```
 

@@ -1792,7 +1792,7 @@ public static partial class Common
 			imagePart.FeedData(stream);
 		}
 
-		AddImageToWorksheet(drawingsPart, drawingsPart.GetIdOfPart(imagePart), mergedCellArea.FirstCell, mergedCellArea.LastCell, xMargin, yMargin, resizeWidth, resizeHeight);
+		AddImageToWorksheet(drawingsPart, drawingsPart.GetIdOfPart(imagePart), mergedCellArea.FirstCell, xMargin, yMargin, resizeWidth, resizeHeight);
 	}
 
 	/// <summary>
@@ -1966,12 +1966,11 @@ public static partial class Common
 	/// <param name="drawingsPart">DrawingsPart of the Excel file to insert an image into</param>
 	/// <param name="relationshipId">The relationship ID for the image</param>
 	/// <param name="fromCell">CellReference for top left corner of range</param>
-	/// <param name="toCell">CellReference for bottom right corner of range (unused: the image is sized by <paramref name="width"/> and <paramref name="height"/> so its aspect ratio never depends on cell sizes)</param>
 	/// <param name="xMargin">Distance in EMUs from the left edge of the range to the left edge of the image</param>
 	/// <param name="yMargin">Distance in EMUs from the top edge of the range to the top edge of the image</param>
 	/// <param name="width">Width of the image in pixels</param>
 	/// <param name="height">Height of the image in pixels</param>
-	public static void AddImageToWorksheet(DrawingsPart drawingsPart, string relationshipId, CellReference fromCell, CellReference toCell, int xMargin, int yMargin, int width, int height)
+	public static void AddImageToWorksheet(DrawingsPart drawingsPart, string relationshipId, CellReference fromCell, int xMargin, int yMargin, int width, int height)
 	{
 		Xdr.WorksheetDrawing? worksheetDrawing = drawingsPart.WorksheetDrawing;
 
@@ -3421,7 +3420,7 @@ public static partial class Common
 		document.WorkbookPart?.Workbook?.Save();
 		document.Dispose();
 		await using FileStream fileStream = File.OpenRead(filePath);
-		await fileStream.CopyToAsync(memoryStream);
+		await fileStream.CopyToAsync(memoryStream).ConfigureAwait(false);
 		if (memoryStream.CanSeek)
 		{
 			memoryStream.Position = 0;

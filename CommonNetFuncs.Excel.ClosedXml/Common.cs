@@ -243,7 +243,7 @@ public static class Common
 			IXLDefinedName? name = wb.DefinedName(cellName);
 			if (name == null)
 			{
-				logger.Warn("Unable to locate cell with name {cellName}", cellName);
+				logger.Warn("Unable to locate cell with name {CellName}", cellName);
 				return null;
 			}
 
@@ -285,7 +285,7 @@ public static class Common
 			IXLDefinedName? name = wb.DefinedName(cellName);
 			if (name == null)
 			{
-				logger.Warn("Unable to locate cell with name {cellName}", cellName);
+				logger.Warn("Unable to locate cell with name {CellName}", cellName);
 				return;
 			}
 

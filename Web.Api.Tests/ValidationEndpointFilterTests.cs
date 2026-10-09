@@ -24,7 +24,7 @@ public sealed class ValidationEndpointFilterTests
 
 	// --- Helper types ---
 
-	private enum TestEnum { A, B }
+	private enum TestOption { A, B }
 
 	private sealed class ValidModel
 	{
@@ -54,9 +54,16 @@ public sealed class ValidationEndpointFilterTests
 		}
 	}
 
-	private sealed class RegisteredService { }
+	private sealed class RegisteredService
+	{
+		public int Id { get; set; }
+	}
 
-	private sealed class TestClaimsPrincipal : ClaimsPrincipal { } // subclass not in SkippedTypes → hits IsAssignableTo(ClaimsPrincipal)
+	// Subclass not in SkippedTypes → hits IsAssignableTo(ClaimsPrincipal)
+	private sealed class TestClaimsPrincipal : ClaimsPrincipal
+	{
+		public string? Label { get; set; }
+	}
 
 	private sealed class TestEndpointFilterInvocationContext(HttpContext httpContext, params object?[] args)
 		: EndpointFilterInvocationContext
@@ -73,15 +80,6 @@ public sealed class ValidationEndpointFilterTests
 			RequestServices = new ServiceCollection().BuildServiceProvider()
 		};
 		return new TestEndpointFilterInvocationContext(httpContext, args);
-	}
-
-	private static EndpointFilterDelegate Next(out bool called)
-	{
-		bool wasCalled = false;
-		called = false;
-		EndpointFilterDelegate del = _ => { wasCalled = true; return ValueTask.FromResult<object?>("next"); };
-		called = wasCalled;
-		return del;
 	}
 
 	// --- InvokeAsync: skipped argument types ---
@@ -105,7 +103,7 @@ public sealed class ValidationEndpointFilterTests
 	[Fact]
 	public async Task InvokeAsync_WhenArgumentIsEnum_CallsNext()
 	{
-		EndpointFilterInvocationContext ctx = CreateContext(TestEnum.A); // enum → IsEnum = true
+		EndpointFilterInvocationContext ctx = CreateContext(TestOption.A); // enum → IsEnum = true
 		object? result = await sut.InvokeAsync(ctx, _ => ValueTask.FromResult<object?>("next"));
 		result.ShouldBe("next");
 	}
@@ -193,7 +191,7 @@ public sealed class ValidationEndpointFilterTests
 	[Fact]
 	public async Task InvokeAsync_WhenArgumentIsClaimsPrincipalSubclass_CallsNext()
 	{
-		EndpointFilterInvocationContext ctx = CreateContext(new TestClaimsPrincipal()); // not in SkippedTypes, but IsAssignableTo(ClaimsPrincipal)
+		EndpointFilterInvocationContext ctx = CreateContext(new TestClaimsPrincipal { Label = "test" }); // not in SkippedTypes, but IsAssignableTo(ClaimsPrincipal)
 		object? result = await sut.InvokeAsync(ctx, _ => ValueTask.FromResult<object?>("next"));
 		result.ShouldBe("next");
 	}
@@ -202,7 +200,7 @@ public sealed class ValidationEndpointFilterTests
 	public async Task InvokeAsync_WhenArgumentIsRegisteredDiService_CallsNext()
 	{
 		A.CallTo(() => serviceChecker.IsService(typeof(RegisteredService))).Returns(true);
-		EndpointFilterInvocationContext ctx = CreateContext(new RegisteredService());
+		EndpointFilterInvocationContext ctx = CreateContext(new RegisteredService { Id = 1 });
 		object? result = await sut.InvokeAsync(ctx, _ => ValueTask.FromResult<object?>("next"));
 		result.ShouldBe("next");
 	}
@@ -222,8 +220,7 @@ public sealed class ValidationEndpointFilterTests
 	{
 		EndpointFilterInvocationContext ctx = CreateContext(new InvalidModel()); // [Required] Name is null
 		object? result = await sut.InvokeAsync(ctx, _ => ValueTask.FromResult<object?>("next"));
-		result.ShouldBeOfType<ValidationProblem>();
-		ValidationProblem vp = (ValidationProblem)result!;
+		ValidationProblem vp = result.ShouldBeOfType<ValidationProblem>();
 		vp.ProblemDetails.Errors.ShouldContainKey("Name");
 	}
 
@@ -232,8 +229,7 @@ public sealed class ValidationEndpointFilterTests
 	{
 		EndpointFilterInvocationContext ctx = CreateContext(new ObjectLevelInvalidModel()); // IValidatableObject with no MemberNames → ?? string.Empty
 		object? result = await sut.InvokeAsync(ctx, _ => ValueTask.FromResult<object?>("next"));
-		result.ShouldBeOfType<ValidationProblem>();
-		ValidationProblem vp = (ValidationProblem)result!;
+		ValidationProblem vp = result.ShouldBeOfType<ValidationProblem>();
 		vp.ProblemDetails.Errors.ShouldContainKey(string.Empty);
 	}
 
@@ -242,8 +238,7 @@ public sealed class ValidationEndpointFilterTests
 	{
 		EndpointFilterInvocationContext ctx = CreateContext(new NullErrorMessageInvalidModel()); // null error message → ErrorMessage ?? string.Empty
 		object? result = await sut.InvokeAsync(ctx, _ => ValueTask.FromResult<object?>("next"));
-		result.ShouldBeOfType<ValidationProblem>();
-		ValidationProblem vp = (ValidationProblem)result!;
+		ValidationProblem vp = result.ShouldBeOfType<ValidationProblem>();
 		vp.ProblemDetails.Errors["SomeField"].ShouldContain(string.Empty);
 	}
 

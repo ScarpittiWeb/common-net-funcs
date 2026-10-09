@@ -296,7 +296,6 @@ public static class DirectQuery
 			MethodCallExpression getValue = Expression.Call(readerParam, getValueMethod, getOrdinalCall);
 
 			// Convert value to property type if needed
-			//UnaryExpression convertedValue = Expression.Convert(getValue, prop.PropertyType);
 			Expression convertedValue;
 			if (prop.PropertyType == typeof(int))
 			{

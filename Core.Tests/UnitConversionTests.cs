@@ -630,6 +630,11 @@ public sealed class UnitConversionTests
 	[InlineData(0L, "0 b")]
 	[InlineData(-1000L, "-1 kb")]
 	[InlineData(-1500L, "-1.5 kb")]
+	[InlineData(999L, "999 b")]
+	[InlineData(999999L, "1000 kb")]  // 999999/1000 = 999.999 rounds to 1000
+	[InlineData(500000L, "500 kb")]
+	[InlineData(500000000L, "500 Mb")]
+	[InlineData(500000000000L, "500 Gb")]
 	public void GetFileSizeFromBitsWithUnits_Long_FormatsCorrectly(long bits, string expected)
 	{
 		// Act
@@ -789,21 +794,6 @@ public sealed class UnitConversionTests
 		// When decimalPlaces < 0, it should be treated as 0
 		string result = 1500L.GetFileSizeFromBitsWithUnits(-1);
 		result.ShouldBe("2 kb");
-	}
-
-	[Theory]
-	[InlineData(999L, "999 b")]
-	[InlineData(999999L, "1000 kb")]  // 999999/1000 = 999.999 rounds to 1000
-	[InlineData(500000L, "500 kb")]
-	[InlineData(500000000L, "500 Mb")]
-	[InlineData(500000000000L, "500 Gb")]
-	public void GetFileSizeFromBitsWithUnits_EdgeCases_FormatsCorrectly(long bits, string expected)
-	{
-		// Act
-		string result = bits.GetFileSizeFromBitsWithUnits();
-
-		// Assert
-		result.ShouldBe(expected);
 	}
 }
 #endif

@@ -2,7 +2,7 @@
 using CommonNetFuncs.ReinforcedTypings.Constants;
 using Reinforced.Typings.Attributes;
 
-namespace ReinforcedTypings.Tests.TestModels.MultiAttribute;
+namespace ReinforcedTypings.Tests.TestModels;
 
 // AutoI defaults to true, so RT's own attribute-driven export writes "IAutoIInterfaceWithConsts.ts" -
 // no actual collision here, but the safe "*Constants.ts" naming is still used unconditionally.

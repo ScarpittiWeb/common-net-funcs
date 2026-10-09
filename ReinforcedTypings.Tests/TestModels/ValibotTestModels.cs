@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using CommonNetFuncs.ReinforcedTypings.Valibot;
 using Reinforced.Typings.Attributes;
 
-namespace ReinforcedTypings.Tests.TestModels.Valibot;
+namespace ReinforcedTypings.Tests.TestModels;
 
 // Fakes for CommonNetFuncs.Web.Common.ValidationAttributes, matched by type name only
 // (ValibotSchemaGenerator.GetCustomAttributePipe switches on attr.GetType().Name). These derive from

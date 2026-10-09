@@ -19,8 +19,7 @@ public sealed class GenericDtoEndpointsTests
 
 	public GenericDtoEndpointsTests()
 	{
-		fixture = new Fixture()
-				.Customize(new AutoFakeItEasyCustomization());
+		fixture = new Fixture().Customize(new AutoFakeItEasyCustomization());
 		sut = new GenericDtoEndpoints();
 	}
 
@@ -437,7 +436,7 @@ public sealed class GenericDtoEndpointsTests
 		// Assert
 
 		result.Result.ShouldBeOfType<ObjectResult>();
-		((ObjectResult)result.Result!).StatusCode.ShouldBe(400);
+		((ObjectResult)result.Result).StatusCode.ShouldBe(400);
 	}
 
 	[Fact]
@@ -577,7 +576,7 @@ public sealed class GenericDtoEndpointsTests
 		// Assert
 
 		result.Result.ShouldBeOfType<ObjectResult>();
-		((ObjectResult)result.Result!).StatusCode.ShouldBe(400);
+		((ObjectResult)result.Result).StatusCode.ShouldBe(400);
 	}
 
 	[Fact]
@@ -671,7 +670,7 @@ public sealed class GenericDtoEndpointsTests
 		// Assert
 
 		result.Result.ShouldBeOfType<ObjectResult>();
-		((ObjectResult)result.Result!).StatusCode.ShouldBe(400);
+		((ObjectResult)result.Result).StatusCode.ShouldBe(400);
 	}
 
 	[Fact]
@@ -784,7 +783,7 @@ public sealed class GenericDtoEndpointsTests
 		// Assert
 
 		result.Result.ShouldBeOfType<ObjectResult>();
-		((ObjectResult)result.Result!).StatusCode.ShouldBe(400);
+		((ObjectResult)result.Result).StatusCode.ShouldBe(400);
 	}
 
 	[Fact]
@@ -1104,7 +1103,7 @@ public sealed class GenericDtoEndpointsTests
 
 		result.ShouldNotBeNull();
 		result.Result.ShouldBeOfType<OkObjectResult>();
-		((OkObjectResult)result.Result!).Value.ShouldBe(3);
+		((OkObjectResult)result.Result).Value.ShouldBe(3);
 	}
 
 	[Fact]
@@ -1184,7 +1183,7 @@ public sealed class GenericDtoEndpointsTests
 		// Assert
 		result.ShouldNotBeNull();
 		result.Result.ShouldBeOfType<OkObjectResult>();
-		((OkObjectResult)result.Result!).Value.ShouldBe(keys);
+		((OkObjectResult)result.Result).Value.ShouldBe(keys);
 	}
 
 	[Fact]
@@ -1274,7 +1273,7 @@ public sealed class GenericDtoEndpointsTests
 
 		result.ShouldNotBeNull();
 		result.Result.ShouldBeOfType<OkObjectResult>();
-		((OkObjectResult)result.Result!).Value.ShouldBe(3);
+		((OkObjectResult)result.Result).Value.ShouldBe(3);
 	}
 
 	[Fact]
@@ -1415,7 +1414,7 @@ public sealed class GenericDtoEndpointsTests
 		// Assert
 
 		result.Result.ShouldBeOfType<ObjectResult>();
-		((ObjectResult)result.Result!).StatusCode.ShouldBe(400);
+		((ObjectResult)result.Result).StatusCode.ShouldBe(400);
 	}
 
 	[Fact]
@@ -1577,7 +1576,7 @@ public sealed class GenericDtoEndpointsTests
 		// Assert
 
 		result.Result.ShouldBeOfType<ObjectResult>();
-		((ObjectResult)result.Result!).StatusCode.ShouldBe(400);
+		((ObjectResult)result.Result).StatusCode.ShouldBe(400);
 	}
 
 	[Fact]

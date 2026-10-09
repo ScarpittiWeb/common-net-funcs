@@ -216,7 +216,6 @@ public sealed class CellFont : IFont
 	}
 }
 
-
 /// <summary>
 /// Methods to make reading and writing to an excel file easier using NPOI
 /// </summary>
@@ -264,7 +263,6 @@ public static partial class Common
 				if ((style.HexColor?.Length == 7) && regex.IsMatch(style.HexColor))
 				{
 					byte[] rgb = [ToByte(style.HexColor.Substring(1, 2), 16), ToByte(style.HexColor.Substring(3, 2), 16), ToByte(style.HexColor.Substring(5, 2), 16)];
-					// ((XSSFCellStyle)newCellStyle).SetFillForegroundColor(new XSSFColor(new Rgb24(rgb[0], rgb[1], rgb[2])));
 
 					((XSSFCellStyle)newCellStyle).SetFillForegroundColor(new(new DefaultIndexedColorMap())
 					{
@@ -407,7 +405,6 @@ public static partial class Common
 		return stringBuilder.ToString();
 	}
 
-
 	/// <summary>
 	/// Checks if cell is empty
 	/// </summary>
@@ -417,7 +414,6 @@ public static partial class Common
 	{
 		return string.IsNullOrWhiteSpace(cell.GetStringValue());
 	}
-
 
 	/// <summary>
 	/// Get ICell offset from cellReference
@@ -434,12 +430,6 @@ public static partial class Common
 			CellRangeAddress cellRangeAddress = CellRangeAddress.ValueOf(cellReference);
 			IRow row = ws.GetRow(cellRangeAddress.FirstRow + rowOffset) ?? ws.CreateRow(cellRangeAddress.FirstRow + rowOffset);
 			return row.GetCell(cellRangeAddress.FirstColumn + colOffset, MissingCellPolicy.CREATE_NULL_AS_BLANK);
-
-			// CellReference cr = new(cellReference);
-			// IRow? row = ws.GetRow(cr.Row + rowOffset);
-			// row ??= ws.CreateRow(cr.Row + rowOffset);
-			// return row.GetCell(cr.Col + colOffset, MissingCellPolicy.CREATE_NULL_AS_BLANK);
-
 		}
 		catch (Exception ex)
 		{
@@ -447,7 +437,6 @@ public static partial class Common
 			return null;
 		}
 	}
-
 
 	/// <summary>
 	/// Get ICell offset from the startCell
@@ -470,7 +459,6 @@ public static partial class Common
 			return null;
 		}
 	}
-
 
 	/// <summary>
 	/// Get ICell offset from the cell indicated with the x and y coordinates
@@ -495,7 +483,6 @@ public static partial class Common
 		}
 	}
 
-
 	/// <summary>
 	/// Gets the 0 based index of the last row with a non-blank value
 	/// </summary>
@@ -504,17 +491,7 @@ public static partial class Common
 	/// <returns>0 based index of the last row with a non-blank value</returns>
 	public static int GetLastPopulatedRowInColumn(this ISheet ws, int colIndex)
 	{
-		//int i = 0;
-		//ICell? currentCell = ws.GetCellFromCoordinates(colIndex, i);
-		//while (currentCell?.IsCellEmpty() == false)
-		//{
-		//    i++;
-		//    currentCell = ws.GetCellFromCoordinates(colIndex, i);
-		//}
-		//return i - 1;
-
 		// Iterate backwards through the rows to find the last populated row (faster on large sheets than top down method)
-
 		for (int i = ws.LastRowNum; i >= 0; i--)
 		{
 			IRow row = ws.GetRow(i);
@@ -527,7 +504,6 @@ public static partial class Common
 		return -1;
 	}
 
-
 	/// <summary>
 	/// Gets the 0 based index of the last row with a non-blank value
 	/// </summary>
@@ -538,7 +514,6 @@ public static partial class Common
 	{
 		return ws.GetLastPopulatedRowInColumn(colName.ColumnNameToNumber());
 	}
-
 
 	/// <summary>
 	/// Get ICell offset from the cell with named reference cellName
@@ -560,7 +535,7 @@ public static partial class Common
 			}
 			else
 			{
-				logger.Warn("Unable to locate cell with name {cellName}", cellName);
+				logger.Warn("Unable to locate cell with name {CellName}", cellName);
 				return null;
 			}
 
@@ -600,7 +575,6 @@ public static partial class Common
 		}
 	}
 
-
 	/// <summary>
 	/// Clear contents from cell with named reference cellName
 	/// </summary>
@@ -618,7 +592,7 @@ public static partial class Common
 			}
 			catch (Exception ex)
 			{
-				logger.Warn(ex, "Unable to locate cell with name {cellName}", cellName);
+				logger.Warn(ex, "Unable to locate cell with name {CellName}", cellName);
 				return;
 			}
 			ISheet ws = wb.GetSheet(crs[0].SheetName);
@@ -647,7 +621,6 @@ public static partial class Common
 		}
 	}
 
-
 	/// <summary>
 	/// Initializes cell at indicated row and column
 	/// </summary>
@@ -658,7 +631,6 @@ public static partial class Common
 	{
 		return row.CreateCell(columnIndex);
 	}
-
 
 	/// <summary>
 	/// Writes an excel file to the specified path
@@ -684,7 +656,6 @@ public static partial class Common
 		}
 	}
 
-
 	/// <summary>
 	/// Writes an excel file to the specified path
 	/// </summary>
@@ -709,7 +680,6 @@ public static partial class Common
 		}
 	}
 
-
 	/// <summary>
 	/// Get cell style based on enum EStyle options
 	/// </summary>
@@ -721,75 +691,44 @@ public static partial class Common
 	private static ICellStyle GetCustomStyle(this IWorkbook wb, bool cellLocked = false, string? hexColor = null, short? hssfColor = null, IFont? font = null, HorizontalAlignment? alignment = null,
 			FillPattern? fillPattern = null, NpoiBorderStyles? borderStyles = null, int cachedColorLimit = 100, bool wrapText = false)
 	{
-		//ICellStyle cellStyle;
-
 		CellStyle cellStyle = new();
-		if (wb.IsXlsx())
+		if (wb.IsXlsx() && borderStyles != null)
 		{
-			//ICellStyle xssfStyle = (XSSFCellStyle)wb.CreateCellStyle();
-			//CellStyle cellStyle = new();
-
-			//cellStyle = (CellStyle)xssfStyle;
-
-
-			if (borderStyles != null)
+			if (borderStyles.BorderTop != null)
 			{
-				if (borderStyles.BorderTop != null)
+				cellStyle.BorderTop = (BorderStyle)borderStyles.BorderTop;
+				if (borderStyles.BorderTopColor != null)
 				{
-					cellStyle.BorderTop = (BorderStyle)borderStyles.BorderTop;
-					if (borderStyles.BorderTopColor != null)
-					{
-						cellStyle.TopBorderColor = (short)borderStyles.BorderTopColor;
-					}
-				}
-
-				if (borderStyles.BorderLeft != null)
-				{
-					cellStyle.BorderLeft = (BorderStyle)borderStyles.BorderLeft;
-					if (borderStyles.BorderLeftColor != null)
-					{
-						cellStyle.LeftBorderColor = (short)borderStyles.BorderLeftColor;
-					}
-				}
-
-				if (borderStyles.BorderRight != null)
-				{
-					cellStyle.BorderRight = (BorderStyle)borderStyles.BorderRight;
-					if (borderStyles.BorderRightColor != null)
-					{
-						cellStyle.RightBorderColor = (short)borderStyles.BorderRightColor;
-					}
-				}
-
-				if (borderStyles.BorderBottom != null)
-				{
-					cellStyle.BorderBottom = (BorderStyle)borderStyles.BorderBottom;
-					if (borderStyles.BorderBottomColor != null)
-					{
-						cellStyle.BottomBorderColor = (short)borderStyles.BorderBottomColor;
-					}
+					cellStyle.TopBorderColor = (short)borderStyles.BorderTopColor;
 				}
 			}
-		}
-		else
-		{
-			//ICellStyle hssfStyle = (HSSFCellStyle)wb.CreateCellStyle();
-			//if (alignment != null)
-			//{
-			//    cellStyle.Alignment = (HorizontalAlignment)alignment;
-			//}
 
-			//if (fillPattern != null)
-			//{
-			//    cellStyle.FillPattern = (FillPattern)fillPattern;
-			//}
-			//if (font != null)
-			//{
-			//    cellStyle.SetFont(font);
-			//}
+			if (borderStyles.BorderLeft != null)
+			{
+				cellStyle.BorderLeft = (BorderStyle)borderStyles.BorderLeft;
+				if (borderStyles.BorderLeftColor != null)
+				{
+					cellStyle.LeftBorderColor = (short)borderStyles.BorderLeftColor;
+				}
+			}
 
-			//cellStyle = (CellStyle)hssfStyle;
+			if (borderStyles.BorderRight != null)
+			{
+				cellStyle.BorderRight = (BorderStyle)borderStyles.BorderRight;
+				if (borderStyles.BorderRightColor != null)
+				{
+					cellStyle.RightBorderColor = (short)borderStyles.BorderRightColor;
+				}
+			}
 
+			if (borderStyles.BorderBottom != null)
+			{
+				cellStyle.BorderBottom = (BorderStyle)borderStyles.BorderBottom;
+				if (borderStyles.BorderBottomColor != null)
+				{
+					cellStyle.BottomBorderColor = (short)borderStyles.BorderBottomColor;
+				}
+			}
 		}
 
 		if (alignment != null)
@@ -824,7 +763,6 @@ public static partial class Common
 		return wb.GetOrCreateStyle(cellStyle, cachedColorLimit);
 	}
 
-
 	/// <summary>
 	/// Get cell style based on enum EStyle options
 	/// </summary>
@@ -838,7 +776,6 @@ public static partial class Common
 	{
 		return GetCustomStyle(wb, cellLocked, null, null, font, alignment, fillPattern, borderStyles, wrapText: wrapText);
 	}
-
 
 	/// <summary>
 	/// Get cell style based on enum EStyle options
@@ -855,7 +792,6 @@ public static partial class Common
 		return wb.GetCustomStyle(cellLocked, hexColor, null, font, alignment, fillPattern, borderStyles, cachedColorLimit, wrapText);
 	}
 
-
 	/// <summary>
 	/// Get cell style based on enum EStyle options
 	/// </summary>
@@ -871,7 +807,6 @@ public static partial class Common
 		return wb.GetCustomStyle(cellLocked, null, hssfColor, font, alignment, fillPattern, borderStyles, wrapText: wrapText);
 	}
 
-
 	/// <summary>
 	/// Gets the standard ICellStyle corresponding to the style enum passed in
 	/// </summary>
@@ -882,8 +817,6 @@ public static partial class Common
 	/// <returns>The ICellStyle that was created</returns>
 	public static ICellStyle GetStandardCellStyle(this IWorkbook wb, EStyle style, bool cellLocked = false, bool wrapText = false, NpoiBorderStyles? borderStyles = null)
 	{
-		//ICellStyle cellStyle = wb.CreateCellStyle();
-
 		CellStyle cellStyle = new();
 		IFont cellFont;
 		switch (style)
@@ -1075,7 +1008,6 @@ public static partial class Common
 		return wb.GetOrCreateStyle(cellStyle);
 	}
 
-
 	/// <summary>
 	/// Get font styling based on EFonts option
 	/// </summary>
@@ -1084,8 +1016,6 @@ public static partial class Common
 	/// <returns>IXLFont object containing all of the styling associated with the input EFonts option</returns>
 	public static IFont GetFont(this IWorkbook wb, EFont font)
 	{
-		//IFont cellFont = wb.CreateFont();
-
 		CellFont cellFont = new();
 		switch (font)
 		{
@@ -1115,7 +1045,6 @@ public static partial class Common
 
 		return wb.GetOrCreateFont(cellFont);
 	}
-
 
 	/// <summary>
 	/// Create a table for the specified sheet in an XSSFWorkbook
@@ -1166,7 +1095,6 @@ public static partial class Common
 		}
 	}
 
-
 	/// <summary>
 	/// Gets string value contained in cell
 	/// </summary>
@@ -1204,7 +1132,6 @@ public static partial class Common
 		};
 	}
 
-
 	/// <summary>
 	/// Writes excel file to a MemoryStream object
 	/// </summary>
@@ -1222,7 +1149,6 @@ public static partial class Common
 		memoryStream.Position = 0;
 	}
 
-
 	/// <summary>
 	/// Adds images into a workbook at the designated named ranges
 	/// </summary>
@@ -1233,7 +1159,6 @@ public static partial class Common
 	{
 		wb.AddImages([imageData], [cellName], anchorType);
 	}
-
 
 	/// <summary>
 	/// Adds images into a workbook at the designated named ranges
@@ -1247,7 +1172,6 @@ public static partial class Common
 		wb.AddImages(ws, [imageData], cellRangeAddress != null ? [cellRangeAddress] : [], anchorType);
 	}
 
-
 	/// <summary>
 	/// Adds images into a workbook at the designated named ranges
 	/// </summary>
@@ -1258,7 +1182,6 @@ public static partial class Common
 	{
 		wb.AddImages(ws, [imageData], [range], anchorType);
 	}
-
 
 	/// <summary>
 	/// Adds images into a workbook at the designated named ranges
@@ -1271,7 +1194,6 @@ public static partial class Common
 		CellRangeAddress? cellRangeAddress = cell.GetRangeOfMergedCells() ?? throw new ArgumentException($"Unable to get range from cell at {cell.Address.FormatAsString()}", nameof(cell));
 		wb.AddImages(ws, [imageData], [cellRangeAddress], anchorType);
 	}
-
 
 	/// <summary>
 	/// Adds images into a workbook at the designated named ranges
@@ -1309,7 +1231,6 @@ public static partial class Common
 		}
 	}
 
-
 	/// <summary>
 	/// Adds images into a workbook at the designated named ranges
 	/// </summary>
@@ -1334,7 +1255,6 @@ public static partial class Common
 		}
 	}
 
-
 	/// <summary>
 	/// Adds picture element to specified CellRangeAddress
 	/// </summary>
@@ -1358,7 +1278,6 @@ public static partial class Common
 
 			cell.CellStyle = cellStyle ?? wb.GetCustomStyle(false, null, HSSFColor.COLOR_NORMAL, wb.GetFont(EFont.ImageBackground), null, null, new(cell.CellStyle));//Ensure consistent cell style to ensure images are sized correctly
 
-
 			IClientAnchor anchor = helper.CreateClientAnchor();
 
 			int imgWidth;
@@ -1376,10 +1295,10 @@ public static partial class Common
 
 			decimal scale = (rangeAspect < imgAspect) ? ((rangeWidth - 3m) / imgWidth) : (rangeHeight - 3m) / imgHeight;
 
-			int resizeWidth = (int)Internal.MathCompat.Round(imgWidth * scale, 0);
-			int resizeHeight = (int)Internal.MathCompat.Round(imgHeight * scale, 0);
-			int xMargin = (int)Internal.MathCompat.Round((rangeWidth - resizeWidth) * Units.EMU_PER_PIXEL / 2.0, 0);
-			int yMargin = (int)Internal.MathCompat.Round((rangeHeight - resizeHeight) * Units.EMU_PER_PIXEL * 1.75 / 2.0, 0);
+			int resizeWidth = (int)MathCompat.Round(imgWidth * scale, 0);
+			int resizeHeight = (int)MathCompat.Round(imgHeight * scale, 0);
+			int xMargin = (int)MathCompat.Round((rangeWidth - resizeWidth) * Units.EMU_PER_PIXEL / 2.0, 0);
+			int yMargin = (int)MathCompat.Round((rangeHeight - resizeHeight) * Units.EMU_PER_PIXEL * 1.75 / 2.0, 0);
 
 			anchor.AnchorType = anchorType;
 			anchor.Col1 = area.FirstColumn;
@@ -1395,7 +1314,6 @@ public static partial class Common
 			drawing?.CreatePicture(anchor, pictureIndex);
 		}
 	}
-
 
 	/// <summary>
 	/// Gets CellRangeAddress of merged cells
@@ -1449,9 +1367,8 @@ public static partial class Common
 			}
 			totalWidth += columnWidth;
 		}
-		return (int)Internal.MathCompat.Round(totalWidth, 0);
+		return (int)MathCompat.Round(totalWidth, 0);
 	}
-
 
 	/// <summary>
 	/// Get the height of a specified range in pixels
@@ -1474,9 +1391,8 @@ public static partial class Common
 			totalHeight += ws.GetRow(i)?.HeightInPoints ?? 0;
 		}
 
-		return (int)Internal.MathCompat.Round(totalHeight * Units.EMU_PER_POINT / Units.EMU_PER_PIXEL, 0); //Approximation of point to px
+		return (int)MathCompat.Round(totalHeight * Units.EMU_PER_POINT / Units.EMU_PER_PIXEL, 0); //Approximation of point to px
 	}
-
 
 	/// <summary>
 	/// Get cells contained within a range
@@ -1526,7 +1442,6 @@ public static partial class Common
 
 		ws.AddValidationData(dataValidation);
 	}
-
 
 	/// <summary>
 	/// Reads tabular data from an unformatted excel sheet to a DataTable object similar to Python Pandas
@@ -1589,7 +1504,7 @@ public static partial class Common
 					startCell = ws.GetCellFromReference(startCellReference) ?? ws.GetCellFromReference("A1"); //Default to A1 if invalid cell referenced
 
 					startColIndex = startCell!.ColumnIndex;
-					startRowIndex = startCell!.RowIndex;
+					startRowIndex = startCell.RowIndex;
 
 					if (!string.IsNullOrWhiteSpace(endCellReference))
 					{
@@ -1664,8 +1579,6 @@ public static partial class Common
 
 								for (int colIndex = startColIndex; colIndex < endColIndex + 1; colIndex++)
 								{
-									//newRowData[colIndex - startColIndex] = ws.GetCellFromCoordinates(colIndex, rowIndex).GetStringValue();
-
 									newRowData[colIndex - startColIndex] = row.GetCell(colIndex).GetStringValue();
 								}
 								dataTable.Rows.Add(newRowData);
@@ -1689,8 +1602,6 @@ public static partial class Common
 
 									for (int colIndex = startColIndex; colIndex < endColIndex + 1; colIndex++)
 									{
-										//string? cellValue = ws.GetCellFromCoordinates(colIndex, rowIndex).GetStringValue();
-
 										string? cellValue = row!.GetCell(colIndex).GetStringValue();
 										rowIsNotNull = rowIsNotNull ? rowIsNotNull : (!string.IsNullOrWhiteSpace(cellValue));
 										newRowData[colIndex - startColIndex] = cellValue;
@@ -1718,7 +1629,6 @@ public static partial class Common
 		return dataTable;
 	}
 
-
 	/// <summary>
 	/// Reads an Excel table into a DataTable object similar to Python Pandas
 	/// </summary>
@@ -1732,7 +1642,6 @@ public static partial class Common
 		try
 		{
 			if (fileStream.IsXlsx()) //Only .xlsx files can have tables
-
 			{
 				fileStream.Position = 0;
 				using XSSFWorkbook wb = new(fileStream);
@@ -1777,8 +1686,6 @@ public static partial class Common
 					IRow currentRow = ws.GetRow(table.StartRowIndex) ?? ws.CreateRow(table.StartRowIndex);
 					for (int i = table.StartColIndex; i < table.EndColIndex + 1; i++)
 					{
-						//dataTable.Columns.Add(ws.GetCellFromCoordinates(i, table.StartRowIndex).GetStringValue());
-
 						dataTable.Columns.Add(currentRow.GetCell(i).GetStringValue());
 					}
 
@@ -1792,8 +1699,6 @@ public static partial class Common
 
 						for (int n = table.StartColIndex; n < table.EndColIndex + 1; n++)
 						{
-							//newRowData[n - table.StartColIndex] = ws.GetCellFromCoordinates(n, i).GetStringValue();
-
 							newRowData[n - table.StartColIndex] = currentRow.GetCell(n).GetStringValue();
 						}
 
@@ -1810,7 +1715,6 @@ public static partial class Common
 		return dataTable;
 	}
 
-
 	/// <summary>
 	/// Gets whether or not the stream passed in represents an XLSX type file or not
 	/// </summary>
@@ -1822,7 +1726,6 @@ public static partial class Common
 		return FileMagicContainer.ValueOf(fileStream) == FileMagic.OOXML;
 		//return DocumentFactoryHelper.HasOOXMLHeader(fileStream); // Deprecated method
 	}
-
 
 	/// <summary>
 	/// Gets whether or not the stream passed in represents an XLSX type file or not
@@ -1838,7 +1741,6 @@ public static partial class Common
 
 	private static readonly Lazy<IEnumerable<HSSFColor>> HssfColors = new(() => HSSFColor.GetIndexHash().Select(x => x.Value));
 
-
 	/// <summary>
 	/// Converts a hex color to the closest available HSSFColor
 	/// </summary>
@@ -1852,7 +1754,7 @@ public static partial class Common
 	{
 		if (HssfColorCache.TryGetValue(hexColor, out HSSFColor? hSSFColor))
 		{
-			return hSSFColor!;
+			return hSSFColor;
 		}
 
 		HSSFColor outputColor;
@@ -1861,31 +1763,6 @@ public static partial class Common
 		{
 			byte[] rgb = [ToByte(hexColor.Substring(1, 2), 16), ToByte(hexColor.Substring(3, 2), 16), ToByte(hexColor.Substring(5, 2), 16)];
 			outputColor = HssfColors.Value.MinBy(hssfColor => ColorDistance(rgb, hssfColor.RGB)) ?? new HSSFColor();
-
-			// Old way to do this
-			// Span<byte> rgb =
-			// [
-			// ToByte(hexColor.Substring(1, 2), 16),
-			// ToByte(hexColor.Substring(3, 2), 16),
-			// ToByte(hexColor.Substring(5, 2), 16),
-			// ];
-
-			// int deviation = int.MaxValue;
-			// foreach (HSSFColor hssfColor in HSSFColor.GetIndexHash().Select(x => x.Value))
-			// {
-			// byte[] hssfRgb = hssfColor.RGB;
-			// int totalDeviation = (int)Pow((double)rgb[0] - hssfRgb[0], 2) + (int)Pow((double)rgb[1] - hssfRgb[1], 2) + (int)Pow((double)rgb[2] - hssfRgb[2], 2);
-			// if (totalDeviation < deviation)
-			// {
-			// outputColor = hssfColor;
-			// deviation = totalDeviation;
-			// if (deviation == 0)
-			// {
-			// break;
-			// }
-			// }
-			// }
-
 		}
 		else
 		{
@@ -1912,7 +1789,6 @@ public static partial class Common
 		return Sqrt(((2 + (rMean / 256)) * r * r) + (4 * g * g) + ((2 + ((255 - rMean) / 256)) * b * b));
 	}
 
-
 	/// <summary>
 	/// Get the 0 based column number for the column name provided (0 = A)
 	/// </summary>
@@ -1937,7 +1813,6 @@ public static partial class Common
 		return index - 1; // Subtract 1 to make it 0-based
 	}
 
-
 	/// <summary>
 	/// Get the column name corresponding to the provided 0 based column number (A = 0)
 	/// </summary>
@@ -1952,7 +1827,6 @@ public static partial class Common
 
 		return ((int)columnNumber).ColumnIndexToName();
 	}
-
 
 	/// <summary>
 	/// Get the column name corresponding to the provided 0 based column number (A = 0)

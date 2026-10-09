@@ -12,7 +12,7 @@ public sealed class HangfireEmailService(IEmailService emailService) : IEmailSer
 	private const string HangfireJobExceptionMessage = "Failed to send email";
 	public async Task<bool> SendEmail(SmtpSettings smtpSettings, EmailAddresses emailAddresses, EmailContent emailContent, bool readReceipt, string readReceiptEmail, CancellationToken cancellationToken = default)
 	{
-		if (!await emailService.SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent, ReadReceipt = readReceipt, ReadReceiptEmail = readReceiptEmail }, cancellationToken))
+		if (!await emailService.SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent, ReadReceipt = readReceipt, ReadReceiptEmail = readReceiptEmail }, cancellationToken).ConfigureAwait(false)	)
 		{
 			throw new HangfireJobException(HangfireJobExceptionMessage);
 		}
@@ -21,7 +21,7 @@ public sealed class HangfireEmailService(IEmailService emailService) : IEmailSer
 
 	public async Task<bool> SendEmail(SmtpSettings smtpSettings, EmailAddresses emailAddresses, EmailContent emailContent, CancellationToken cancellationToken = default)
 	{
-		if (!await emailService.SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent, }, cancellationToken))
+		if (!await emailService.SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent, }, cancellationToken).ConfigureAwait(false))
 		{
 			throw new HangfireJobException(HangfireJobExceptionMessage);
 		}
@@ -30,7 +30,7 @@ public sealed class HangfireEmailService(IEmailService emailService) : IEmailSer
 
 	public async Task<bool> SendEmail(SmtpSettings smtpSettings, EmailAddresses emailAddresses, EmailContentBytes emailContent, bool readReceipt, string readReceiptEmail, CancellationToken cancellationToken = default)
 	{
-		if (!await emailService.SendEmail(new SendEmailConfigBytes() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent, ReadReceipt = readReceipt, ReadReceiptEmail = readReceiptEmail }, cancellationToken))
+		if (!await emailService.SendEmail(new SendEmailConfigBytes() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent, ReadReceipt = readReceipt, ReadReceiptEmail = readReceiptEmail }, cancellationToken).ConfigureAwait(false))
 		{
 			throw new HangfireJobException(HangfireJobExceptionMessage);
 		}
@@ -39,7 +39,7 @@ public sealed class HangfireEmailService(IEmailService emailService) : IEmailSer
 
 	public async Task<bool> SendEmail(SmtpSettings smtpSettings, EmailAddresses emailAddresses, EmailContentBytes emailContent, CancellationToken cancellationToken = default)
 	{
-		if (!await emailService.SendEmail(new SendEmailConfigBytes() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent, }, cancellationToken))
+		if (!await emailService.SendEmail(new SendEmailConfigBytes() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent, }, cancellationToken).ConfigureAwait(false))
 		{
 			throw new HangfireJobException(HangfireJobExceptionMessage);
 		}
@@ -48,7 +48,7 @@ public sealed class HangfireEmailService(IEmailService emailService) : IEmailSer
 
 	public async Task<bool> SendEmail(SendEmailConfig sendEmailConfig, CancellationToken cancellationToken = default)
 	{
-		if (!await emailService.SendEmail(sendEmailConfig, cancellationToken))
+		if (!await emailService.SendEmail(sendEmailConfig, cancellationToken).ConfigureAwait(false))
 		{
 			throw new HangfireJobException(HangfireJobExceptionMessage);
 		}
@@ -57,7 +57,7 @@ public sealed class HangfireEmailService(IEmailService emailService) : IEmailSer
 
 	public async Task<bool> SendEmail(SendEmailConfigBytes sendEmailConfig, CancellationToken cancellationToken = default)
 	{
-		if (!await emailService.SendEmail(sendEmailConfig, cancellationToken))
+		if (!await emailService.SendEmail(sendEmailConfig, cancellationToken).ConfigureAwait(false))
 		{
 			throw new HangfireJobException(HangfireJobExceptionMessage);
 		}

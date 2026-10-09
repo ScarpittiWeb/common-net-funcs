@@ -322,10 +322,10 @@ public sealed class FilteredEfCoreLoggerTests
 		FilteredEfCoreLogger logger = new(_innerLogger, LogLevel.Warning);
 
 		// Act - Simulate various EF Core log messages
-		logger.Log(LogLevel.Debug, new EventId(20100), "Executing SQL command", null, (state, _) => state!);
-		logger.Log(LogLevel.Information, new EventId(20101), "Executed SQL in 50ms", null, (state, _) => state!);
+		logger.Log(LogLevel.Debug, new EventId(20100), "Executing SQL command", null, (state, _) => state);
+		logger.Log(LogLevel.Information, new EventId(20101), "Executed SQL in 50ms", null, (state, _) => state);
 		logger.Log(LogLevel.Warning, new EventId(20500), "Query took longer than expected: 2000ms", null, (state, _) => state);
-		logger.Log(LogLevel.Error, new EventId(20102), "Database error occurred", new InvalidOperationException("Connection lost"), (state, _) => state!);
+		logger.Log(LogLevel.Error, new EventId(20102), "Database error occurred", new InvalidOperationException("Connection lost"), (state, _) => state);
 
 		// Assert
 		_logMessages.ShouldNotContain(m => m.Contains("Executing SQL command"));

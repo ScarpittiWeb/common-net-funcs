@@ -11,7 +11,9 @@ internal static class ThrowHelper
 	public static void ThrowIfNull([NotNull] object? argument, string? paramName)
 	{
 #if NET6_0_OR_GREATER
+#pragma warning disable S3236 // Caller information arguments should not be provided explicitly
 		ArgumentNullException.ThrowIfNull(argument, paramName);
+#pragma warning restore S3236 // Caller information arguments should not be provided explicitly
 #else
 		if (argument is null)
 		{
@@ -23,7 +25,9 @@ internal static class ThrowHelper
 	public static void ThrowIfNegativeOrZero(int value, string? paramName)
 	{
 #if NET8_0_OR_GREATER
+#pragma warning disable S3236 // Caller information arguments should not be provided explicitly
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, paramName);
+#pragma warning restore S3236 // Caller information arguments should not be provided explicitly
 #else
 		if (value <= 0)
 		{

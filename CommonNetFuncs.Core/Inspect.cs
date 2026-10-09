@@ -58,78 +58,6 @@ public static class Inspect
 		return hasAttribute;
 	}
 
-	///// <summary>
-	///// Compares two like objects against each other to check to see if they contain the same values
-	///// </summary>
-	///// <param name="obj1">First object to compare for value equality</param>
-	///// <param name="obj2">Second object to compare for value equality</param>
-	///// <returns><see langword="true"/> if the two objects have the same value for all elements, otherwise false</returns>
-	//[Obsolete("Please use IsEqual method instead")]
-	//public static bool IsEqualR(this object? obj1, object? obj2)
-	//{
-	//	return obj1.IsEqualR(obj2, null);
-	//}
-
-	///// <summary>
-	///// Compare two class objects for value equality
-	///// </summary>
-	///// <param name="obj1">First object to compare for value equality</param>
-	///// <param name="obj2">Second object to compare for value equality</param>
-	///// <param name="exemptProps">Names of properties to not include in the matching check</param>
-	///// <returns><see langword="true"/> if both objects contain identical values for all properties except for the ones identified by exemptProps, otherwise false</returns>
-	//[Obsolete("Please use IsEqual method instead")]
-	//public static bool IsEqualR(this object? obj1, object? obj2, IEnumerable<string>? exemptProps = null)
-	//{
-	//	// They're both null.
-	//	if ((obj1 == null) && (obj2 == null))
-	//	{
-	//		return true;
-	//	}
-
-	//	// One is null, so they can't be the same.
-	//	if ((obj1 == null) || (obj2 == null))
-	//	{
-	//		return false;
-	//	}
-
-	//	// How can they be the same if they're different types?
-	//	if (obj1.GetType() != obj1.GetType())
-	//	{
-	//		return false;
-	//	}
-
-	//	IEnumerable<PropertyInfo> props = GetOrAddPropertiesFromReflectionCache(obj1.GetType());
-	//	if (exemptProps?.Any() == true)
-	//	{
-	//		props = props.Where(x => exemptProps?.Contains(x.Name) != true);
-	//	}
-
-	//	foreach (PropertyInfo prop in props)
-	//	{
-	//		object aPropValue = prop.GetValue(obj1) ?? string.Empty;
-	//		object bPropValue = prop.GetValue(obj2) ?? string.Empty;
-
-	//		bool aIsNumeric = aPropValue.IsNumeric();
-	//		bool bIsNumeric = bPropValue.IsNumeric();
-
-	//		try
-	//		{
-	//			// This will prevent issues with numbers with varying decimal places from being counted as a difference
-	//			if ((aIsNumeric && bIsNumeric && (decimal.Parse(aPropValue.ToString()!) != decimal.Parse(bPropValue.ToString()!))) ||
-	//									(!(aIsNumeric && bIsNumeric) && !aPropValue.ToString().StrComp(bPropValue.ToString())))
-	//			{
-	//				return false;
-	//			}
-	//		}
-	//		catch (Exception ex)
-	//		{
-	//			logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
-	//			return false;
-	//		}
-	//	}
-	//	return true;
-	//}
-
 	// This class is used to track object pairs being compared
 	private sealed class ComparisonContext
 	{
@@ -276,7 +204,6 @@ public static class Inspect
 			}
 			else
 			{
-				// comparison = Expression.Equal(value1, value2);
 				comparison = Expression.Constant(true);
 			}
 

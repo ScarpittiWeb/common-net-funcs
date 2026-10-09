@@ -6,6 +6,8 @@
 		<Nullable>enable</Nullable>
 		<IsPackable>false</IsPackable>
 		<LangVersion>latest</LangVersion>
+		<!-- The MessagePack source generator emits a resolver in this project that shadows the one in CommonNetFuncs.Web.Requests -->
+		<NoWarn>$(NoWarn);CS0436</NoWarn>
 	</PropertyGroup>
 
 	<PropertyGroup>

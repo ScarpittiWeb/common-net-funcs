@@ -41,7 +41,7 @@ public static class DistributedCacheExtensions
 
 	public static async Task<T?> TryGetValueAsync<T>(this IDistributedCache cache, string key)
 	{
-		byte[]? val = await cache.GetAsync(key);
+		byte[]? val = await cache.GetAsync(key).ConfigureAwait(false);
 		if (val == null)
 		{
 			return default;

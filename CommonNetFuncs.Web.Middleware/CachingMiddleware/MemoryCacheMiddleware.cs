@@ -58,17 +58,17 @@ internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, C
 
 					if (cachedValue.CompressionType > 0)
 					{
-						byte[] decompressedData = await cachedValue.Data.DecompressAsync((ECompressionType)cachedValue.CompressionType).ConfigureAwait(false);
-						await context.Response.Body.WriteAsync(decompressedData.AsMemory(0, decompressedData.Length)).ConfigureAwait(false);
+						byte[] decompressedData = await cachedValue.Data.DecompressAsync((ECompressionType)cachedValue.CompressionType, cancellationToken: context.RequestAborted).ConfigureAwait(false);
+						await context.Response.Body.WriteAsync(decompressedData.AsMemory(0, decompressedData.Length), context.RequestAborted).ConfigureAwait(false);
 					}
 					else
 					{
-						await context.Response.Body.WriteAsync(cachedValue.Data.AsMemory(0, cachedValue.Data.Length)).ConfigureAwait(false);
+						await context.Response.Body.WriteAsync(cachedValue.Data.AsMemory(0, cachedValue.Data.Length), context.RequestAborted).ConfigureAwait(false);
 					}
 				}
 				else
 				{
-					await context.Response.Body.WriteAsync(null).ConfigureAwait(false);
+					await context.Response.Body.WriteAsync(null, context.RequestAborted).ConfigureAwait(false);
 				}
 				return;
 			}
@@ -109,12 +109,12 @@ internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, C
 					bool spaceAvailable = await EnsureCacheSpaceAvailableAsync(responseData.Length).ConfigureAwait(false);
 					if (spaceAvailable)
 					{
-						await cacheLock.WaitAsync().ConfigureAwait(false);
+						await cacheLock.WaitAsync(context.RequestAborted).ConfigureAwait(false);
 						try
 						{
 							CacheEntry entry = new()
 							{
-								Data = cacheOptions.UseCompression ? await responseData.CompressAsync(cacheOptions.CompressionType).ConfigureAwait(false) : responseData,
+								Data = cacheOptions.UseCompression ? await responseData.CompressAsync(cacheOptions.CompressionType, cancellationToken: context.RequestAborted).ConfigureAwait(false) : responseData,
 								Tags = ExtractCacheTags(context),
 								Headers = context.Response.Headers.Where(x => cacheOptions.HeadersToCache.ContainsInvariant(x.Key)).ToDictionary(h => h.Key, h => h.Value.ToString()), //Only cache needed headers
 								CompressionType = cacheOptions.UseCompression ? (short)cacheOptions.CompressionType : (short)0
@@ -155,12 +155,12 @@ internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, C
 					}
 
 					memoryStream.Position = 0;
-					await memoryStream.CopyToAsync(originalBody).ConfigureAwait(false);
+					await memoryStream.CopyToAsync(originalBody, context.RequestAborted).ConfigureAwait(false);
 				}
 				else
 				{
 					memoryStream.Position = 0;
-					await memoryStream.CopyToAsync(originalBody).ConfigureAwait(false);
+					await memoryStream.CopyToAsync(originalBody, context.RequestAborted).ConfigureAwait(false);
 				}
 			}
 			finally
@@ -192,7 +192,7 @@ internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, C
 
 		if (tagsToEvict?.Length > 0)
 		{
-			await cacheLock.WaitAsync().ConfigureAwait(false);
+			await cacheLock.WaitAsync(context.RequestAborted).ConfigureAwait(false);
 			try
 			{
 				lock (tagLock)
@@ -211,7 +211,7 @@ internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, C
 									cache.Remove(keyToEvict);
 									if (!cacheOptions.SuppressLogs)
 									{
-										logger.Info("Manually evicting {keyToEvict} because it had tag {tag}", keyToEvict, tag.SanitizeForLog());
+										logger.Info("Manually evicting {KeyToEvict} because it had tag {Tag}", keyToEvict, tag.SanitizeForLog());
 									}
 								}
 							}
@@ -231,7 +231,7 @@ internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, C
 			// Single entry eviction
 			if (cache.TryGetValue(cacheKey, out CacheEntry? entry))
 			{
-				await cacheLock.WaitAsync().ConfigureAwait(false);
+				await cacheLock.WaitAsync(context.RequestAborted).ConfigureAwait(false);
 				try
 				{
 					cacheMetrics?.SubtractFromSize(entry?.Data.Length ?? 0);
@@ -240,7 +240,7 @@ internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, C
 					cache.Remove(cacheKey);
 					if (!cacheOptions.SuppressLogs)
 					{
-						logger.Info("Manually evicting {cacheKey}", cacheKey.SanitizeForLog());
+						logger.Info("Manually evicting {CacheKey}", cacheKey.SanitizeForLog());
 					}
 					RemoveCacheTags(cacheKey, entry?.Tags ?? []);
 				}
@@ -265,7 +265,7 @@ internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, C
 		RemoveCacheTags(key.ToString() ?? string.Empty, entry.Tags);
 		if (!cacheOptions.SuppressLogs)
 		{
-			logger.Info("Automatically evicting {key} for reason: {reason}", key.ToString()!.SanitizeForLog(), reason);
+			logger.Info("Automatically evicting {Key} for reason: {Reason}", key.ToString()!.SanitizeForLog(), reason);
 		}
 	}
 
@@ -329,7 +329,7 @@ internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, C
 					cacheTracker?.RemoveEntry(entry.Key);
 					if (!cacheOptions.SuppressLogs)
 					{
-						logger.Info("Automatically evicting {key} because due to there not being enough space in cache for new value of size {size}", entry.Key.SanitizeForLog(), entry.Value.Size.BytesToKb());
+						logger.Info("Automatically evicting {Key} because due to there not being enough space in cache for new value of size {Size}", entry.Key.SanitizeForLog(), entry.Value.Size.BytesToKb());
 					}
 
 					freedSpace += entry.Value.Size;
@@ -387,7 +387,7 @@ internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, C
 		{
 			context.Request.EnableBuffering();
 			using StreamReader reader = new(context.Request.Body, leaveOpen: true);
-			string body = await reader.ReadToEndAsync().ConfigureAwait(false);
+			string body = await reader.ReadToEndAsync(context.RequestAborted).ConfigureAwait(false);
 			context.Request.Body.Position = 0;
 
 			stringBuilder.Append('|').Append(Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(body))));
@@ -520,15 +520,15 @@ public static class MemoryCacheEvictionMiddlewareExtensions
 						}
 					}
 
-					logger.Info("Cache entry evicted for key: {key}", key.SanitizeForLog());
+					logger.Info("Cache entry evicted for key: {Key}", key.SanitizeForLog());
 					return Results.Ok(1);
 				}
-				logger.Info("No cache entry found for key: {key}", key.SanitizeForLog());
+				logger.Info("No cache entry found for key: {Key}", key.SanitizeForLog());
 				return Results.Ok(0);
 			}
 			catch (Exception ex)
 			{
-				logger.Error(ex, "Error evicting cache entry by key: {key}", key.SanitizeForLog());
+				logger.Error(ex, "Error evicting cache entry by key: {Key}", key.SanitizeForLog());
 				return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError, title: "Error evicting cache entry");
 			}
 		})
@@ -579,11 +579,11 @@ public static class MemoryCacheEvictionMiddlewareExtensions
 						}
 					}
 
-					logger.Info("Evicted {count} cache entries with tag: {tag}", evictedCount, tag.SanitizeForLog());
+					logger.Info("Evicted {Count} cache entries with tag: {Tag}", evictedCount, tag.SanitizeForLog());
 					return Results.Ok(evictedCount);
 				}
 
-				logger.Info("No cache entries found with tag: {tag}", tag);
+				logger.Info("No cache entries found with tag: {Tag}", tag);
 				return Results.Ok(0);
 			}
 			catch (Exception ex)

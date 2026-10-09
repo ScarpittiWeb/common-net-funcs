@@ -92,7 +92,7 @@ public sealed class RestHelpersWrapper
 				attempts++;
 				lastResponse = result.Response;
 
-				if (attempts >= options.ResilienceOptions!.MaxRetry)
+				if (attempts >= options.ResilienceOptions.MaxRetry)
 				{
 					logger.Warn("GET {Url} still failing after max allowed attempts ({MaxRetry}).", options.Url, options.ResilienceOptions.MaxRetry);
 					break;

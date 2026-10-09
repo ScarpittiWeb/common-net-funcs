@@ -60,14 +60,14 @@ public sealed class DebugTests
 	public void RenderQueryAsScript_WithPostgreSqlDialect_EscapesEmbeddedQuotes()
 	{
 		using DebugTestDbContext context = CreateContext(o => o.UseNpgsql(PostgreSqlConnectionString));
-		string name = "O'Brien";
+		string name = "O'Brian";
 
 		IQueryable<DebugTestEntity> query = context.Entities.Where(e => e.Name == name);
 
 		string result = query.RenderQueryAsScript(SqlDialect.PostgreSql);
 
-		result.ShouldContain("-- @name = 'O''Brien'");
-		result.ShouldContain("'O''Brien'");
+		result.ShouldContain("-- @name = 'O''Brian'");
+		result.ShouldContain("'O''Brian'");
 	}
 
 	[Fact]
@@ -113,7 +113,7 @@ public sealed class DebugTests
 	public void RenderQueryAsScript_WithPostgreSqlDialect_FormatsDateTimeWithTimestampCast()
 	{
 		using DebugTestDbContext context = CreateContext(o => o.UseNpgsql(PostgreSqlConnectionString));
-		DateTime date = new(2024, 5, 17, 13, 45, 30);
+		DateTime date = new(2024, 5, 17, 13, 45, 30, DateTimeKind.Unspecified);
 
 		IQueryable<DebugTestEntity> query = context.Entities.Where(e => e.CreatedDate == date);
 

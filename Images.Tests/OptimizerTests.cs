@@ -11,7 +11,6 @@ public sealed class OptimizerTests : IDisposable
 
 	public void Dispose()
 	{
-		//File.Delete(_tempSavePath);
 		GC.SuppressFinalize(this);
 	}
 

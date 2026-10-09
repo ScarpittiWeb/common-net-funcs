@@ -86,7 +86,6 @@ public static class SshFtp
 		if (sftpClient.IsConnected())
 		{
 			sftpClient.Disconnect();
-			//sftpClient.Dispose();
 		}
 		return sftpClient.IsConnected();
 	}
@@ -164,7 +163,7 @@ public static class SshFtp
 
 		async IAsyncEnumerable<string> GetFileListAsyncInternal(CancellationTokenSource? cancellationTokenSource)
 		{
-			if (!await sftpClient.ExistsAsync(path).ConfigureAwait(false))
+			if (!await sftpClient.ExistsAsync(path, cancellationTokenSource?.Token ?? CancellationToken.None).ConfigureAwait(false))
 			{
 				throw new ArgumentException($"Path <{path}> cannot be found on host.");
 			}

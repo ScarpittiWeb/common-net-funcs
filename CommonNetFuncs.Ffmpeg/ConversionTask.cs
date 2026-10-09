@@ -54,7 +54,7 @@ public static class ConversionTask
 				CancellationTokenSource? cancellationTokenSource = null)
 	{
 		return FfmpegConversionTask(fileToConvert, outputFileName, workingPath, codec, outputFormat, conversionPreset, conversionIndex, fpsDict, mediaInfo, null, numberOfThreads, cancelIfLarger,
-						taskDescription, strict, overwriteOutput, processPriority, hardwareAccelerationValues, conversionOutputs, additionalLogText, cancellationTokenSource);
+			taskDescription, strict, overwriteOutput, processPriority, hardwareAccelerationValues, conversionOutputs, additionalLogText, cancellationTokenSource);
 	}
 
 	/// <summary>
@@ -103,7 +103,7 @@ public static class ConversionTask
 			DateTime lastOutput3 = DateTime.UtcNow.AddSeconds(-6);
 
 			Conversion conversion = new();
-			mediaInfo ??= await FFmpeg.GetMediaInfo($"{fileToConvert.@FullName}").ConfigureAwait(false);
+			mediaInfo ??= await FFmpeg.GetMediaInfo($"{fileToConvert.@FullName}", cancellationTokenSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
 			IVideoStream? videoStream = mediaInfo.VideoStreams.FirstOrDefault();
 			IAudioStream? audioStream = mediaInfo.AudioStreams.FirstOrDefault();
 
@@ -189,7 +189,6 @@ public static class ConversionTask
 				conversionFailed = true;
 			}
 
-			//await Console.Out.WriteLineAsync($"Finished conversion file [{fileToConvert.Name}]");
 			logger.Info($"Finished conversion for #{conversionIndex} [{fileToConvert.Name}] with {(conversionFailed ? "[FAILED]" : "[SUCCESS]")} Status");
 		}
 		catch (ConversionException cex)

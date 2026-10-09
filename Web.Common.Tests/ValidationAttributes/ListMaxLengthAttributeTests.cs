@@ -24,12 +24,6 @@ public class CustomCollectionNoCount(List<string?> items) : IEnumerable<string?>
 	System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-// Custom collection with write-only Count property - commented out due to compilation warnings
-// public class CustomCollectionWriteOnlyCount
-// {
-// 	public int Count { set { } }
-// }
-
 public sealed class ListMaxLengthAttributeTests : ValidationTestBase
 {
 	[Fact]

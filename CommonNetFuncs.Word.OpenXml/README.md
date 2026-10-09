@@ -9,13 +9,13 @@ This lightweight project contains helper methods related to MS Word formatted do
 ## Contents
 
 - [CommonNetFuncs.Word.OpenXml](#commonnetfuncswordopenxml)
-	- [Contents](#contents)
-	- [ChangeUrls](#changeurls)
-		- [Common Usage Examples](#common-usage-examples)
-			- [ChangeUrlsInWordDoc](#changeurlsinworddoc)
-			- [ChangeUrlsInWordDocRegex](#changeurlsinworddocregex)
-	- [Installation](#installation)
-	- [License](#license)
+  - [Contents](#contents)
+  - [ChangeUrls](#changeurls)
+    - [Common Usage Examples](#common-usage-examples)
+      - [ChangeUrlsInWordDoc](#changeurlsinworddoc)
+      - [ChangeUrlsInWordDocRegex](#changeurlsinworddocregex)
+  - [Installation](#installation)
+  - [License](#license)
 
 ---
 

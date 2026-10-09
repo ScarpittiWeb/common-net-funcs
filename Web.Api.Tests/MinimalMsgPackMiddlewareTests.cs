@@ -25,7 +25,6 @@ public sealed class TestPayload
 // MsgPackRequestMiddleware
 // ---------------------------------------------------------------------------
 
-
 public sealed class MsgPackRequestMiddlewareTests
 {
 	private const string MsgPackMimeType = "application/x-msgpack";

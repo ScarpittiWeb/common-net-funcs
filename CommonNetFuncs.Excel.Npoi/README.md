@@ -9,12 +9,12 @@ This project contains helper methods for reading and writing Excel files using t
 ## Contents
 
 - [CommonNetFuncs.Excel.Npoi](#commonnetfuncsexcelnpoi)
-	- [Contents](#contents)
-	- [Export](#export)
-		- [Export Usage Examples](#export-usage-examples)
-			- [GenericExcelExport](#genericexcelexport)
-	- [Installation](#installation)
-	- [License](#license)
+  - [Contents](#contents)
+  - [Export](#export)
+    - [Export Usage Examples](#export-usage-examples)
+      - [GenericExcelExport](#genericexcelexport)
+  - [Installation](#installation)
+  - [License](#license)
 
 ---
 

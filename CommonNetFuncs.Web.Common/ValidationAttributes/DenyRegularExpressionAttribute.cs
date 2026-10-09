@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -69,7 +69,7 @@ public sealed class DenyRegularExpressionAttribute : ValidationAttribute
 		if (!DenyOnlyFullMatch)
 		{
 			// Check if the pattern matches anywhere in the string - if it does, validation fails
-			if (Regex!.IsMatch(stringValue))
+			if (Regex.IsMatch(stringValue))
 			{
 				string memberName = validationContext.MemberName ?? string.Empty;
 				return new ValidationResult(
@@ -81,7 +81,7 @@ public sealed class DenyRegularExpressionAttribute : ValidationAttribute
 		else
 		{
 			// Check if the pattern matches - if it does, validation fails (this is the "deny" logic)
-			foreach (ValueMatch m in Regex!.EnumerateMatches(stringValue))
+			foreach (ValueMatch m in Regex.EnumerateMatches(stringValue))
 			{
 				// We are looking for an exact match, not just a search hit
 				if (m.Index == 0 && m.Length == stringValue.Length)

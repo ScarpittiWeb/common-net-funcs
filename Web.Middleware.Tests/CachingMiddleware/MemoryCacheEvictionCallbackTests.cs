@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
 using xRetry.v3;
+using static Xunit.TestContext;
 
 namespace Web.Middleware.Tests.CachingMiddleware;
 
@@ -62,11 +63,11 @@ public sealed class MemoryCacheEvictionCallbackTests
 		initialCount.ShouldBe(1);
 
 		// Wait for expiration
-		await Task.Delay(300);
+		await Task.Delay(300, Current.CancellationToken);
 
 		// Trigger a cache operation to process expired items
 		cache.Compact(1.0);
-		await Task.Delay(100);
+		await Task.Delay(100, Current.CancellationToken);
 
 		// Assert - Metrics should be updated after eviction
 		// Note: The eviction callback should have been triggered
@@ -95,9 +96,9 @@ public sealed class MemoryCacheEvictionCallbackTests
 		tracker.CacheTags.ContainsKey(tagName).ShouldBeTrue();
 
 		// Wait for expiration and trigger cleanup
-		await Task.Delay(300);
+		await Task.Delay(300, Current.CancellationToken);
 		cache.Compact(1.0);
-		await Task.Delay(100);
+		await Task.Delay(100, Current.CancellationToken);
 
 		// Assert - Tag should be removed from tracker after eviction
 		// If all entries with this tag are evicted, the tag should be removed
@@ -134,9 +135,9 @@ public sealed class MemoryCacheEvictionCallbackTests
 		initialCount.ShouldBe(3);
 
 		// Wait for expiration
-		await Task.Delay(300);
+		await Task.Delay(300, Current.CancellationToken);
 		cache.Compact(1.0);
-		await Task.Delay(100);
+		await Task.Delay(100, Current.CancellationToken);
 
 		// Assert - All entries should have been evicted and metrics updated
 		metrics.EvictedDueToRemoved().ShouldBeGreaterThan(0);
@@ -167,9 +168,9 @@ public sealed class MemoryCacheEvictionCallbackTests
 		await middleware.InvokeAsync(context);
 
 		// Wait for expiration
-		await Task.Delay(300);
+		await Task.Delay(300, Current.CancellationToken);
 		cache.Compact(1.0);
-		await Task.Delay(100);
+		await Task.Delay(100, Current.CancellationToken);
 
 		// Assert - Should not throw (logging is enabled)
 		metrics.EvictedDueToRemoved().ShouldBeGreaterThan(0);
@@ -185,9 +186,9 @@ public sealed class MemoryCacheEvictionCallbackTests
 		cache.Set(key, "just a string", entryOptions);
 
 		// Wait for expiration
-		await Task.Delay(300);
+		await Task.Delay(300, Current.CancellationToken);
 		cache.Compact(1.0);
-		await Task.Delay(100);
+		await Task.Delay(100, Current.CancellationToken);
 
 		// Assert - Should handle gracefully without throwing
 		// The callback checks if value is CacheEntry and returns early if not
@@ -218,9 +219,9 @@ public sealed class MemoryCacheEvictionCallbackTests
 		tracker.CacheTags.ContainsKey("tag3").ShouldBeTrue();
 
 		// Wait for expiration
-		await Task.Delay(300);
+		await Task.Delay(300, Current.CancellationToken);
 		cache.Compact(1.0);
-		await Task.Delay(100);
+		await Task.Delay(100, Current.CancellationToken);
 
 		// Assert - All tags should be cleaned up after eviction
 		foreach (string tag in tags.Split(','))

@@ -48,7 +48,7 @@ internal sealed class FakeDbParameterCollection : DbParameterCollection
 	{
 		foreach (object? value in values)
 		{
-			Add(value!);
+			Add(value);
 		}
 	}
 

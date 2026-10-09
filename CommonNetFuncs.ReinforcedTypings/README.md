@@ -15,24 +15,24 @@ All of the above honor the resolved `[TsGlobal]`/fluent `Global(...)` settings (
 ## Contents
 
 - [CommonNetFuncs.ReinforcedTypings](#commonnetfuncsreinforcedtypings)
-	- [Contents](#contents)
-	- [Setup](#setup)
-	- [TsConst](#tsconst)
-		- [TsConst Usage Examples](#tsconst-usage-examples)
-			- [Export all fields, suppress one](#export-all-fields-suppress-one)
-			- [Export only selected fields](#export-only-selected-fields)
-			- [Non-string field types](#non-string-field-types)
-	- [TsCollection](#tscollection)
-		- [TsCollection Usage Examples](#tscollection-usage-examples)
-			- [Export all fields, suppress one](#export-all-fields-suppress-one-1)
-			- [Export only selected fields](#export-only-selected-fields-1)
-			- [Collections of exported types](#collections-of-exported-types)
-	- [Valibot Schema Generation](#valibot-schema-generation)
-		- [Valibot Usage Examples](#valibot-usage-examples)
-			- [Basic form model](#basic-form-model)
-			- [SubsetOf-bound input models](#subsetof-bound-input-models)
-	- [Installation](#installation)
-	- [License](#license)
+  - [Contents](#contents)
+  - [Setup](#setup)
+  - [TsConst](#tsconst)
+    - [TsConst Usage Examples](#tsconst-usage-examples)
+      - [Export all fields, suppress one](#export-all-fields-suppress-one)
+      - [Export only selected fields](#export-only-selected-fields)
+      - [Non-string field types](#non-string-field-types)
+  - [TsCollection](#tscollection)
+    - [TsCollection Usage Examples](#tscollection-usage-examples)
+      - [Export all fields, suppress one](#export-all-fields-suppress-one-1)
+      - [Export only selected fields](#export-only-selected-fields-1)
+      - [Collections of exported types](#collections-of-exported-types)
+  - [Valibot Schema Generation](#valibot-schema-generation)
+    - [Valibot Usage Examples](#valibot-usage-examples)
+      - [Basic form model](#basic-form-model)
+      - [SubsetOf-bound input models](#subsetof-bound-input-models)
+  - [Installation](#installation)
+  - [License](#license)
 
 ---
 
@@ -105,7 +105,7 @@ Generates `RoleConstants.ts`:
 
 ```ts
 export const RoleConstants = {
-	NmPkgPlAdminName: "NM Pkg PL Admin",
+  NmPkgPlAdminName: "NM Pkg PL Admin",
 } as const;
 
 export type RoleConstantsKey = keyof typeof RoleConstants;
@@ -141,9 +141,9 @@ public static class AppDefaults
 
 ```ts
 export const AppDefaults = {
-	TenantId: "11111111-1111-1111-1111-111111111111",
-	LaunchDate: "2024-01-02",
-	AllowedPageSizes: [10, 25, 50],
+  TenantId: "11111111-1111-1111-1111-111111111111",
+  LaunchDate: "2024-01-02",
+  AllowedPageSizes: [10, 25, 50],
 } as const;
 ```
 
@@ -183,12 +183,12 @@ Generates `RoleConstants.ts`:
 
 ```ts
 export const RoleConstantsCollections = {
-	AllRoleNames: ["Admin", "Editor", "Viewer"] as string[],
+  AllRoleNames: ["Admin", "Editor", "Viewer"] as string[],
 } as const;
 
 export type RoleConstantsCollectionsKey = keyof typeof RoleConstantsCollections;
 export type RoleConstantsCollectionsValue =
-	(typeof RoleConstantsCollections)[RoleConstantsCollectionsKey];
+  (typeof RoleConstantsCollections)[RoleConstantsCollectionsKey];
 ```
 
 #### Export only selected fields
@@ -231,8 +231,8 @@ import type { Role } from "./Role";
 import type { IUserSummary } from "./UserSummary";
 
 export const SeedCollections = {
-	DefaultRoles: [0, 2] as Role[],
-	SampleUsers: [{ Name: "Ada" }] as IUserSummary[],
+  DefaultRoles: [0, 2] as Role[],
+  SampleUsers: [{ Name: "Ada" }] as IUserSummary[],
 } as const;
 
 export type SeedCollectionsKey = keyof typeof SeedCollections;
@@ -291,19 +291,19 @@ Generates `CreateUserModel.schema.ts`:
 import * as v from "valibot";
 
 export const CreateUserModelSchema = v.object({
-	Name: v.pipe(v.string(), v.maxLength(50)),
-	Email: v.pipe(v.string(), v.email()),
-	Age: v.optional(
-		v.nullable(v.pipe(v.number(), v.minValue(18), v.maxValue(120))),
-	),
+  Name: v.pipe(v.string(), v.maxLength(50)),
+  Email: v.pipe(v.string(), v.email()),
+  Age: v.optional(
+    v.nullable(v.pipe(v.number(), v.minValue(18), v.maxValue(120))),
+  ),
 });
 
 export type CreateUserModelInput = v.InferInput<typeof CreateUserModelSchema>;
 
 export const CreateUserModelLabels: Record<string, string> = {
-	Name: "Full Name",
-	Email: "Email",
-	Age: "Age",
+  Name: "Full Name",
+  Email: "Email",
+  Age: "Age",
 };
 ```
 

@@ -91,7 +91,7 @@ public static partial class Debug
 
 		return npgsqlDbType switch
 		{
-			_ when npgsqlDbType.HasFlag(NpgsqlDbType.Array) => $"{(npgsqlDbType & ~NpgsqlDbType.Array).ToString().ToLowerInvariant()}[]",
+			_ when ((int)npgsqlDbType & (int)NpgsqlDbType.Array) != 0 => $"{((NpgsqlDbType)((int)npgsqlDbType & ~(int)NpgsqlDbType.Array)).ToString().ToLowerInvariant()}[]",
 			NpgsqlDbType.Varchar or NpgsqlDbType.Char => $"{npgsqlDbType.ToString().ToLowerInvariant()}({(parameter.Size <= 0 ? "unbounded" : parameter.Size.ToString(CultureInfo.InvariantCulture))})",
 			NpgsqlDbType.Numeric => $"numeric({(parameter.Precision == 0 ? 18 : parameter.Precision)},{parameter.Scale})",
 			_ => npgsqlDbType.ToString().ToLowerInvariant()
@@ -114,7 +114,7 @@ public static partial class Debug
 		DateOnly => NpgsqlDbType.Date,
 		TimeOnly => NpgsqlDbType.Time,
 		TimeSpan => NpgsqlDbType.Interval,
-		System.Collections.IEnumerable and not string => NpgsqlDbType.Array | NpgsqlDbType.Text,
+		System.Collections.IEnumerable and not string => (NpgsqlDbType)((int)NpgsqlDbType.Array + (int)NpgsqlDbType.Text),
 		_ => NpgsqlDbType.Varchar
 	};
 

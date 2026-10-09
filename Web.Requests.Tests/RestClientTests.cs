@@ -87,7 +87,7 @@ public sealed class RestClientTests
 
 		result.ShouldNotBeNull();
 		result.Response.ShouldNotBeNull();
-		result.Response!.StatusCode.ShouldBe(HttpStatusCode.OK);
+		result.Response.StatusCode.ShouldBe(HttpStatusCode.OK);
 	}
 
 	[Fact]
@@ -116,7 +116,7 @@ public sealed class RestClientTests
 
 		result.ShouldNotBeNull();
 		result.Response.ShouldNotBeNull();
-		result.Response!.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+		result.Response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
 	}
 
 	[Fact]
@@ -143,7 +143,7 @@ public sealed class RestClientTests
 
 		result.ShouldNotBeNull();
 		result.Response.ShouldNotBeNull();
-		result.Response!.StatusCode.ShouldBe(HttpStatusCode.OK);
+		result.Response.StatusCode.ShouldBe(HttpStatusCode.OK);
 		result.Result.ShouldNotBeNull();
 
 		// Enumerate the results

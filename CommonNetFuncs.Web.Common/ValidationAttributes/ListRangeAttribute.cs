@@ -146,11 +146,6 @@ public sealed class ListRangeAttribute : ValidationAttribute
 			object minimum = Minimum;
 			object maximum = Maximum;
 
-			// if (minimum == null || maximum == null)
-			// {
-			// 	throw new InvalidOperationException("Must set both minimum and maximum values");
-			// }
-
 			// Careful here -- OperandType could be int or double if they used the long form of the ctor.
 			// But the min and max would still be strings.  Do use the type of the min/max operands to condition
 			// the following code.

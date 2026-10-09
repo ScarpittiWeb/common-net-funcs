@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
@@ -33,7 +33,7 @@ public static partial class Debug
 		string debugViewSql = query.ToQueryString();
 
 		// SQL Server's debug view is already a runnable script (parameters are declared via T-SQL DECLARE statements).
-		// PostgreSQL has no top-level DECLARE syntax, so Npgsql's debug view only comments the parameter values out;
+		// PostgreSQL has no top-level DECLARE syntax, so Npgsql's debug view only comments the parameter values out,
 		// those need to be inlined as literals into the command text to produce something actually runnable.
 		return dialect == SqlDialect.PostgreSql ? RenderPostgreSqlScript(debugViewSql) : debugViewSql;
 	}
@@ -51,20 +51,21 @@ public static partial class Debug
 		int commandStartIndex = 0;
 		while (commandStartIndex < lines.Length)
 		{
-			string entry = lines[commandStartIndex];
+			string firstLine = lines[commandStartIndex];
 			int linesConsumed = 1;
-			if (!entry.StartsWith("-- ", StringComparison.Ordinal))
+			if (!firstLine.StartsWith("-- ", StringComparison.Ordinal))
 			{
 				break; // Npgsql's parameter comments always precede the command text as a contiguous block
 			}
 
-			Match match = ParameterCommentLineRegex().Match(entry);
+			StringBuilder entry = new(firstLine);
+			Match match = ParameterCommentLineRegex().Match(firstLine);
 			// A parameter value containing line breaks spans multiple lines; keep appending until the entry is complete
 			while (!match.Success && commandStartIndex + linesConsumed < lines.Length && !lines[commandStartIndex + linesConsumed].StartsWith("-- ", StringComparison.Ordinal))
 			{
-				entry += "\n" + lines[commandStartIndex + linesConsumed];
+				entry.Append('\n').Append(lines[commandStartIndex + linesConsumed]);
 				linesConsumed++;
-				match = ParameterCommentLineRegex().Match(entry);
+				match = ParameterCommentLineRegex().Match(entry.ToString());
 			}
 
 			if (!match.Success)
@@ -73,8 +74,21 @@ public static partial class Debug
 			}
 
 			string? dbType = match.Groups["dbType"].Success ? match.Groups["dbType"].Value : null;
-			string literal = match.Groups["array"].Success ? FormatPostgreSqlArrayLiteral(match.Groups["array"].Value) :
-				match.Groups["null"].Success ? "NULL" : FormatPostgreSqlLiteral(match.Groups["value"].Value, dbType);
+
+			string literal;
+			if (match.Groups["array"].Success)
+			{
+				literal = FormatPostgreSqlArrayLiteral(match.Groups["array"].Value);
+			}
+			else if (match.Groups["null"].Success)
+			{
+				literal = "NULL";
+			}
+			else
+			{
+				literal = FormatPostgreSqlLiteral(match.Groups["value"].Value, dbType);
+			}
+
 			parameters.Add((match.Groups["name"].Value, literal));
 			commandStartIndex += linesConsumed;
 		}
@@ -85,7 +99,7 @@ public static partial class Debug
 			string escapedLiteral = literal.Replace("$", "$$");
 			if (literal.StartsWith("ARRAY[", StringComparison.Ordinal))
 			{
-				// Hand-written raw SQL sometimes already wraps an array parameter in an explicit ARRAY[...] literal (e.g. "ARRAY[@p14]");
+				// Hand-written raw SQL sometimes already wraps an array parameter in an explicit ARRAY[...] literal (e.g. "ARRAY[@p14]")
 				// replace that whole wrapper first so the self-contained array literal below isn't nested inside another ARRAY[...].
 				commandText = Regex.Replace(commandText, $@"ARRAY\s*\[\s*@{Regex.Escape(name)}(?!\w)\s*\]", escapedLiteral, RegexOptions.IgnoreCase);
 			}

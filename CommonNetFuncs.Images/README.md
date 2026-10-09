@@ -18,7 +18,13 @@ This project contains helper methods for dealing with base64 image encoding and 
       - [ImageSaveToFile](#imagesavetofile)
       - [IsValidBase64Image](#isvalidbase64image)
   - [Manipulation](#manipulation)
-  - [Manipulation Usage Examples](#manipulation-usage-examples) - [ResizeImage](#resizeimage) - [ResizeTo Helpers](#resizeto-helpers) - [ConvertImageFormat](#convertimageformat) - [ReduceImageQuality](#reduceimagequality) - [TryDetectImageType](#trydetectimagetype) - [TryGetMetadata](#trygetmetadata)
+  - [Manipulation Usage Examples](#manipulation-usage-examples)
+    - [ResizeImage](#resizeimage)
+    - [ResizeTo Helpers](#resizeto-helpers)
+    - [ConvertImageFormat](#convertimageformat)
+    - [ReduceImageQuality](#reduceimagequality)
+    - [TryDetectImageType](#trydetectimagetype)
+    - [TryGetMetadata](#trygetmetadata)
   - [Fingerprinting](#fingerprinting)
     - [Fingerprinting Usage Examples](#fingerprinting-usage-examples)
       - [FingerprintImage](#fingerprintimage)
@@ -190,9 +196,9 @@ Fingerprint all supported images in a directory.
 
 ```cs
 IReadOnlyList<ImageFingerprint> fingerprints = await ImageFingerprinting.FingerprintDirectory(
-	@"C:\path\to\images",
-	recursive: true,
-	algorithm: ImageHashAlgorithm.PerceptualHash
+  @"C:\path\to\images",
+  recursive: true,
+  algorithm: ImageHashAlgorithm.PerceptualHash
 );
 ```
 
@@ -206,9 +212,9 @@ SimilarityResult pair = ImageFingerprinting.Compare(fingerprints[0], fingerprint
 IReadOnlyList<SimilarityResult> duplicates = ImageFingerprinting.FindDuplicates(fingerprints, duplicateThreshold: 90.0m);
 
 IReadOnlyList<SimilarityResult> duplicatesFromDirectory = await ImageFingerprinting.FindDuplicatesInDirectory(
-	@"C:\path\to\images",
-	recursive: true,
-	algorithm: ImageHashAlgorithm.DifferenceHash
+  @"C:\path\to\images",
+  recursive: true,
+  algorithm: ImageHashAlgorithm.DifferenceHash
 );
 ```
 
@@ -234,6 +240,7 @@ await OptimizeImage(@"C:\path\to\input_image.jpg", @"C:\path\to\output_image.jpg
 ```
 
 </details>
+
 ## Installation
 
 Install via NuGet:

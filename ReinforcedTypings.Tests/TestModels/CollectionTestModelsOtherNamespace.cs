@@ -1,6 +1,6 @@
 ﻿using Reinforced.Typings.Attributes;
 
-namespace ReinforcedTypings.Tests.TestModels.Collections.Other;
+namespace ReinforcedTypings.Tests.TestModels;
 
 [TsInterface]
 public sealed class OtherNamespaceModel

@@ -189,7 +189,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLCell? cell = sheet.GetCellFromReference("B2");
 		cell.ShouldNotBeNull();
-		cell!.Address.RowNumber.ShouldBe(2);
+		cell.Address.RowNumber.ShouldBe(2);
 		cell.Address.ColumnNumber.ShouldBe(2);
 	}
 
@@ -198,7 +198,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLCell? cell = sheet.GetCellFromReference("B2:D5");
 		cell.ShouldNotBeNull();
-		cell!.Address.RowNumber.ShouldBe(2);
+		cell.Address.RowNumber.ShouldBe(2);
 		cell.Address.ColumnNumber.ShouldBe(2);
 	}
 
@@ -212,7 +212,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLCell? cell = sheet.GetCellFromReference("B2", colOffset, rowOffset);
 		cell.ShouldNotBeNull();
-		cell!.Address.RowNumber.ShouldBe(2 + rowOffset);
+		cell.Address.RowNumber.ShouldBe(2 + rowOffset);
 		cell.Address.ColumnNumber.ShouldBe(2 + colOffset);
 	}
 
@@ -230,7 +230,7 @@ public sealed class CommonTests : IDisposable
 		IXLCell start = sheet.Cell(3, 3); // C3
 		IXLCell? result = start.GetCellOffset(colOffset, rowOffset);
 		result.ShouldNotBeNull();
-		result!.Address.ColumnNumber.ShouldBe(3 + colOffset);
+		result.Address.ColumnNumber.ShouldBe(3 + colOffset);
 		result.Address.RowNumber.ShouldBe(3 + rowOffset);
 	}
 
@@ -240,7 +240,7 @@ public sealed class CommonTests : IDisposable
 		IXLCell start = sheet.Cell(2, 2);
 		IXLCell? result = start.GetCellOffset(0, 0);
 		result.ShouldNotBeNull();
-		result!.Address.ColumnNumber.ShouldBe(2);
+		result.Address.ColumnNumber.ShouldBe(2);
 		result.Address.RowNumber.ShouldBe(2);
 	}
 
@@ -265,7 +265,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLCell? cell = sheet.GetCellFromCoordinates(colIndex, rowIndex);
 		cell.ShouldNotBeNull();
-		cell!.Address.ColumnNumber.ShouldBe(colIndex);
+		cell.Address.ColumnNumber.ShouldBe(colIndex);
 		cell.Address.RowNumber.ShouldBe(rowIndex);
 	}
 
@@ -276,7 +276,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLCell? cell = sheet.GetCellFromCoordinates(col, row, colOff, rowOff);
 		cell.ShouldNotBeNull();
-		cell!.Address.ColumnNumber.ShouldBe(col + colOff);
+		cell.Address.ColumnNumber.ShouldBe(col + colOff);
 		cell.Address.RowNumber.ShouldBe(row + rowOff);
 	}
 
@@ -362,7 +362,7 @@ public sealed class CommonTests : IDisposable
 
 		IXLCell? cell = workbook.GetCellFromName("MyCell");
 		cell.ShouldNotBeNull();
-		cell!.Address.ColumnNumber.ShouldBe(2);
+		cell.Address.ColumnNumber.ShouldBe(2);
 		cell.Address.RowNumber.ShouldBe(3);
 	}
 
@@ -373,7 +373,7 @@ public sealed class CommonTests : IDisposable
 
 		IXLCell? cell = workbook.GetCellFromName("OffsetCell", 1, 1);
 		cell.ShouldNotBeNull();
-		cell!.Address.ColumnNumber.ShouldBe(3);
+		cell.Address.ColumnNumber.ShouldBe(3);
 		cell.Address.RowNumber.ShouldBe(4);
 	}
 
@@ -395,15 +395,15 @@ public sealed class CommonTests : IDisposable
 		IXLCell? cell = wb2.GetCellFromName("MultiRange");
 		cell.ShouldNotBeNull();
 		// A1 (row 1, col 1) is higher/left than C5 (row 5, col 3)
-		cell!.Address.RowNumber.ShouldBe(1);
+		cell.Address.RowNumber.ShouldBe(1);
 		cell.Address.ColumnNumber.ShouldBe(1);
 	}
 
 	[Fact]
 	public void GetCellFromName_WithDeadSheetReference_ReturnsNull()
 	{
-		// A defined name pointing to a non-existent sheet has no resolvable ranges;
-		// topLeftCell stays null after the foreach loop → returns null
+		// A defined name pointing to a non-existent sheet has no resolvable ranges,
+		// so topLeftCell stays null after the foreach loop and null is returned
 		using XLWorkbook wb2 = new();
 		wb2.DefinedNames.Add("DeadRef", "NoSuchSheet!$A$1");
 
@@ -450,7 +450,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLRange? range = sheet.Cell(1, 1).GetRangeOfMergedCells();
 		range.ShouldNotBeNull();
-		range!.RowCount().ShouldBe(1);
+		range.RowCount().ShouldBe(1);
 		range.ColumnCount().ShouldBe(1);
 	}
 
@@ -460,7 +460,7 @@ public sealed class CommonTests : IDisposable
 		sheet.Range("A1:C3").Merge();
 		IXLRange? range = sheet.Cell(1, 1).GetRangeOfMergedCells();
 		range.ShouldNotBeNull();
-		range!.RowCount().ShouldBe(3);
+		range.RowCount().ShouldBe(3);
 		range.ColumnCount().ShouldBe(3);
 	}
 
@@ -511,7 +511,7 @@ public sealed class CommonTests : IDisposable
 
 		IXLDataValidation? validation = sheet.DataValidations.FirstOrDefault();
 		validation.ShouldNotBeNull();
-		validation!.ShowErrorMessage.ShouldBeTrue();
+		validation.ShowErrorMessage.ShouldBeTrue();
 		validation.ErrorStyle.ShouldBe(XLErrorStyle.Stop);
 	}
 
@@ -898,7 +898,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLStyle? style = workbook.GetStandardCellStyle(EStyle.Header);
 		style.ShouldNotBeNull();
-		style!.Alignment.Horizontal.ShouldBe(XLAlignmentHorizontalValues.Center);
+		style.Alignment.Horizontal.ShouldBe(XLAlignmentHorizontalValues.Center);
 		style.Fill.BackgroundColor.ShouldBe(XLColor.LightGray);
 		style.Border.BottomBorder.ShouldBe(XLBorderStyleValues.Thin);
 	}
@@ -908,7 +908,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLStyle? style = workbook.GetStandardCellStyle(EStyle.HeaderThickTop);
 		style.ShouldNotBeNull();
-		style!.Border.TopBorder.ShouldBe(XLBorderStyleValues.Medium);
+		style.Border.TopBorder.ShouldBe(XLBorderStyleValues.Medium);
 		style.Fill.BackgroundColor.ShouldBe(XLColor.LightGray);
 	}
 
@@ -917,7 +917,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLStyle? style = workbook.GetStandardCellStyle(EStyle.Error);
 		style.ShouldNotBeNull();
-		style!.Fill.BackgroundColor.ShouldBe(XLColor.Red);
+		style.Fill.BackgroundColor.ShouldBe(XLColor.Red);
 		style.Fill.PatternType.ShouldBe(XLFillPatternValues.Solid);
 	}
 
@@ -926,7 +926,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLStyle? style = workbook.GetStandardCellStyle(EStyle.Blackout);
 		style.ShouldNotBeNull();
-		style!.Font.FontColor.ShouldBe(XLColor.Black);
+		style.Font.FontColor.ShouldBe(XLColor.Black);
 		style.Fill.BackgroundColor.ShouldBe(XLColor.Black);
 	}
 
@@ -935,7 +935,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLStyle? style = workbook.GetStandardCellStyle(EStyle.Whiteout);
 		style.ShouldNotBeNull();
-		style!.Font.FontColor.ShouldBe(XLColor.White);
+		style.Font.FontColor.ShouldBe(XLColor.White);
 		style.Fill.BackgroundColor.ShouldBe(XLColor.White);
 	}
 
@@ -944,7 +944,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLStyle? style = workbook.GetStandardCellStyle(EStyle.ImageBackground);
 		style.ShouldNotBeNull();
-		style!.Alignment.Horizontal.ShouldBe(XLAlignmentHorizontalValues.Center);
+		style.Alignment.Horizontal.ShouldBe(XLAlignmentHorizontalValues.Center);
 		style.Alignment.Vertical.ShouldBe(XLAlignmentVerticalValues.Center);
 	}
 
@@ -953,7 +953,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLStyle? style = workbook.GetStandardCellStyle(EStyle.Header, cellLocked: true);
 		style.ShouldNotBeNull();
-		style!.Protection.Locked.ShouldBeTrue();
+		style.Protection.Locked.ShouldBeTrue();
 	}
 
 	[Fact]
@@ -961,7 +961,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLStyle? style = workbook.GetStandardCellStyle(EStyle.Body, wrapText: true);
 		style.ShouldNotBeNull();
-		style!.Alignment.WrapText.ShouldBeTrue();
+		style.Alignment.WrapText.ShouldBeTrue();
 	}
 
 	[Fact]
@@ -975,7 +975,7 @@ public sealed class CommonTests : IDisposable
 
 		IXLStyle? style = workbook.GetStandardCellStyle(EStyle.Error, borderStyles: bs);
 		style.ShouldNotBeNull();
-		style!.Border.TopBorder.ShouldBe(XLBorderStyleValues.Thick);
+		style.Border.TopBorder.ShouldBe(XLBorderStyleValues.Thick);
 		style.Border.LeftBorder.ShouldBe(XLBorderStyleValues.Double);
 		style.Border.RightBorder.ShouldBe(XLBorderStyleValues.Medium);
 		style.Border.BottomBorder.ShouldBe(XLBorderStyleValues.Thin);
@@ -992,7 +992,7 @@ public sealed class CommonTests : IDisposable
 
 		IXLStyle? style = workbook.GetStandardCellStyle(EStyle.Header, borderStyles: bs);
 		style.ShouldNotBeNull();
-		style!.Border.TopBorderColor.ShouldBe(XLColor.Red);
+		style.Border.TopBorderColor.ShouldBe(XLColor.Red);
 		style.Border.BottomBorderColor.ShouldBe(XLColor.Blue);
 		style.Border.LeftBorderColor.ShouldBe(XLColor.Green);
 		style.Border.RightBorderColor.ShouldBe(XLColor.Black);
@@ -1004,7 +1004,7 @@ public sealed class CommonTests : IDisposable
 		ClosedXmlBorderStyles bs = new(borderTop: XLBorderStyleValues.Thick);
 		IXLStyle? style = workbook.GetStandardCellStyle(EStyle.Body, borderStyles: bs);
 		style.ShouldNotBeNull();
-		style!.Border.TopBorder.ShouldBe(XLBorderStyleValues.Thick);
+		style.Border.TopBorder.ShouldBe(XLBorderStyleValues.Thick);
 	}
 
 	#endregion
@@ -1029,7 +1029,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLStyle? style = Common.GetStyle(EStyle.Custom, workbook, htmlColor: "#FF0000");
 		style.ShouldNotBeNull();
-		style!.Fill.BackgroundColor.ShouldBe(XLColor.FromHtml("#FF0000"));
+		style.Fill.BackgroundColor.ShouldBe(XLColor.FromHtml("#FF0000"));
 	}
 
 	[Fact]
@@ -1037,7 +1037,7 @@ public sealed class CommonTests : IDisposable
 	{
 		IXLStyle? style = Common.GetStyle(EStyle.Custom, workbook, alignment: XLAlignmentHorizontalValues.Left);
 		style.ShouldNotBeNull();
-		style!.Alignment.Horizontal.ShouldBe(XLAlignmentHorizontalValues.Left);
+		style.Alignment.Horizontal.ShouldBe(XLAlignmentHorizontalValues.Left);
 	}
 
 	[Fact]
@@ -1046,7 +1046,7 @@ public sealed class CommonTests : IDisposable
 		IXLFont font = Common.GetFont(EFont.Header, workbook);
 		IXLStyle? style = Common.GetStyle(EStyle.Custom, workbook, font: font);
 		style.ShouldNotBeNull();
-		style!.Font.Bold.ShouldBeTrue();
+		style.Font.Bold.ShouldBeTrue();
 	}
 
 	[Fact]

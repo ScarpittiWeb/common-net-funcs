@@ -1,9 +1,11 @@
 ﻿using System.Collections;
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using CommonNetFuncs.FastMap;
 
 namespace FastMap.Tests;
 
+[SuppressMessage("Major Code Smell", "S107:Methods should not have too many parameters", Justification = "Theory methods take one parameter per data value")]
 public sealed class FastMapperTests
 {
 	public sealed class SimpleSource

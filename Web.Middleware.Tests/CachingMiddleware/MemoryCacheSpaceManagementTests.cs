@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
 using xRetry.v3;
+using static Xunit.TestContext;
 
 namespace Web.Middleware.Tests.CachingMiddleware;
 
@@ -97,7 +98,7 @@ public sealed class MemoryCacheSpaceManagementTests
 			await middleware.InvokeAsync(testHttpContext);
 
 			// Small delay to ensure different creation times
-			await Task.Delay(10);
+			await Task.Delay(10, Current.CancellationToken);
 		}
 
 		long initialCount = metrics.CurrentCacheEntryCount();
@@ -144,7 +145,7 @@ public sealed class MemoryCacheSpaceManagementTests
 
 			MemoryCacheMiddleware middleware = new(testNext, cache, options, metrics, tracker);
 			await middleware.InvokeAsync(testHttpContext);
-			await Task.Delay(5);
+			await Task.Delay(5, Current.CancellationToken);
 		}
 
 		// Try to add large item
@@ -190,7 +191,7 @@ public sealed class MemoryCacheSpaceManagementTests
 
 			MemoryCacheMiddleware middleware = new(testNext, cache, options, metrics, tracker);
 			await middleware.InvokeAsync(testHttpContext);
-			await Task.Delay(10);
+			await Task.Delay(10, Current.CancellationToken);
 		}
 
 		tracker.CacheTags.ContainsKey(tag1).ShouldBeTrue();

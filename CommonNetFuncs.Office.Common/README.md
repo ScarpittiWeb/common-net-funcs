@@ -9,12 +9,12 @@ This project contains helper methods to convert compatible file types (`.xlsx`, 
 ## Contents
 
 - [CommonNetFuncs.Images](#commonnetfuncsimages)
-	- [Contents](#contents)
-	- [PdfConversion](#pdfconversion)
-		- [PdfConversion Usage Examples](#pdfconversion-usage-examples)
-			- [ConvertToPdf](#converttopdf)
-	- [Installation](#installation)
-	- [License](#license)
+  - [Contents](#contents)
+  - [PdfConversion](#pdfconversion)
+    - [PdfConversion Usage Examples](#pdfconversion-usage-examples)
+      - [ConvertToPdf](#converttopdf)
+  - [Installation](#installation)
+  - [License](#license)
 
 ---
 

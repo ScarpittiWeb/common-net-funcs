@@ -259,7 +259,7 @@ public sealed class OptionsClassesTests
 		// Assert
 
 		options.GetBearerTokenFunc.ShouldNotBeNull();
-		string token = await options.GetBearerTokenFunc!("TestApi", false);
+		string token = await options.GetBearerTokenFunc("TestApi", false);
 		token.ShouldBe("token-TestApi-False");
 	}
 

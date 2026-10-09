@@ -1,15 +1,12 @@
-﻿using ReinforcedTypings.Tests.TestModels.Collections;
-using ReinforcedTypings.Tests.TestModels.Consts;
-
-namespace ReinforcedTypings.Tests;
+﻿namespace ReinforcedTypings.Tests;
 
 public sealed class ReinforcedTypingsFluentConfigTests
 {
-	private const string ConstsRoot = "ReinforcedTypings.Tests.TestModels.Consts";
+	private const string ConstsRoot = "ReinforcedTypings.Tests.TestModels";
 
 	private const string CollectionsRoot = "ReinforcedTypings.Tests.TestModels";
 
-	private const string MultiAttributeRoot = "ReinforcedTypings.Tests.TestModels.MultiAttribute";
+	private const string MultiAttributeRoot = "ReinforcedTypings.Tests.TestModels";
 
 	#region TsConst - basic export modes
 
@@ -277,12 +274,12 @@ public sealed class ReinforcedTypingsFluentConfigTests
 
 		string content = RtTestHarness.ReadGenerated(outDir, "Collections/ReferenceCollections.ts");
 
-		content.ShouldContain("import type { ExportedEnum } from './ExportedEnum';");
+		content.ShouldContain("import type { ExportedOption } from './ExportedOption';");
 		content.ShouldContain("import type { IAutoIInterfaceModel } from './AutoIInterfaceModel';"); // AutoI (default true) prefixes with I
 		content.ShouldContain("import type { PlainInterfaceModel } from './PlainInterfaceModel';"); // AutoI = false: no I prefix
 		content.ShouldContain("import type { ExportedClassModel } from './ExportedClassModel';");
 
-		content.ShouldContain("Enums: [0, 1] as ExportedEnum[],"); // Enum values serialize numerically (no [TsEnum(UseString = true)])
+		content.ShouldContain("Enums: [0, 1] as ExportedOption[],"); // Enum values serialize numerically (no [TsEnum(UseString = true)])
 		content.ShouldContain("AutoIModels: [{ Name: 'one' }] as IAutoIInterfaceModel[],");
 		content.ShouldContain("PlainModels: [{ Name: 'two' }] as PlainInterfaceModel[],");
 		content.ShouldContain("ClassModels: [{ Name: 'three' }] as ExportedClassModel[],");
@@ -319,7 +316,7 @@ public sealed class ReinforcedTypingsFluentConfigTests
 		string content = RtTestHarness.ReadGenerated(outDir, "Collections/ReferenceCollections.ts");
 
 		content.ShouldNotContain("import type");
-		content.ShouldContain("as Collections.ExportedEnum[],");
+		content.ShouldContain("as Collections.ExportedOption[],");
 		content.ShouldContain("as Collections.IAutoIInterfaceModel[],");
 	}
 

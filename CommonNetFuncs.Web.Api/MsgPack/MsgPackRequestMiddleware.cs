@@ -25,8 +25,8 @@ public sealed class MsgPackRequestMiddleware(RequestDelegate next, MessagePackSe
 
 	private async Task TransformThenContinueAsync(HttpContext context)
 	{
-		await TransformRequestBodyAsync(context, options);
-		await next(context);
+		await TransformRequestBodyAsync(context, options).ConfigureAwait(false);
+		await next(context).ConfigureAwait(false);
 	}
 
 	private static async Task TransformRequestBodyAsync(HttpContext context, MessagePackSerializerOptions options)
@@ -35,7 +35,7 @@ public sealed class MsgPackRequestMiddleware(RequestDelegate next, MessagePackSe
 		// Plain `using` is correct: MemoryStream does not override DisposeAsync(), so
 		// `await using` would create a needless async state-machine transition.
 		using MemoryStream ms = new((int)(context.Request.ContentLength ?? 4096));
-		await context.Request.Body.CopyToAsync(ms, context.RequestAborted);
+		await context.Request.Body.CopyToAsync(ms, context.RequestAborted).ConfigureAwait(false);
 
 		int written = (int)ms.Length;
 		if (written == 0)
@@ -45,7 +45,7 @@ public sealed class MsgPackRequestMiddleware(RequestDelegate next, MessagePackSe
 
 		// GetBuffer() exposes the underlying array without copying — one fewer
 		// allocation compared to ToArray().
-		string json = MessagePackSerializer.ConvertToJson(ms.GetBuffer().AsMemory(0, written), options);
+		string json = MessagePackSerializer.ConvertToJson(ms.GetBuffer().AsMemory(0, written), options, context.RequestAborted);
 		byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
 
 		context.Request.Body = new MemoryStream(jsonBytes, writable: false);

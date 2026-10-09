@@ -1,9 +1,9 @@
-﻿using AutoFixture;
+﻿using System.Data;
+using AutoFixture;
 using CommonNetFuncs.Excel.OpenXml;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
-using System.Data;
 using xRetry.v3;
 
 namespace Excel.OpenXml.Tests;
@@ -90,8 +90,8 @@ public sealed class ExportTests : IDisposable
 		// Arrange
 		List<TestModel> testData = fixture.CreateMany<TestModel>(2).ToList();
 
-// Act
-using MemoryStream? result = testData.GenericExcelExport(createTable: createTable, tableName: tableName);
+		// Act
+		using MemoryStream? result = testData.GenericExcelExport(exportSettings: new(createTable: createTable, tableName: tableName));
 		// Assert
 		result.ShouldNotBeNull();
 		using SpreadsheetDocument doc = SpreadsheetDocument.Open(result, false);
@@ -147,7 +147,7 @@ using MemoryStream? result = testData.GenericExcelExport(createTable: createTabl
 		worksheet.ShouldNotBeNull();
 
 		// Act
-		bool result = Export.ExportFromTable(doc, worksheet, testData, skipColumnNames: skipColumns);
+		bool result = Export.ExportFromTable(doc, worksheet, testData, new(skipColumnNames: skipColumns));
 
 		// Assert
 		result.ShouldBeTrue();
@@ -181,8 +181,8 @@ using MemoryStream? result = testData.GenericExcelExport(createTable: createTabl
 		// Arrange
 		List<TestModel>? nullList = null;
 
-// Act
-using MemoryStream? result = nullList!.GenericExcelExport();
+		// Act
+		using MemoryStream? result = nullList!.GenericExcelExport();
 		// Assert
 		result.ShouldNotBeNull();
 		result.Length.ShouldBeGreaterThan(0); // Creates valid Excel file even with null data
@@ -194,8 +194,8 @@ using MemoryStream? result = nullList!.GenericExcelExport();
 		// Arrange
 		List<TestModel> emptyList = new();
 
-// Act
-using MemoryStream? result = emptyList.GenericExcelExport();
+		// Act
+		using MemoryStream? result = emptyList.GenericExcelExport();
 		// Assert
 		result.ShouldNotBeNull();
 		result.Length.ShouldBeGreaterThan(0); // Should still create a valid Excel file
@@ -204,10 +204,10 @@ using MemoryStream? result = emptyList.GenericExcelExport();
 	[RetryFact(3)]
 	public void GenericExcelExport_DataTable_WithNullTable_ShouldCreateEmptyFile()
 	{
-// Arrange
-using DataTable? nullTable = null;
-// Act
-using MemoryStream? result = nullTable!.GenericExcelExport();
+		// Arrange
+		using DataTable? nullTable = null;
+		// Act
+		using MemoryStream? result = nullTable!.GenericExcelExport();
 		// Assert
 		result.ShouldNotBeNull();
 		result.Length.ShouldBeGreaterThan(0); // Creates valid Excel file even with null data
@@ -220,8 +220,8 @@ using MemoryStream? result = nullTable!.GenericExcelExport();
 		using DataTable emptyTable = new("EmptyTable");
 		emptyTable.Columns.Add("Column1", typeof(string));
 
-// Act
-using MemoryStream? result = emptyTable.GenericExcelExport();
+		// Act
+		using MemoryStream? result = emptyTable.GenericExcelExport();
 		// Assert
 		result.ShouldNotBeNull();
 		result.Length.ShouldBeGreaterThan(0);
@@ -240,7 +240,7 @@ using MemoryStream? result = emptyTable.GenericExcelExport();
 		doc.WorkbookPart.Workbook.AddChild(new Sheets());
 
 		// Act
-		bool result = doc.AddGenericTable(testData, "TestSheet", createTable: false, tableName: "TestTable");
+		bool result = doc.AddGenericTable(testData, "TestSheet", new(createTable: false, tableName: "TestTable"));
 
 		// Assert
 		result.ShouldBeTrue();
@@ -267,7 +267,7 @@ using MemoryStream? result = emptyTable.GenericExcelExport();
 		doc.WorkbookPart.Workbook.AddChild(new Sheets());
 
 		// Act
-		bool result = doc.AddGenericTable(dataTable, "DataSheet", createTable: false, tableName: "DataTable");
+		bool result = doc.AddGenericTable(dataTable, "DataSheet", new(createTable: false, tableName: "DataTable"));
 
 		// Assert
 		result.ShouldBeTrue();
@@ -290,10 +290,10 @@ using MemoryStream? result = emptyTable.GenericExcelExport();
 		doc.WorkbookPart.Workbook.AddChild(new Sheets());
 
 		// Act - Add first sheet
-		bool result1 = doc.AddGenericTable(testData, "TestSheet", createTable: false, tableName: "Table1");
+		bool result1 = doc.AddGenericTable(testData, "TestSheet", new(createTable: false, tableName: "Table1"));
 
 		// Act - Add second sheet with same name
-		bool result2 = doc.AddGenericTable(testData, "TestSheet", createTable: false, tableName: "Table2");
+		bool result2 = doc.AddGenericTable(testData, "TestSheet", new(createTable: false, tableName: "Table2"));
 
 		// Assert
 		result1.ShouldBeTrue();
@@ -324,8 +324,8 @@ using MemoryStream? result = emptyTable.GenericExcelExport();
 		doc.WorkbookPart.Workbook.AddChild(new Sheets());
 
 		// Act - Add sheets with same name
-		bool result1 = doc.AddGenericTable(dataTable1, "DupeSheet", createTable: false, tableName: "Table1");
-		bool result2 = doc.AddGenericTable(dataTable2, "DupeSheet", createTable: false, tableName: "Table2");
+		bool result1 = doc.AddGenericTable(dataTable1, "DupeSheet", new(createTable: false, tableName: "Table1"));
+		bool result2 = doc.AddGenericTable(dataTable2, "DupeSheet", new(createTable: false, tableName: "Table2"));
 
 		// Assert
 		result1.ShouldBeTrue();
@@ -349,9 +349,9 @@ using MemoryStream? result = emptyTable.GenericExcelExport();
 		doc.WorkbookPart.Workbook.AddChild(new Sheets());
 
 		// Act - Add multiple sheets with same name
-		doc.AddGenericTable(testData, "Sheet", createTable: false, tableName: "Table1");
-		doc.AddGenericTable(testData, "Sheet", createTable: false, tableName: "Table2");
-		doc.AddGenericTable(testData, "Sheet", createTable: false, tableName: "Table3");
+		doc.AddGenericTable(testData, "Sheet", new(createTable: false, tableName: "Table1"));
+		doc.AddGenericTable(testData, "Sheet", new(createTable: false, tableName: "Table2"));
+		doc.AddGenericTable(testData, "Sheet", new(createTable: false, tableName: "Table3"));
 
 		// Assert
 		List<Sheet> sheets = doc.WorkbookPart.Workbook.Sheets!.Elements<Sheet>().ToList();
@@ -380,7 +380,7 @@ using MemoryStream? result = emptyTable.GenericExcelExport();
 		worksheet.ShouldNotBeNull();
 
 		// Act
-		bool result = Export.ExportFromTable(doc, worksheet, dataTable, skipColumnNames: skipColumns);
+		bool result = Export.ExportFromTable(doc, worksheet, dataTable, new(skipColumnNames: skipColumns));
 
 		// Assert
 		result.ShouldBeTrue();
@@ -467,8 +467,8 @@ using MemoryStream? result = emptyTable.GenericExcelExport();
 		// Arrange
 		List<TestModel> testData = fixture.CreateMany<TestModel>(2).ToList();
 
-// Act
-using MemoryStream? result = testData.GenericExcelExport(wrapText: true);
+		// Act
+		using MemoryStream? result = testData.GenericExcelExport(exportSettings: new(wrapText: true));
 		// Assert
 		result.ShouldNotBeNull();
 		result.Length.ShouldBeGreaterThan(0);
@@ -482,8 +482,8 @@ using MemoryStream? result = testData.GenericExcelExport(wrapText: true);
 		dataTable.Columns.Add("Name", typeof(string));
 		dataTable.Rows.Add("Test");
 
-// Act
-using MemoryStream? result = dataTable.GenericExcelExport(wrapText: true);
+		// Act
+		using MemoryStream? result = dataTable.GenericExcelExport(exportSettings: new(wrapText: true));
 		// Assert
 		result.ShouldNotBeNull();
 		result.Length.ShouldBeGreaterThan(0);
@@ -495,8 +495,8 @@ using MemoryStream? result = dataTable.GenericExcelExport(wrapText: true);
 		// Arrange
 		List<TestModel> testData = fixture.CreateMany<TestModel>(1).ToList();
 
-// Act
-using MemoryStream? result = testData.GenericExcelExport(sheetName: "CustomSheet");
+		// Act
+		using MemoryStream? result = testData.GenericExcelExport(sheetName: "CustomSheet");
 		// Assert
 		result.ShouldNotBeNull();
 		using SpreadsheetDocument doc = SpreadsheetDocument.Open(result, false);
@@ -513,8 +513,8 @@ using MemoryStream? result = testData.GenericExcelExport(sheetName: "CustomSheet
 		dataTable.Columns.Add("Column", typeof(string));
 		dataTable.Rows.Add("Value");
 
-// Act
-using MemoryStream? result = dataTable.GenericExcelExport(sheetName: "MyCustomSheet");
+		// Act
+		using MemoryStream? result = dataTable.GenericExcelExport(sheetName: "MyCustomSheet");
 		// Assert
 		result.ShouldNotBeNull();
 		using SpreadsheetDocument doc = SpreadsheetDocument.Open(result, false);
@@ -537,7 +537,7 @@ using MemoryStream? result = dataTable.GenericExcelExport(sheetName: "MyCustomSh
 		worksheet.ShouldNotBeNull();
 
 		// Act
-		bool result = Export.ExportFromTable(doc, worksheet, testData, skipColumnNames: skipAllColumns);
+		bool result = Export.ExportFromTable(doc, worksheet, testData, new(skipColumnNames: skipAllColumns));
 
 		// Assert
 		result.ShouldBeFalse(); // Returns false when no properties to export
@@ -561,7 +561,7 @@ using MemoryStream? result = dataTable.GenericExcelExport(sheetName: "MyCustomSh
 		worksheet.ShouldNotBeNull();
 
 		// Act
-		bool result = Export.ExportFromTable(doc, worksheet, dataTable, skipColumnNames: skipAllColumns);
+		bool result = Export.ExportFromTable(doc, worksheet, dataTable, new(skipColumnNames: skipAllColumns));
 
 		// Assert
 		result.ShouldBeTrue();
@@ -715,8 +715,8 @@ using MemoryStream? result = dataTable.GenericExcelExport(sheetName: "MyCustomSh
 		// Arrange
 		List<TestModel> testData = fixture.CreateMany<TestModel>(1000).ToList();
 
-// Act
-using MemoryStream? result = testData.GenericExcelExport();
+		// Act
+		using MemoryStream? result = testData.GenericExcelExport();
 		// Assert
 		result.ShouldNotBeNull();
 		result.Length.ShouldBeGreaterThan(0);
@@ -741,8 +741,8 @@ using MemoryStream? result = testData.GenericExcelExport();
 			dataTable.Rows.Add($"Value{i}", i);
 		}
 
-// Act
-using MemoryStream? result = dataTable.GenericExcelExport();
+		// Act
+		using MemoryStream? result = dataTable.GenericExcelExport();
 		// Assert
 		result.ShouldNotBeNull();
 		result.Length.ShouldBeGreaterThan(0);
@@ -879,8 +879,8 @@ using MemoryStream? result = dataTable.GenericExcelExport();
 		doc.WorkbookPart.Workbook.AddChild(new Sheets());
 
 		// Act
-		bool result1 = doc.AddGenericTable(testData, "Sheet1", createTable: true, tableName: "Table1");
-		bool result2 = doc.AddGenericTable(testData, "Sheet2", createTable: true, tableName: "Table2");
+		bool result1 = doc.AddGenericTable(testData, "Sheet1", new(createTable: true, tableName: "Table1"));
+		bool result2 = doc.AddGenericTable(testData, "Sheet2", new(createTable: true, tableName: "Table2"));
 
 		// Assert
 		result1.ShouldBeTrue();
@@ -897,8 +897,8 @@ using MemoryStream? result = dataTable.GenericExcelExport();
 		List<TestModel> testData = fixture.CreateMany<TestModel>(1).ToList();
 		List<string> skipColumns = new() { "NAME", "description" }; // Different case
 
-// Act
-using MemoryStream? result = testData.GenericExcelExport(skipColumnNames: skipColumns);
+		// Act
+		using MemoryStream? result = testData.GenericExcelExport(exportSettings: new(skipColumnNames: skipColumns));
 		// Assert
 		result.ShouldNotBeNull();
 		using SpreadsheetDocument doc = SpreadsheetDocument.Open(result, false);
@@ -922,8 +922,8 @@ using MemoryStream? result = testData.GenericExcelExport(skipColumnNames: skipCo
 
 		List<string> skipColumns = new() { "COLUMN1", "column3" }; // Different case
 
-// Act
-using MemoryStream? result = dataTable.GenericExcelExport(skipColumnNames: skipColumns);
+		// Act
+		using MemoryStream? result = dataTable.GenericExcelExport(exportSettings: new(skipColumnNames: skipColumns));
 		// Assert
 		result.ShouldNotBeNull();
 		using SpreadsheetDocument doc = SpreadsheetDocument.Open(result, false);
@@ -948,7 +948,7 @@ using MemoryStream? result = dataTable.GenericExcelExport(skipColumnNames: skipC
 		worksheet.ShouldNotBeNull();
 
 		// Act
-		bool result = Export.ExportFromTable(doc, worksheet, testData, createTable: true, tableName: "MyTable");
+		bool result = Export.ExportFromTable(doc, worksheet, testData, new(createTable: true, tableName: "MyTable"));
 
 		// Assert
 		result.ShouldBeTrue();
@@ -976,7 +976,7 @@ using MemoryStream? result = dataTable.GenericExcelExport(skipColumnNames: skipC
 		worksheet.ShouldNotBeNull();
 
 		// Act
-		bool result = Export.ExportFromTable(doc, worksheet, dataTable, createTable: true, tableName: "DataTable");
+		bool result = Export.ExportFromTable(doc, worksheet, dataTable, new(createTable: true, tableName: "DataTable"));
 
 		// Assert
 		result.ShouldBeTrue();
@@ -1001,7 +1001,7 @@ using MemoryStream? result = dataTable.GenericExcelExport(skipColumnNames: skipC
 		worksheet.ShouldNotBeNull();
 
 		// Act
-		bool result = Export.ExportFromTable(doc, worksheet, testData, createTable: false);
+		bool result = Export.ExportFromTable(doc, worksheet, testData, new(createTable: false));
 
 		// Assert
 		result.ShouldBeTrue();
@@ -1024,7 +1024,7 @@ using MemoryStream? result = dataTable.GenericExcelExport(skipColumnNames: skipC
 		worksheet.ShouldNotBeNull();
 
 		// Act
-		bool result = Export.ExportFromTable(doc, worksheet, dataTable, createTable: false);
+		bool result = Export.ExportFromTable(doc, worksheet, dataTable, new(createTable: false));
 
 		// Assert
 		result.ShouldBeTrue();
@@ -1073,14 +1073,15 @@ using MemoryStream? result = dataTable.GenericExcelExport(skipColumnNames: skipC
 		// Arrange
 		List<TestModel> testData = fixture.CreateMany<TestModel>(5).ToList();
 
-// Act
-using MemoryStream? result = testData.GenericExcelExport(
-					memoryStream: new MemoryStream(),
-					createTable: true,
-					sheetName: "CustomSheet",
-					tableName: "CustomTable",
-					skipColumnNames: new() { "Description" },
-					wrapText: true);
+		// Act
+		using MemoryStream? result = testData.GenericExcelExport(
+							memoryStream: new MemoryStream(),
+							sheetName: "CustomSheet",
+							new(
+							createTable: true,
+							tableName: "CustomTable",
+							skipColumnNames: new() { "Description" },
+							wrapText: true));
 
 		// Assert
 		result.ShouldNotBeNull();
@@ -1113,16 +1114,16 @@ using MemoryStream? result = testData.GenericExcelExport(
 			dataTable.Rows.Add($"Value{i}", i, $"Desc{i}");
 		}
 
-// Act
-using MemoryStream? result = dataTable.GenericExcelExport
-		(
-			memoryStream: new MemoryStream(),
-			createTable: true,
-			sheetName: "DataSheet",
-			tableName: "DataTable",
-			skipColumnNames: new() { "Col3" },
-			wrapText: true
-		);
+		// Act
+		using MemoryStream? result = dataTable.GenericExcelExport
+				(
+					memoryStream: new MemoryStream(),
+					sheetName: "DataSheet",
+					new(createTable: true,
+					tableName: "DataTable",
+					skipColumnNames: new() { "Col3" },
+					wrapText: true)
+				);
 
 		// Assert
 		result.ShouldNotBeNull();
@@ -1346,8 +1347,8 @@ using MemoryStream? result = dataTable.GenericExcelExport
 		// Arrange
 		List<TestModel> testData = fixture.CreateMany<TestModel>(2).ToList();
 
-// Act - Use all default parameters
-using MemoryStream? result = testData.GenericExcelExport();
+		// Act - Use all default parameters
+		using MemoryStream? result = testData.GenericExcelExport();
 		// Assert
 		result.ShouldNotBeNull();
 		result.Length.ShouldBeGreaterThan(0);
@@ -1370,8 +1371,8 @@ using MemoryStream? result = testData.GenericExcelExport();
 		dataTable.Columns.Add("Column", typeof(string));
 		dataTable.Rows.Add("Value");
 
-// Act - Use all default parameters
-using MemoryStream? result = dataTable.GenericExcelExport();
+		// Act - Use all default parameters
+		using MemoryStream? result = dataTable.GenericExcelExport();
 		// Assert
 		result.ShouldNotBeNull();
 		result.Length.ShouldBeGreaterThan(0);
@@ -1476,8 +1477,8 @@ using MemoryStream? result = dataTable.GenericExcelExport();
 			throw new InvalidOperationException("Forced failure during iteration");
 		}
 
-// Act
-using MemoryStream? result = ThrowingEnumerable().GenericExcelExport();
+		// Act
+		using MemoryStream? result = ThrowingEnumerable().GenericExcelExport();
 		// Assert
 		result.ShouldBeNull();
 	}
@@ -1504,7 +1505,7 @@ using MemoryStream? result = ThrowingEnumerable().GenericExcelExport();
 
 		// Assert
 		result.ShouldBeTrue();
-		doc.WorkbookPart!.Workbook.Sheets!.Elements<Sheet>().Count().ShouldBe(1);
+		doc.WorkbookPart.Workbook.Sheets!.Elements<Sheet>().Count().ShouldBe(1);
 		Sheet sheet = doc.WorkbookPart.Workbook.Sheets.Elements<Sheet>().First();
 		sheet.Name!.Value.ShouldBe("Sales");
 	}
@@ -1532,4 +1533,5 @@ using MemoryStream? result = ThrowingEnumerable().GenericExcelExport();
 			.Elements<Sheet>().Select(s => s.Name?.Value).ToList();
 		names.ShouldContain("Sheet1");
 		names.ShouldContain("Sheet1 (1)");
-	}}
+	}
+}

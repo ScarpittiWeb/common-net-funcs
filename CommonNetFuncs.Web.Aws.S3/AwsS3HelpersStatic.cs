@@ -20,8 +20,8 @@ public static class AwsS3HelpersStatic
 	private static readonly ConcurrentDictionary<string, bool> ValidatedBuckets = [];
 	internal const long MultipartThreshold = 10 * 1024 * 1024; // 10MB
 
-	private const string BeginUploadTemplate = "Starting upload of {fileName} to bucket { bucketName }";
-	private const string CompleteUploadTemplate = "Finished upload of {fileName} to bucket {bucketName} in {time}ms";
+	private const string BeginUploadTemplate = "Starting upload of {FileName} to bucket {BucketName}";
+	private const string CompleteUploadTemplate = "Finished upload of {FileName} to bucket {BucketName} in {Time}ms";
 	private const string AwsErrorLocationTemplate = "{ErrorLocation} AWS S3 Error";
 	private const string UnableToGetFileTemplate = "Unable to get file {FileName} from {BucketName} bucket in {ErrorLocation}";
 
@@ -56,7 +56,7 @@ public static class AwsS3HelpersStatic
 		if (logger.IsTraceEnabled)
 		{
 			sw = Stopwatch.StartNew();
-			logger.Trace("Starting UploadS3File method for {fileName} from bucket {bucketName}", fileName, bucketName);
+			logger.Trace("Starting UploadS3File method for {FileName} from bucket {BucketName}", fileName, bucketName);
 		}
 
 		bool success = false;
@@ -68,7 +68,7 @@ public static class AwsS3HelpersStatic
 				if (logTrace)
 				{
 					sw!.Stop();
-					logger.Trace("Finished bucket validation in UploadS3File method for {fileName} from bucket {bucketName} in {time}ms", fileName, bucketName);
+					logger.Trace("Finished bucket validation in UploadS3File method for {FileName} from bucket {BucketName} in {Time}ms", fileName, bucketName);
 				}
 
 				await CheckForExistingFile(s3Client, bucketName, fileName, cancellationToken).ConfigureAwait(false);
@@ -205,7 +205,7 @@ public static class AwsS3HelpersStatic
 		if (logTrace)
 		{
 			sw = Stopwatch.StartNew();
-			logger.Trace("Starting UploadS3File method for {fileName} from bucket {bucketName}", fileName, bucketName);
+			logger.Trace("Starting UploadS3File method for {FileName} from bucket {BucketName}", fileName, bucketName);
 		}
 
 		bool success = false;
@@ -217,7 +217,7 @@ public static class AwsS3HelpersStatic
 				if (logTrace)
 				{
 					sw!.Stop();
-					logger.Trace("Finished bucket validation in UploadS3File method for {fileName} from bucket {bucketName} in {time}ms", fileName, bucketName);
+					logger.Trace("Finished bucket validation in UploadS3File method for {FileName} from bucket {BucketName} in {Time}ms", fileName, bucketName);
 				}
 
 				await CheckForExistingFile(s3Client, bucketName, fileName, cancellationToken).ConfigureAwait(false);
@@ -254,7 +254,7 @@ public static class AwsS3HelpersStatic
 					success = response?.HttpStatusCode == HttpStatusCode.OK;
 					if (!success && logInfo)
 					{
-						logger.Info("AWS Request Status: {msg}", response?.HttpStatusCode.ToString());
+						logger.Info("AWS Request Status: {StatusCode}", response?.HttpStatusCode.ToString());
 					}
 				}
 				else
@@ -299,7 +299,7 @@ public static class AwsS3HelpersStatic
 		if (logTrace)
 		{
 			sw = Stopwatch.StartNew();
-			logger.Trace("Starting check for existing file in CheckForExistingFile method for {fileName} from bucket {bucketName}", fileName, bucketName);
+			logger.Trace("Starting check for existing file in CheckForExistingFile method for {FileName} from bucket {BucketName}", fileName, bucketName);
 		}
 
 		if (await s3Client.S3FileExists(bucketName, fileName, cancellationToken: cancellationToken).ConfigureAwait(false))
@@ -307,7 +307,7 @@ public static class AwsS3HelpersStatic
 			if (logTrace)
 			{
 				deleteSw = Stopwatch.StartNew();
-				logger.Trace("Starting delete of existing file in CheckForExistingFile method for {fileName} from bucket {bucketName}", fileName, bucketName);
+				logger.Trace("Starting delete of existing file in CheckForExistingFile method for {FileName} from bucket {BucketName}", fileName, bucketName);
 			}
 
 			await s3Client.DeleteS3File(bucketName, fileName, cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -315,14 +315,14 @@ public static class AwsS3HelpersStatic
 			if (logTrace)
 			{
 				deleteSw!.Stop();
-				logger.Trace("Finished delete of existing file in CheckForExistingFile method for {fileName} from bucket {bucketName} in {time}ms", fileName, bucketName, deleteSw.ElapsedMilliseconds);
+				logger.Trace("Finished delete of existing file in CheckForExistingFile method for {FileName} from bucket {BucketName} in {Time}ms", fileName, bucketName, deleteSw.ElapsedMilliseconds);
 			}
 		}
 
 		if (logTrace)
 		{
 			sw!.Stop();
-			logger.Trace("Finished check for existing file in CheckForExistingFile method for {fileName} from bucket {bucketName} in {time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
+			logger.Trace("Finished check for existing file in CheckForExistingFile method for {FileName} from bucket {BucketName} in {Time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
 		}
 	}
 
@@ -383,7 +383,7 @@ public static class AwsS3HelpersStatic
 
 			if (logInfo)
 			{
-				logger.Info("Starting multipart upload: {totalSize} bytes in {totalParts} parts of {chunkSize} bytes each", totalSize, totalParts, chunkSize);
+				logger.Info("Starting multipart upload: {TotalSize} bytes in {TotalParts} parts of {ChunkSize} bytes each", totalSize, totalParts, chunkSize);
 			}
 
 			// Create semaphore to limit concurrent uploads (adjust based on your needs)
@@ -394,7 +394,7 @@ public static class AwsS3HelpersStatic
 			if (logDebug)
 			{
 				sw = Stopwatch.StartNew();
-				logger.Debug("Starting multi-part upload of {fileName} to bucket {bucketName}", fileName, bucketName);
+				logger.Debug("Starting multi-part upload of {FileName} to bucket {BucketName}", fileName, bucketName);
 			}
 
 			// Upload parts in parallel
@@ -433,12 +433,12 @@ public static class AwsS3HelpersStatic
 			if (logDebug)
 			{
 				sw!.Stop();
-				logger.Debug("Finished multi-part upload of {fileName} to bucket {bucketName} in {time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
+				logger.Debug("Finished multi-part upload of {FileName} to bucket {BucketName} in {Time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
 			}
 
 			if (logInfo)
 			{
-				logger.Info("Multipart upload completed successfully for {fileName}", fileName);
+				logger.Info("Multipart upload completed successfully for {FileName}", fileName);
 			}
 
 			return completeResponse.HttpStatusCode == HttpStatusCode.OK;
@@ -458,15 +458,15 @@ public static class AwsS3HelpersStatic
 						UploadId = uploadId
 					}, cancellationToken).ConfigureAwait(false);
 
-					logger.Warn("Aborted multipart upload {uploadId} due to error", uploadId);
+					logger.Warn("Aborted multipart upload {UploadId} due to error", uploadId);
 				}
 				catch (Exception abortEx)
 				{
-					logger.Warn(abortEx, "Failed to abort multipart upload {uploadId}", uploadId);
+					logger.Warn(abortEx, "Failed to abort multipart upload {UploadId}", uploadId);
 				}
 			}
 
-			logger.Error(ex, "Multipart upload failed for {fileName}", fileName);
+			logger.Error(ex, "Multipart upload failed for {FileName}", fileName);
 			return false;
 		}
 	}
@@ -500,8 +500,6 @@ public static class AwsS3HelpersStatic
 					int bytesRead;
 
 					while (totalBytesRead < actualChunkSize && (bytesRead = sourceStream.ReadAsync(buffer, totalBytesRead, (int)(actualChunkSize - totalBytesRead), cancellationToken).Result) > 0)
-					//while (totalBytesRead < actualChunkSize && (bytesRead = sourceStream.Read(buffer, totalBytesRead, (int)(actualChunkSize - totalBytesRead))) > 0)
-
 					{
 						totalBytesRead += bytesRead;
 					}
@@ -515,8 +513,6 @@ public static class AwsS3HelpersStatic
 				}
 
 				// Upload the part
-				//await using MemoryStream partStream = new(buffer);
-
 				await using MemoryStream partStream = new(buffer, 0, totalBytesRead, writable: false);
 
 				UploadPartRequest uploadPartRequest = new()
@@ -535,7 +531,7 @@ public static class AwsS3HelpersStatic
 				if (logDebug)
 				{
 					sw = Stopwatch.StartNew();
-					logger.Debug("Starting upload of part #{partNumber} ({actualChunkSize} bytes) {fileName} to bucket {bucketName}", partNumber, actualChunkSize, fileName, bucketName);
+					logger.Debug("Starting upload of part #{PartNumber} ({ActualChunkSize} bytes) {FileName} to bucket {BucketName}", partNumber, actualChunkSize, fileName, bucketName);
 				}
 
 				UploadPartResponse response = await s3Client.UploadPartAsync(uploadPartRequest, cancellationToken).ConfigureAwait(false);
@@ -543,17 +539,17 @@ public static class AwsS3HelpersStatic
 				if (logDebug)
 				{
 					sw!.Stop();
-					logger.Debug("Finished upload of part #{partNumber} ({actualChunkSize} bytes) {fileName} to bucket {bucketName} in {time}ms", partNumber, actualChunkSize, fileName, bucketName, sw.ElapsedMilliseconds);
+					logger.Debug("Finished upload of part #{PartNumber} ({ActualChunkSize} bytes) {FileName} to bucket {BucketName} in {Time}ms", partNumber, actualChunkSize, fileName, bucketName, sw.ElapsedMilliseconds);
 				}
 
 				if (response.HttpStatusCode == HttpStatusCode.OK)
 				{
-					logger.Debug("Successfully uploaded part {partNumber} ({actualChunkSize} bytes)", partNumber, actualChunkSize);
+					logger.Debug("Successfully uploaded part {PartNumber} ({ActualChunkSize} bytes)", partNumber, actualChunkSize);
 					return new PartETag(partNumber, response.ETag);
 				}
 				else
 				{
-					logger.Error("Failed to upload part {partNumber}. Status: {statusCode}", partNumber, response.HttpStatusCode);
+					logger.Error("Failed to upload part {PartNumber}. Status: {StatusCode}", partNumber, response.HttpStatusCode);
 					return null;
 				}
 			}
@@ -564,7 +560,7 @@ public static class AwsS3HelpersStatic
 		}
 		catch (Exception ex)
 		{
-			logger.Error(ex, "Error uploading part {partNumber}", partNumber);
+			logger.Error(ex, "Error uploading part {PartNumber}", partNumber);
 			return null;
 		}
 		finally
@@ -596,7 +592,7 @@ public static class AwsS3HelpersStatic
 			if (logTrace)
 			{
 				sw = Stopwatch.StartNew();
-				logger.Trace("Starting GetS3File method for {fileName} from bucket {bucketName}", fileName, bucketName);
+				logger.Trace("Starting GetS3File method for {FileName} from bucket {BucketName}", fileName, bucketName);
 			}
 
 			validatedBuckets ??= new(ValidatedBuckets);
@@ -605,7 +601,7 @@ public static class AwsS3HelpersStatic
 				if (logTrace)
 				{
 					sw!.Stop();
-					logger.Trace("Finished validating bucket in GetS3File method for {fileName} from bucket {bucketName} in {time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
+					logger.Trace("Finished validating bucket in GetS3File method for {FileName} from bucket {BucketName} in {Time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
 				}
 
 				GetObjectRequest request = new()
@@ -617,7 +613,7 @@ public static class AwsS3HelpersStatic
 				if (logDebug)
 				{
 					sw = Stopwatch.StartNew();
-					logger.Debug("Starting download of {fileName} from bucket {bucketName}", fileName, bucketName);
+					logger.Debug("Starting download of {FileName} from bucket {BucketName}", fileName, bucketName);
 				}
 
 				using GetObjectResponse? response = await s3Client.GetObjectAsync(request, cancellationToken).ConfigureAwait(false);
@@ -625,7 +621,7 @@ public static class AwsS3HelpersStatic
 				if (logDebug)
 				{
 					sw!.Stop();
-					logger.Debug("Finished download of {fileName} from bucket {bucketName} in {time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
+					logger.Debug("Finished download of {FileName} from bucket {BucketName} in {Time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
 				}
 
 				if (response != null)
@@ -637,8 +633,6 @@ public static class AwsS3HelpersStatic
 					}
 					else
 					{
-						//ECompressionType currentCompression = await response.ResponseStream.DetectCompressionType().ConfigureAwait(false);
-
 						(ECompressionType currentCompression, Stream resetStream) = await DetectCompressionTypeAndReset(response.ResponseStream).ConfigureAwait(false);
 						if (currentCompression != ECompressionType.None)
 						{
@@ -646,8 +640,6 @@ public static class AwsS3HelpersStatic
 						}
 						else
 						{
-							//await responseStream.CopyToAsync(fileData, cancellationToken).ConfigureAwait(false);
-
 							await resetStream.CopyToAsync(fileData, cancellationToken).ConfigureAwait(false);
 						}
 
@@ -699,7 +691,7 @@ public static class AwsS3HelpersStatic
 
 			if (logTrace)
 			{
-				logger.Trace("Opening FileStream in GetS3File method for {fileName} from bucket {bucketName}", fileName, bucketName);
+				logger.Trace("Opening FileStream in GetS3File method for {FileName} from bucket {BucketName}", fileName, bucketName);
 			}
 
 			await using FileStream fileStream = new(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
@@ -707,7 +699,7 @@ public static class AwsS3HelpersStatic
 			if (logTrace)
 			{
 				sw = Stopwatch.StartNew();
-				logger.Trace("Starting GetS3File method for {fileName} from bucket {bucketName}", fileName, bucketName);
+				logger.Trace("Starting GetS3File method for {FileName} from bucket {BucketName}", fileName, bucketName);
 			}
 
 			validatedBuckets ??= new(ValidatedBuckets);
@@ -716,7 +708,7 @@ public static class AwsS3HelpersStatic
 				if (logTrace)
 				{
 					sw!.Stop();
-					logger.Trace("Finished validating bucket in GetS3File method for {fileName} from bucket {bucketName} in {time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
+					logger.Trace("Finished validating bucket in GetS3File method for {FileName} from bucket {BucketName} in {Time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
 				}
 
 				GetObjectRequest request = new()
@@ -728,14 +720,14 @@ public static class AwsS3HelpersStatic
 				if (logDebug)
 				{
 					sw = Stopwatch.StartNew();
-					logger.Debug("Starting download of {fileName} from bucket {bucketName}", fileName, bucketName);
+					logger.Debug("Starting download of {FileName} from bucket {BucketName}", fileName, bucketName);
 				}
 
 				using GetObjectResponse? response = await s3Client.GetObjectAsync(request, cancellationToken).ConfigureAwait(false);
 				if (logDebug)
 				{
 					sw!.Stop();
-					logger.Debug("Finished download of {fileName} from bucket {bucketName} in {time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
+					logger.Debug("Finished download of {FileName} from bucket {BucketName} in {Time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
 				}
 
 				if (response != null)
@@ -800,7 +792,7 @@ public static class AwsS3HelpersStatic
 			if (logTrace)
 			{
 				sw = Stopwatch.StartNew();
-				logger.Trace("Starting DeleteS3File method for {fileName} from bucket {bucketName}", fileName, bucketName);
+				logger.Trace("Starting DeleteS3File method for {FileName} from bucket {BucketName}", fileName, bucketName);
 			}
 
 			validatedBuckets ??= new(ValidatedBuckets);
@@ -810,13 +802,13 @@ public static class AwsS3HelpersStatic
 				if (logTrace)
 				{
 					sw!.Stop();
-					logger.Trace("Finished validating bucket in DeleteS3File method for {fileName} from bucket {bucketName} in {time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
+					logger.Trace("Finished validating bucket in DeleteS3File method for {FileName} from bucket {BucketName} in {Time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
 				}
 
 				if (logDebug)
 				{
 					sw = Stopwatch.StartNew();
-					logger.Debug("Starting deletion of {fileName} from bucket {bucketName}", fileName, bucketName);
+					logger.Debug("Starting deletion of {FileName} from bucket {BucketName}", fileName, bucketName);
 				}
 
 				await s3Client.DeleteObjectAsync(bucketName, fileName, cancellationToken).ConfigureAwait(false);
@@ -824,7 +816,7 @@ public static class AwsS3HelpersStatic
 				if (logDebug)
 				{
 					sw!.Stop();
-					logger.Debug("Finished deletion of {fileName} from bucket {bucketName} in {time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
+					logger.Debug("Finished deletion of {FileName} from bucket {BucketName} in {Time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
 				}
 
 				success = true;
@@ -879,7 +871,7 @@ public static class AwsS3HelpersStatic
 				Stopwatch? sw = null;
 				if (logDebug)
 				{
-					logger.Debug("Starting file exists check for {fileName} in bucket {bucketName}", fileName, bucketName);
+					logger.Debug("Starting file exists check for {FileName} in bucket {BucketName}", fileName, bucketName);
 					sw = Stopwatch.StartNew();
 				}
 
@@ -888,7 +880,7 @@ public static class AwsS3HelpersStatic
 				if (logDebug)
 				{
 					sw!.Stop();
-					logger.Debug("Finished file exists check for {fileName} in bucket {bucketName} in {time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
+					logger.Debug("Finished file exists check for {FileName} in bucket {BucketName} in {Time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
 				}
 
 				success = response?.HttpStatusCode == HttpStatusCode.OK;
@@ -938,7 +930,7 @@ public static class AwsS3HelpersStatic
 				Stopwatch? sw = null;
 				if (logDebug)
 				{
-					logger.Debug("Starting file list download from bucket {bucketName}", bucketName);
+					logger.Debug("Starting file list download from bucket {BucketName}", bucketName);
 					sw = Stopwatch.StartNew();
 				}
 
@@ -952,7 +944,7 @@ public static class AwsS3HelpersStatic
 				if (logDebug)
 				{
 					sw!.Stop();
-					logger.Debug("Finished downloading file list from bucket {bucketName} in {time}ms", bucketName, sw.ElapsedMilliseconds);
+					logger.Debug("Finished downloading file list from bucket {BucketName} in {Time}ms", bucketName, sw.ElapsedMilliseconds);
 				}
 			}
 		}
@@ -992,7 +984,7 @@ public static class AwsS3HelpersStatic
 			if (logTrace)
 			{
 				sw = Stopwatch.StartNew();
-				logger.Trace("Starting GetS3Url method for {fileName} from bucket {bucketName}", fileName, bucketName);
+				logger.Trace("Starting GetS3Url method for {FileName} from bucket {BucketName}", fileName, bucketName);
 			}
 
 			validatedBuckets ??= new(ValidatedBuckets);
@@ -1001,7 +993,7 @@ public static class AwsS3HelpersStatic
 				if (logTrace)
 				{
 					sw!.Stop();
-					logger.Trace("Finished validating bucket in GetS3Url method for {fileName} from bucket {bucketName} in {time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
+					logger.Trace("Finished validating bucket in GetS3Url method for {FileName} from bucket {BucketName} in {Time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
 				}
 
 				GetPreSignedUrlRequest request = new()
@@ -1013,16 +1005,16 @@ public static class AwsS3HelpersStatic
 
 				if (logDebug)
 				{
-					logger.Debug("Starting URL generation for {fileName} from bucket {bucketName}", fileName, bucketName);
+					logger.Debug("Starting URL generation for {FileName} from bucket {BucketName}", fileName, bucketName);
 					sw = Stopwatch.StartNew();
 				}
 
-				url = await s3Client.GetPreSignedURLAsync(request);
+				url = await s3Client.GetPreSignedURLAsync(request).ConfigureAwait(false);
 
 				if (logDebug)
 				{
 					sw!.Stop();
-					logger.Debug("Finished URL generation for {fileName} from bucket {bucketName} in {time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
+					logger.Debug("Finished URL generation for {FileName} from bucket {BucketName} in {Time}ms", fileName, bucketName, sw.ElapsedMilliseconds);
 				}
 			}
 		}
@@ -1066,7 +1058,7 @@ public static class AwsS3HelpersStatic
 		{
 			if (logTrace)
 			{
-				logger.Trace("Starting IsBucketValid method for bucket {bucketName}", bucketName);
+				logger.Trace("Starting IsBucketValid method for bucket {BucketName}", bucketName);
 			}
 
 			validatedBuckets ??= new(ValidatedBuckets);
@@ -1080,7 +1072,7 @@ public static class AwsS3HelpersStatic
 				{
 					if (logDebug)
 					{
-						logger.Debug("Starting bucket validation of {bucketName}", bucketName);
+						logger.Debug("Starting bucket validation of {BucketName}", bucketName);
 						sw = Stopwatch.StartNew();
 					}
 
@@ -1089,7 +1081,7 @@ public static class AwsS3HelpersStatic
 					if (logDebug)
 					{
 						sw!.Stop();
-						logger.Debug("Finished bucket validation of {bucketName} in {time}ms", bucketName, sw.ElapsedMilliseconds);
+						logger.Debug("Finished bucket validation of {BucketName} in {Time}ms", bucketName, sw.ElapsedMilliseconds);
 					}
 
 					validatedBuckets.TryAdd(bucketName, isValid);
@@ -1102,7 +1094,7 @@ public static class AwsS3HelpersStatic
 				if (logDebug)
 				{
 					sw = Stopwatch.StartNew();
-					logger.Debug("Starting re-try for bucket validation of {bucketName}", bucketName);
+					logger.Debug("Starting re-try for bucket validation of {BucketName}", bucketName);
 				}
 
 				isValid = await DoesS3BucketExistV2Async(s3Client, bucketName).ConfigureAwait(false);
@@ -1110,7 +1102,7 @@ public static class AwsS3HelpersStatic
 				if (logDebug)
 				{
 					sw!.Stop();
-					logger.Debug("Finished re-try for bucket validation of {bucketName} in {time}ms", bucketName, sw.ElapsedMilliseconds);
+					logger.Debug("Finished re-try for bucket validation of {BucketName} in {Time}ms", bucketName, sw.ElapsedMilliseconds);
 				}
 
 				validatedBuckets?[bucketName] = isValid;

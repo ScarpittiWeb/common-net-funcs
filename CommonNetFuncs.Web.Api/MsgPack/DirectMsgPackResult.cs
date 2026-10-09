@@ -29,6 +29,6 @@ internal sealed class DirectMsgPackResult(object? value, int statusCode, Message
 		// but without requiring the type parameter at compile time.
 		// Propagate the cancellation token so that a client disconnect aborts in-flight
 		// serialization rather than letting it run to completion.
-		await MessagePackSerializer.SerializeAsync(value.GetType(), httpContext.Response.Body, value, options, httpContext.RequestAborted);
+		await MessagePackSerializer.SerializeAsync(value.GetType(), httpContext.Response.Body, value, options, httpContext.RequestAborted).ConfigureAwait(false);
 	}
 }

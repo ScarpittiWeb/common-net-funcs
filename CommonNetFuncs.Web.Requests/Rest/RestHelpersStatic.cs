@@ -26,7 +26,6 @@ public static class RestHelpersStatic
 	private static readonly FrozenSet<HttpMethod> requestsWithBody = [HttpMethod.Post, HttpMethod.Put, HttpMethod.Patch];
 	private const double DefaultRequestTimeout = 100;
 
-	//public static JsonSerializerOptions? JsonSerializerOptions { get; set; }
 	private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 	public static readonly JsonSerializerOptions defaultJsonSerializerOptions = new() { ReferenceHandler = ReferenceHandler.IgnoreCycles, PropertyNameCaseInsensitive = true };
 
@@ -50,14 +49,12 @@ public static class RestHelpersStatic
 
 			using CancellationTokenSource combinedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 			combinedTokenSource.CancelAfter(GetTimeout(requestOptions));
-			//using CancellationTokenSource tokenSource = new(GetTimeout(requestOptions));
 
 			using HttpRequestMessage httpRequestMessage = new(requestOptions.HttpMethod, requestOptions.Url);
 
 			httpRequestMessage.AttachHeaders(requestOptions.BearerToken, requestOptions.HttpHeaders);
 			httpRequestMessage.AddContent(requestOptions.HttpMethod, requestOptions.HttpHeaders, requestOptions.BodyObject, requestOptions.PatchDocument, requestOptions.MessagePackSerializerOptions);
 
-			//client.Timeout = requestOptions.Timeout == null ? client.Timeout : TimeSpan.FromSeconds((long)requestOptions.Timeout);
 			using HttpResponseMessage response = await client.SendAsync(httpRequestMessage, HttpCompletionOption.ResponseContentRead, combinedTokenSource.Token).ConfigureAwait(false) ?? new();
 			result = await HandleResponse<TResponse, TBody>(response, requestOptions, cancellationToken: cancellationToken).ConfigureAwait(false);
 		}
@@ -106,15 +103,10 @@ public static class RestHelpersStatic
 
 				//Ensure JSON header is being used
 				requestOptions.HttpHeaders ??= new Dictionary<string, string>([JsonAcceptHeader]);
-				// else if (requestOptions.HttpHeaders.Remove(AcceptHeader))
-				// {
-				// 	requestOptions.HttpHeaders.AddDictionaryItem(JsonAcceptHeader);
-				// }
 
 				httpRequestMessage.AttachHeaders(requestOptions.BearerToken, requestOptions.HttpHeaders);
 				httpRequestMessage.AddContent(requestOptions.HttpMethod, requestOptions.HttpHeaders, requestOptions.BodyObject, requestOptions.PatchDocument, requestOptions.MessagePackSerializerOptions);
 
-				//client.Timeout = requestOptions.Timeout == null ? client.Timeout : TimeSpan.FromSeconds((long)requestOptions.Timeout);
 				response = await client.SendAsync(httpRequestMessage, HttpCompletionOption.ResponseContentRead, combinedTokenSource.Token).ConfigureAwait(false) ?? new();
 				enumeratedReader = HandleResponseAsync<TResponse, TBody>(response, requestOptions, cancellationToken: cancellationToken).GetAsyncEnumerator(cancellationToken);
 			}
@@ -150,7 +142,10 @@ public static class RestHelpersStatic
 		finally
 		{
 			response?.Dispose();
-			await (enumeratedReader?.DisposeAsync() ?? ValueTask.CompletedTask);
+			if (enumeratedReader != null)
+			{
+				await enumeratedReader.DisposeAsync().ConfigureAwait(false);
+			}
 		}
 	}
 
@@ -172,13 +167,11 @@ public static class RestHelpersStatic
 
 			using CancellationTokenSource combinedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 			combinedTokenSource.CancelAfter(GetTimeout(requestOptions));
-			//using CancellationTokenSource tokenSource = new(GetTimeout(requestOptions));
 
 			using HttpRequestMessage httpRequestMessage = new(requestOptions.HttpMethod, requestOptions.Url);
 			httpRequestMessage.AttachHeaders(requestOptions.BearerToken, requestOptions.HttpHeaders);
 			httpRequestMessage.AddContent(requestOptions.HttpMethod, requestOptions.HttpHeaders, requestOptions.BodyObject, requestOptions.PatchDocument, requestOptions.MessagePackSerializerOptions);
 
-			//client.Timeout = requestOptions.Timeout == null ? client.Timeout : TimeSpan.FromSeconds((long)requestOptions.Timeout);
 			restObject.Response = await client.SendAsync(httpRequestMessage, HttpCompletionOption.ResponseContentRead, combinedTokenSource.Token).ConfigureAwait(false) ?? new();
 			restObject.Result = await HandleResponse<TResponse, TBody>(restObject.Response, requestOptions, cancellationToken).ConfigureAwait(false);
 		}
@@ -219,20 +212,14 @@ public static class RestHelpersStatic
 
 			using CancellationTokenSource combinedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 			combinedTokenSource.CancelAfter(GetTimeout(requestOptions));
-			//using CancellationTokenSource tokenSource = new(GetTimeout(requestOptions));
 			using HttpRequestMessage httpRequestMessage = new(requestOptions.HttpMethod, requestOptions.Url);
 
 			//Ensure JSON header is being used if no accept header is provided
 			requestOptions.HttpHeaders ??= new Dictionary<string, string>([JsonAcceptHeader]);
-			// else if (requestOptions.HttpHeaders.TryGetValue(AcceptHeader, out string? header) && header != Json && requestOptions.HttpHeaders.Remove(AcceptHeader))
-			// {
-			// 	requestOptions.HttpHeaders.AddDictionaryItem(JsonAcceptHeader);
-			// }
 
 			httpRequestMessage.AttachHeaders(requestOptions.BearerToken, requestOptions.HttpHeaders);
 			httpRequestMessage.AddContent(requestOptions.HttpMethod, requestOptions.HttpHeaders, requestOptions.BodyObject, requestOptions.PatchDocument, requestOptions.MessagePackSerializerOptions);
 
-			//client.Timeout = requestOptions.Timeout == null ? client.Timeout : TimeSpan.FromSeconds((long)requestOptions.Timeout);
 			restObject.Response = await client.SendAsync(httpRequestMessage, HttpCompletionOption.ResponseContentRead, combinedTokenSource.Token).ConfigureAwait(false) ?? new();
 			restObject.Result = HandleResponseAsync<TResponse, TBody>(restObject.Response, requestOptions, cancellationToken: cancellationToken);
 		}
@@ -384,8 +371,14 @@ public static class RestHelpersStatic
 		}
 		finally
 		{
-			await (responseStream?.DisposeAsync() ?? ValueTask.CompletedTask);
-			await (enumeratedReader?.DisposeAsync() ?? ValueTask.CompletedTask);
+			if(responseStream != null)
+			{
+				await responseStream.DisposeAsync().ConfigureAwait(false);
+			}
+			if(enumeratedReader != null)
+			{
+				await enumeratedReader.DisposeAsync().ConfigureAwait(false);
+			}
 		}
 	}
 
@@ -412,11 +405,6 @@ public static class RestHelpersStatic
 				return result; // Early exit for empty streams
 			}
 
-			//if (responseStream.Length <= 1)
-			//{
-			//	return result; // Early exit for empty streams
-			//}
-
 			if (contentType.StrEq(MsgPack)) //Message Pack uses native compression
 			{
 				result = await MessagePackSerializer.DeserializeAsync<TResponse>(responseStream, messagePackSerializerOptions ?? MessagePackSerializerOptions.Standard, cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -440,29 +428,18 @@ public static class RestHelpersStatic
 			}
 			else if (contentType.ContainsInvariant("json"))//Assume JSON
 			{
-				//Deserialize as stream - More memory efficient than string deserialization
-				//Stream streamToRead = responseStream;
-				//Stream? decompressedStream = null;
-
-				//try
-				//{
 				if (contentEncoding.StrEq(GZip))
 				{
-					//decompressedStream = responseStream.Decompress(ECompressionType.Gzip);
-					//streamToRead = decompressedStream;
 					await using Stream decompressedStream = responseStream.Decompress(ECompressionType.Gzip);
 					result = useNewtonsoftDeserializer
-						? await DeserializeWithNewtonsoft<TResponse>(decompressedStream)
+						? await DeserializeWithNewtonsoft<TResponse>(decompressedStream).ConfigureAwait(false)
 						: await System.Text.Json.JsonSerializer.DeserializeAsync<TResponse>(decompressedStream, jsonSerializerOptions ?? defaultJsonSerializerOptions, cancellationToken).ConfigureAwait(false);
 				}
 				else if (contentEncoding.StrEq(Brotli))
 				{
-					//decompressedStream = responseStream.Decompress(ECompressionType.Brotli);
-					//streamToRead = decompressedStream;
-
 					await using Stream decompressedStream = responseStream.Decompress(ECompressionType.Brotli);
 					result = useNewtonsoftDeserializer
-						? await DeserializeWithNewtonsoft<TResponse>(decompressedStream)
+						? await DeserializeWithNewtonsoft<TResponse>(decompressedStream).ConfigureAwait(false)
 						: await System.Text.Json.JsonSerializer.DeserializeAsync<TResponse>(decompressedStream, jsonSerializerOptions ?? defaultJsonSerializerOptions, cancellationToken).ConfigureAwait(false);
 				}
 				else if (!useNewtonsoftDeserializer)
@@ -471,28 +448,8 @@ public static class RestHelpersStatic
 				}
 				else
 				{
-					result = await DeserializeWithNewtonsoft<TResponse>(responseStream);
+					result = await DeserializeWithNewtonsoft<TResponse>(responseStream).ConfigureAwait(false);
 				}
-
-				//if (useNewtonsoftDeserializer)
-				//{
-				//	using StreamReader streamReader = new(streamToRead);
-				//	await using JsonTextReader jsonReader = new(streamReader);
-				//	Newtonsoft.Json.JsonSerializer serializer = new();
-				//	result = serializer.Deserialize<TBody>(jsonReader);
-				//}
-				//else
-				//{
-				//	result = await System.Text.Json.JsonSerializer.DeserializeAsync<TBody>(streamToRead, jsonSerializerOptions ?? defaultJsonSerializerOptions, cancellationToken).ConfigureAwait(false);
-				//}
-				//}
-				//finally
-				//{
-				//	if (decompressedStream != null)
-				//	{
-				//		await decompressedStream.DisposeAsync().ConfigureAwait(false);
-				//	}
-				//}
 			}
 			else if (contentType.ContainsInvariant("text")) //String encoding (error usually)
 			{
@@ -568,7 +525,7 @@ public static class RestHelpersStatic
 				while (await messagePackStreamReader.ReadAsync(cancellationToken).ConfigureAwait(false) is ReadOnlySequence<byte> msgPackData)
 				{
 					TResponse? item = MessagePackSerializer.Deserialize<TResponse>(msgPackData, messagePackSerializerOptions ?? MessagePackSerializerOptions.Standard, cancellationToken);
-					if (item != null)
+					if (item is not null)
 					{
 						yield return item;
 					}
@@ -578,7 +535,7 @@ public static class RestHelpersStatic
 			{
 				await foreach (TResponse? item in MemoryPackStreamingSerializer.DeserializeAsync<TResponse>(streamToRead, cancellationToken: cancellationToken).ConfigureAwait(false))
 				{
-					if (item != null)
+					if (item is not null)
 					{
 						yield return item;
 					}
@@ -588,7 +545,7 @@ public static class RestHelpersStatic
 			{
 				await foreach (TResponse? item in System.Text.Json.JsonSerializer.DeserializeAsyncEnumerable<TResponse?>(streamToRead, jsonSerializerOptions ?? defaultJsonSerializerOptions, cancellationToken).ConfigureAwait(false))
 				{
-					if (item != null)
+					if (item is not null)
 					{
 						yield return item;
 					}
@@ -659,7 +616,7 @@ public static class RestHelpersStatic
 
 		if (httpHeaders.AnyFast())
 		{
-			foreach (KeyValuePair<string, string> header in httpHeaders!)
+			foreach (KeyValuePair<string, string> header in httpHeaders)
 			{
 				httpRequestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value);
 			}
@@ -680,14 +637,12 @@ public static class RestHelpersStatic
 		//IAsyncEnumerable is limited to MvcOptions.MaxIAsyncEnumerableBufferLimit which is 8192 by default
 		int itemsPerChunk = startingItemsPerChunk;
 
-		//int numberOfChunks = (int)MathHelpers.Ceiling((decimal)itemCount / itemsPerChunk, 1);
 		decimal numberOfChunksDecimal = (decimal)itemCount / itemsPerChunk;
 		int numberOfChunks = (int)numberOfChunksDecimal + (numberOfChunksDecimal > 0 && numberOfChunksDecimal % 1 != 0 ? 1 : 0);
 		while (numberOfChunks >= bufferLimit)
 		{
 			itemsPerChunk += 1000;
 
-			//numberOfChunks = (int)MathHelpers.Ceiling((decimal)itemCount / itemsPerChunk, 1);
 			numberOfChunksDecimal = (decimal)itemCount / itemsPerChunk;
 			numberOfChunks = (int)numberOfChunksDecimal + (numberOfChunksDecimal > 0 && numberOfChunksDecimal % 1 != 0 ? 1 : 0);
 		}
@@ -711,13 +666,20 @@ public static class RestHelpersStatic
 
 		if (requestOptions.LogBody && requestsWithBody.Contains(requestOptions.HttpMethod))
 		{
-#pragma warning disable S2955 // Generic parameters not constrained to reference types should not be compared to "null"
-			string body = requestOptions.BodyObject != null
-				? System.Text.Json.JsonSerializer.Serialize(requestOptions.BodyObject, requestOptions.JsonSerializerOptions ?? defaultJsonSerializerOptions)
-				: requestOptions.PatchDocument != null
-					? await requestOptions.PatchDocument.ReadAsStringAsync(cancellationToken).ConfigureAwait(false)
-					: string.Empty;
-#pragma warning restore S2955 // Generic parameters not constrained to reference types should not be compared to "null"
+			string body;
+			if (requestOptions.BodyObject is not null)
+			{
+				body = System.Text.Json.JsonSerializer.Serialize(requestOptions.BodyObject, requestOptions.JsonSerializerOptions ?? defaultJsonSerializerOptions);
+			}
+			else if (requestOptions.PatchDocument != null)
+			{
+				body = await requestOptions.PatchDocument.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+			}
+			else
+			{
+				body = string.Empty;
+			}
+
 			logger.Info("Request Body: {Body}", body);
 		}
 	}

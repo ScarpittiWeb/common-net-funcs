@@ -521,11 +521,11 @@ public sealed class FingerprintTests
 	[RetryFact(3)]
 	public void HammingSimilarity_IsSymmetric()
 	{
-		ulong hashA = 0x1234_5678_9ABC_DEF0UL;
-		ulong hashB = 0xFEDC_BA98_7654_3210UL;
+		ulong first = 0x1234_5678_9ABC_DEF0UL;
+		ulong second = 0xFEDC_BA98_7654_3210UL;
 
-		double ab = ImageFingerprinting.HammingSimilarity(hashA, hashB);
-		double ba = ImageFingerprinting.HammingSimilarity(hashB, hashA);
+		double ab = ImageFingerprinting.HammingSimilarity(first, second);
+		double ba = ImageFingerprinting.HammingSimilarity(second, first);
 
 		ab.ShouldBe(ba);
 	}

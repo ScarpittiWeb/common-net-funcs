@@ -1,8 +1,8 @@
-﻿using FastExpressionCompiler;
-using System.Collections;
+﻿using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
+using FastExpressionCompiler;
 using static CommonNetFuncs.Core.ReflectionCaches;
 
 namespace CommonNetFuncs.Core;
@@ -386,7 +386,21 @@ public static class Copy
 				valueIsSimpleType ??= value?.GetType().IsSimpleType();
 
 				object copiedKey = (bool)keyIsSimpleType ? key : CopyObject(key, destKeyType, 1, maxDepth)!;
-				object? copiedValue = value == null ? null : (bool)valueIsSimpleType! ? value : CopyObject(value, destValueType, 0, maxDepth);
+
+				object? copiedValue;
+				if (value == null)
+				{
+					copiedValue = null;
+				}
+				else if ((bool)valueIsSimpleType!)
+				{
+					copiedValue = value;
+				}
+				else
+				{
+					copiedValue = CopyObject(value, destValueType, 0, maxDepth);
+				}
+
 				destDictionary.Add(copiedKey, copiedValue);
 			}
 
@@ -403,7 +417,20 @@ public static class Copy
 			{
 				cancellationToken.ThrowIfCancellationRequested();
 				itemIsSimpleType ??= item?.GetType().IsSimpleType();
-				object? copiedItem = item == null ? null : (bool)itemIsSimpleType! ? item : CopyObject(item, elementType, 0, maxDepth);
+
+				object? copiedItem;
+				if (item == null)
+				{
+					copiedItem = null;
+				}
+				else if ((bool)itemIsSimpleType!)
+				{
+					copiedItem = item;
+				}
+				else
+				{
+					copiedItem = CopyObject(item, elementType, 0, maxDepth);
+				}
 
 				list.Add(copiedItem);
 			}

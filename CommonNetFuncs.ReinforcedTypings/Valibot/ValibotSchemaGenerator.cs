@@ -40,16 +40,7 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 		// Resolve the output directory from RT's target directory (set once)
 		if (outputDirectory == null)
 		{
-			// The TypeScriptModels directory is where RT writes files — derive it from the assembly location
-			string assemblyDir = Path.GetDirectoryName(element.Assembly.Location) ?? "";
-
-			// Find the project directory containing TypeScriptModels
-			string? projectDir = FindProjectDirectory(assemblyDir);
-			if (projectDir != null)
-			{
-				outputDirectory = Path.Combine(projectDir, "TypeScriptModels");
-				Directory.CreateDirectory(outputDirectory);
-			}
+			InitializeOutputDirectory(element.Assembly.Location);
 		}
 
 		// Generate and write the companion schema file
@@ -64,6 +55,20 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 		}
 
 		return node;
+	}
+
+	private static void InitializeOutputDirectory(string assemblyLocation)
+	{
+		// The TypeScriptModels directory is where RT writes files — derive it from the assembly location
+		string assemblyDir = Path.GetDirectoryName(assemblyLocation) ?? "";
+
+		// Find the project directory containing TypeScriptModels
+		string? projectDir = FindProjectDirectory(assemblyDir);
+		if (projectDir != null)
+		{
+			outputDirectory = Path.Combine(projectDir, "TypeScriptModels");
+			Directory.CreateDirectory(outputDirectory);
+		}
 	}
 
 	private static string? FindProjectDirectory(string startDir)
@@ -481,8 +486,8 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 			"ListStringLengthAttribute" => (true, GetListStringLengthItemPipe(attr)),
 			"ListRangeAttribute" => (true, GetListRangeItemPipe(attr)),
 			"ListRegularExpressionAttribute" => (true, GetListRegexItemPipe(attr)),
-			"ListDenyCharactersAttribute" => (true, GetListDenyCharsItemPipe(attr)),
-			"ListDenyRegularExpressionAttribute" => (true, GetListDenyRegexItemPipe(attr)),
+			"ListDenyCharactersAttribute" => (true, GetDenyCharsPipe(attr)),
+			"ListDenyRegularExpressionAttribute" => (true, GetDenyRegexPipe(attr)),
 			"DenyCharactersAttribute" => (false, GetDenyCharsPipe(attr)),
 			"DenyRegularExpressionAttribute" => (false, GetDenyRegexPipe(attr)),
 			"AllowedNullableValuesAttribute" => (false, GetAllowedValuesPipe(attr)),
@@ -558,28 +563,6 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 		return null;
 	}
 
-	private static string? GetListDenyCharsItemPipe(Attribute attr)
-	{
-		PropertyInfo? charsProp = attr.GetType().GetProperty("DeniedCharacters") ?? attr.GetType().GetProperty("Characters");
-		if (charsProp?.GetValue(attr) is string chars)
-		{
-			return $"v.regex(/^[^{EscapeRegexChars(chars)}]*$/{ErrorMessageArg(GetAttrErrorMessage(attr))})";
-		}
-
-		return null;
-	}
-
-	private static string? GetListDenyRegexItemPipe(Attribute attr)
-	{
-		PropertyInfo? patternProp = attr.GetType().GetProperty("Pattern");
-		if (patternProp?.GetValue(attr) is string pattern)
-		{
-			return $"v.regex(/^(?!.*{pattern}).*$/{ErrorMessageArg(GetAttrErrorMessage(attr))})";
-		}
-
-		return null;
-	}
-
 	private static string? GetDenyCharsPipe(Attribute attr)
 	{
 		PropertyInfo? charsProp = attr.GetType().GetProperty("DeniedCharacters") ?? attr.GetType().GetProperty("Characters");
@@ -645,7 +628,7 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 
 		return type;
 	}
-	
+
 	private static string EscapeRegexChars(string chars)
 	{
 		// Escape characters that are special in regex character classes

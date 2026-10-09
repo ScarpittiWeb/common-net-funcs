@@ -78,7 +78,7 @@ public class PrioritizedEndpointQueue : IDisposable
 
 		logger.Debug("Enqueued task {TaskId} with priority {Priority} ({PriorityLevel}) for endpoint {EndpointKey}", queuedTask.Id, priority, priorityLevel, EndpointKey);
 
-		object? result = await queuedTask.CompletionSource.Task;
+		object? result = await queuedTask.CompletionSource.Task.ConfigureAwait(false);
 		return (T?)result;
 	}
 
@@ -97,7 +97,7 @@ public class PrioritizedEndpointQueue : IDisposable
 	{
 		int cancelledCount = 0;
 
-		await queueSemaphore.WaitAsync().ConfigureAwait(false);
+		await queueSemaphore.WaitAsync(cancellationTokenSource.Token).ConfigureAwait(false);
 		try
 		{
 			List<PrioritizedQueuedTask> tasksToCancel = new();
@@ -128,8 +128,8 @@ public class PrioritizedEndpointQueue : IDisposable
 
 			foreach (PrioritizedQueuedTask task in tasksToCancel)
 			{
-				await task.CancellationTokenSource.CancelAsync();
-				task.CompletionSource.SetCanceled();
+				await task.CancellationTokenSource.CancelAsync().ConfigureAwait(false);
+				task.CompletionSource.SetCanceled(cancellationTokenSource.Token);
 				cancelledCount++;
 			}
 
@@ -385,7 +385,7 @@ public class PrioritizedEndpointQueue : IDisposable
 
 				try
 				{
-					processingTask?.Wait(TimeSpan.FromSeconds(5));
+					processingTask?.Wait(TimeSpan.FromSeconds(5), cancellationTokenSource.Token);
 				}
 				catch (AggregateException)
 				{

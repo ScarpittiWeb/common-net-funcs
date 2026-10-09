@@ -1279,29 +1279,6 @@ public sealed class StringsTests
 		result.ShouldBe(expected);
 	}
 
-	//private class TestTrimObj
-	//{
-	//	public string? Name { get; set; }
-
-	//	public string? Desc { get; set; }
-	//}
-
-	//	[Fact]
-	//	public void TrimObjectStringsR_TrimsStrings()
-	//	{
-	//		// Arrange
-	//		TestTrimObj obj = new() { Name = "  test  ", Desc = "  desc  " };
-
-	//		// Act
-	//#pragma warning disable CS0618 // Type or member is obsolete
-	//		TestTrimObj result = obj.TrimObjectStringsR();
-	//#pragma warning restore CS0618 // Type or member is obsolete
-
-	//		// Assert
-	//		result!.Name.ShouldBe("test");
-	//		result.Desc.ShouldBe("desc");
-	//	}
-
 	private class TestNormObj
 	{
 		public string? Name { get; set; }
@@ -1963,9 +1940,9 @@ public sealed class StringsTests
 		TestNormObj result3 = obj.NormalizeObjectStrings(true, NormalizationForm.FormD, recursive: false, useCache: false);
 
 		// Assert
-		result1!.Name.ShouldBe("café");
-		result2!.Name.ShouldBe("café");
-		result3!.Name.ShouldBe("café");
+		result1.Name.ShouldBe("café");
+		result2.Name.ShouldBe("café");
+		result3.Name.ShouldBe("café");
 	}
 
 	[Fact]
@@ -2754,7 +2731,7 @@ public sealed class StringsTests
 		result.ShouldNotBeNull();
 		result.Name.ShouldBeNull(); // Top-level string property
 		result.NestedObj.ShouldNotBeNull();
-		result.NestedObj!.Value.ShouldBeNull(); // Nested string property
+		result.NestedObj.Value.ShouldBeNull(); // Nested string property
 	}
 
 	[Fact]
@@ -2771,7 +2748,7 @@ public sealed class StringsTests
 		result.ShouldNotBeNull();
 		result.Name.ShouldBeNull();
 		result.NestedObj.ShouldNotBeNull();
-		result.NestedObj!.Value.ShouldBe("not null");
+		result.NestedObj.Value.ShouldBe("not null");
 	}
 
 	[Fact]

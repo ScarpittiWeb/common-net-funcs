@@ -7,10 +7,6 @@ using CommonNetFuncs.Core.Internal;
 /// </summary>
 public static class RunBatches
 {
-	//public delegate bool BatchedProcess<TObj>(IReadOnlyList<TObj> itemsToProcess);
-	//public delegate Task<bool> AsyncBatchedProcess<TObj>(IReadOnlyList<TObj> itemsToProcess);
-	//public delegate Task<bool> AsyncBatchedProcessList<TObj>(List<TObj> itemsToProcess);
-
 	private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
 	/// <summary>
@@ -38,7 +34,7 @@ public static class RunBatches
 
 			if (logProgress)
 			{
-				logger.Info("Process {currentBatch}/{totalBatches} complete", i + 1, totalBatches);
+				logger.Info("Process {CurrentBatch}/{TotalBatches} complete", i + 1, totalBatches);
 			}
 
 			if (!success && breakOnFail)
@@ -84,7 +80,7 @@ public static class RunBatches
 
 			if (logProgress)
 			{
-				logger.Info("Process {currentBatch}/{totalBatches} complete", i + 1, totalBatches);
+				logger.Info("Process {CurrentBatch}/{TotalBatches} complete", i + 1, totalBatches);
 			}
 
 			if (!success && breakOnFail)

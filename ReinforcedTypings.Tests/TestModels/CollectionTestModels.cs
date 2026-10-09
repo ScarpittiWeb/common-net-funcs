@@ -1,10 +1,10 @@
 ﻿using CommonNetFuncs.ReinforcedTypings.Collections;
 using Reinforced.Typings.Attributes;
 
-namespace ReinforcedTypings.Tests.TestModels.Collections;
+namespace ReinforcedTypings.Tests.TestModels;
 
 [TsEnum]
-public enum ExportedEnum
+public enum ExportedOption
 {
 	A,
 	B,
@@ -59,7 +59,7 @@ public static class BasicCollectionsSelected
 [TsCollection]
 public static class ReferenceCollections
 {
-	public static readonly List<ExportedEnum> Enums = [ExportedEnum.A, ExportedEnum.B];
+	public static readonly List<ExportedOption> Enums = [ExportedOption.A, ExportedOption.B];
 
 	public static readonly List<AutoIInterfaceModel> AutoIModels = [new() { Name = "one" }];
 
@@ -79,5 +79,5 @@ public static class EmptyEligibleCollections
 [TsCollection]
 public static class CrossNamespaceCollections
 {
-	public static readonly List<Other.OtherNamespaceModel> Items = [new() { Name = "cross" }];
+	public static readonly List<OtherNamespaceModel> Items = [new() { Name = "cross" }];
 }

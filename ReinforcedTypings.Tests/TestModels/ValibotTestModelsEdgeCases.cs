@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace ReinforcedTypings.Tests.TestModels.Valibot.EdgeCases;
+namespace ReinforcedTypings.Tests.TestModels.Valibot;
 
 // Deliberately "broken" duplicates of the custom attributes in ValibotTestModels.cs: each is missing
 // the property ValibotSchemaGenerator's Get*Pipe methods look up via reflection, so that the

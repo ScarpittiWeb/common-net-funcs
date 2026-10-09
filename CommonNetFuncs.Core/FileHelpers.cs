@@ -51,13 +51,13 @@ public static partial class FileHelpers
 			{
 				if (!suppressLogging)
 				{
-					logger.Warn("[{directory}] does not exist! Creating new directory...", directory);
+					logger.Warn("[{Directory}] does not exist! Creating new directory...", directory);
 				}
 				Directory.CreateDirectory(directory);
 			}
 			else if (!suppressLogging)
 			{
-				logger.Warn("[{directory}] does not exist! Unable to continue...", directory);
+				logger.Warn("[{Directory}] does not exist! Unable to continue...", directory);
 				return string.Empty;
 			}
 		}
@@ -84,7 +84,7 @@ public static partial class FileHelpers
 			{
 				if (!suppressLogging)
 				{
-					logger.Info("[{testPath}] exists, checking with iterator [{i}]", testPath, i);
+					logger.Info("[{TestPath}] exists, checking with iterator [{Iterator}]", testPath, i);
 				}
 
 				// Check if file already has an iterator
@@ -105,7 +105,7 @@ public static partial class FileHelpers
 		}
 		else if (!suppressLogging)
 		{
-			logger.Info("[{testPath}] is unique", testPath);
+			logger.Info("[{TestPath}] is unique", testPath);
 		}
 
 		return testPath;
@@ -132,13 +132,13 @@ public static partial class FileHelpers
 			{
 				if (!suppressLogging)
 				{
-					logger.Warn("[{directory}] does not exist! Creating new directory...", directory);
+					logger.Warn("[{Directory}] does not exist! Creating new directory...", directory);
 				}
 				Directory.CreateDirectory(directory);
 			}
 			else if (!suppressLogging)
 			{
-				logger.Warn("[{directory}] does not exist! Unable to continue...", directory);
+				logger.Warn("[{Directory}] does not exist! Unable to continue...", directory);
 				return string.Empty;
 			}
 		}
@@ -176,7 +176,7 @@ public static partial class FileHelpers
 
 				if (!suppressLogging)
 				{
-					logger.Info("Checking new testPath [{testPath}] with iterator [{i}]", testPath, i);
+					logger.Info("Checking new testPath [{TestPath}] with iterator [{Iterator}]", testPath, i);
 				}
 
 				i++;
@@ -184,7 +184,7 @@ public static partial class FileHelpers
 		}
 		else if (!suppressLogging)
 		{
-			logger.Info("Original path with cleaned file name [{testPath}] is unique", testPath);
+			logger.Info("Original path with cleaned file name [{TestPath}] is unique", testPath);
 		}
 
 		return Path.GetFileName(testPath);
@@ -361,7 +361,7 @@ public static partial class FileHelpers
 		{
 			try
 			{
-				ReadResult readResult = await reader.ReadAsync(cancellationToken);
+				ReadResult readResult = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
 				ReadOnlySequence<byte> data = readResult.Buffer;
 				totalBytesRead += data.Length;
 
@@ -378,13 +378,13 @@ public static partial class FileHelpers
 				// Write directly without ToArray() allocation
 				if (data.IsSingleSegment)
 				{
-					await outputStream.WriteAsync(data.First, cancellationToken);
+					await outputStream.WriteAsync(data.First, cancellationToken).ConfigureAwait(false);
 				}
 				else
 				{
 					foreach (ReadOnlyMemory<byte> segment in data)
 					{
-						await outputStream.WriteAsync(segment, cancellationToken);
+						await outputStream.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
 					}
 				}
 
@@ -430,7 +430,7 @@ public static partial class FileHelpers
 		{
 			try
 			{
-				ReadResult readResult = await reader.ReadAsync(cancellationToken);
+				ReadResult readResult = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
 				ReadOnlySequence<byte> data = readResult.Buffer;
 
 				if (data.IsEmpty && readResult.IsCompleted)
@@ -441,13 +441,13 @@ public static partial class FileHelpers
 				// Write directly without ToArray() allocation
 				if (data.IsSingleSegment)
 				{
-					await outputStream.WriteAsync(data.First, cancellationToken);
+					await outputStream.WriteAsync(data.First, cancellationToken).ConfigureAwait(false);
 				}
 				else
 				{
 					foreach (ReadOnlyMemory<byte> segment in data)
 					{
-						await outputStream.WriteAsync(segment, cancellationToken);
+						await outputStream.WriteAsync(segment, cancellationToken).ConfigureAwait(false);
 					}
 				}
 

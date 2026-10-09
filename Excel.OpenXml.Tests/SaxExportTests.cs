@@ -9,34 +9,13 @@ using xRetry.v3;
 
 namespace Excel.OpenXml.Tests;
 
-public sealed class SaxExportTests : IDisposable
+public sealed class SaxExportTests
 {
 	private readonly Fixture fixture;
 
 	public SaxExportTests()
 	{
 		fixture = new Fixture();
-	}
-
-	private bool disposed;
-
-	public void Dispose()
-	{
-		Dispose(true);
-		GC.SuppressFinalize(this);
-	}
-
-	private void Dispose(bool disposing)
-	{
-		if (!disposed)
-		{
-			disposed = true;
-		}
-	}
-
-	~SaxExportTests()
-	{
-		Dispose(false);
 	}
 
 	// ── helpers ──────────────────────────────────────────────────────────────
@@ -136,7 +115,7 @@ public sealed class SaxExportTests : IDisposable
 		List<TestModel> data = fixture.CreateMany<TestModel>(2).ToList();
 
 		using MemoryStream stream = new();
-		await data.GenericExcelExportAsync(stream, createTable: createTable, tableName: tableName);
+		await data.GenericExcelExportAsync(stream, exportSettings: new(createTable: createTable, tableName: tableName));
 
 		using SpreadsheetDocument doc = OpenDoc(stream);
 		WorksheetPart? wsp = doc.WorkbookPart?.WorksheetParts.FirstOrDefault();
@@ -162,7 +141,7 @@ public sealed class SaxExportTests : IDisposable
 		List<TestModel> data = fixture.CreateMany<TestModel>(2).ToList();
 
 		using MemoryStream stream = new();
-		await data.GenericExcelExportAsync(stream, createTable: false);
+		await data.GenericExcelExportAsync(stream, exportSettings: new(createTable: false));
 
 		using SpreadsheetDocument doc = OpenDoc(stream);
 		WorksheetPart? wsp = doc.WorkbookPart?.WorksheetParts.FirstOrDefault();
@@ -179,7 +158,7 @@ public sealed class SaxExportTests : IDisposable
 		List<TestModel> data = fixture.CreateMany<TestModel>(2).ToList();
 
 		using MemoryStream stream = new();
-		await data.GenericExcelExportAsync(stream, skipColumnNames: ["Description"]);
+		await data.GenericExcelExportAsync(stream, exportSettings: new(skipColumnNames: ["Description"]));
 
 		using SpreadsheetDocument doc = OpenDoc(stream);
 		SheetData? sheetData = doc.WorkbookPart?.WorksheetParts.First().Worksheet?.GetFirstChild<SheetData>();
@@ -196,7 +175,7 @@ public sealed class SaxExportTests : IDisposable
 		List<TestModel> data = fixture.CreateMany<TestModel>(1).ToList();
 
 		using MemoryStream stream = new();
-		await data.GenericExcelExportAsync(stream, skipColumnNames: ["name", "DESCRIPTION"]);
+		await data.GenericExcelExportAsync(stream, exportSettings: new(skipColumnNames: ["name", "DESCRIPTION"]));
 
 		using SpreadsheetDocument doc = OpenDoc(stream);
 		SheetData? sheetData = doc.WorkbookPart?.WorksheetParts.First().Worksheet?.GetFirstChild<SheetData>();
@@ -254,7 +233,7 @@ public sealed class SaxExportTests : IDisposable
 		List<TestModel> data = fixture.CreateMany<TestModel>(2).ToList();
 
 		using MemoryStream stream = new();
-		await Should.NotThrowAsync(() => data.GenericExcelExportAsync(stream, wrapText: true));
+		await Should.NotThrowAsync(() => data.GenericExcelExportAsync(stream, exportSettings: new(wrapText: true)));
 		stream.Length.ShouldBeGreaterThan(0);
 	}
 
@@ -331,7 +310,7 @@ public sealed class SaxExportTests : IDisposable
 		List<TestModel> source = fixture.CreateMany<TestModel>(2).ToList();
 
 		using MemoryStream stream = new();
-		await ToAsyncEnumerable(source).GenericExcelExportAsync(stream, createTable: createTable, tableName: tableName);
+		await ToAsyncEnumerable(source).GenericExcelExportAsync(stream, exportSettings: new(createTable: createTable, tableName: tableName));
 
 		using SpreadsheetDocument doc = OpenDoc(stream);
 		WorksheetPart? wsp = doc.WorkbookPart?.WorksheetParts.FirstOrDefault();
@@ -355,7 +334,7 @@ public sealed class SaxExportTests : IDisposable
 		List<TestModel> source = fixture.CreateMany<TestModel>(2).ToList();
 
 		using MemoryStream stream = new();
-		await ToAsyncEnumerable(source).GenericExcelExportAsync(stream, skipColumnNames: ["Age", "Description"]);
+		await ToAsyncEnumerable(source).GenericExcelExportAsync(stream, exportSettings: new(skipColumnNames: ["Age", "Description"]));
 
 		using SpreadsheetDocument doc = OpenDoc(stream);
 		SheetData? sheetData = doc.WorkbookPart?.WorksheetParts.First().Worksheet?.GetFirstChild<SheetData>();
@@ -383,7 +362,7 @@ public sealed class SaxExportTests : IDisposable
 		List<TestModel> source = fixture.CreateMany<TestModel>(2).ToList();
 
 		using MemoryStream stream = new();
-		await ToAsyncEnumerable(source).GenericExcelExportAsync(stream, createTable: false);
+		await ToAsyncEnumerable(source).GenericExcelExportAsync(stream, exportSettings: new(createTable: false));
 
 		using SpreadsheetDocument doc = OpenDoc(stream);
 		WorksheetPart? wsp = doc.WorkbookPart?.WorksheetParts.FirstOrDefault();
@@ -460,7 +439,7 @@ public sealed class SaxExportTests : IDisposable
 		dt.Rows.Add("Val");
 
 		using MemoryStream stream = new();
-		await dt.GenericExcelExportAsync(stream, createTable: createTable, tableName: tableName);
+		await dt.GenericExcelExportAsync(stream, exportSettings: new(createTable: createTable, tableName: tableName));
 
 		using SpreadsheetDocument doc = OpenDoc(stream);
 		WorksheetPart? wsp = doc.WorkbookPart?.WorksheetParts.FirstOrDefault();
@@ -488,7 +467,7 @@ public sealed class SaxExportTests : IDisposable
 		dt.Rows.Add("a", 1, "c");
 
 		using MemoryStream stream = new();
-		await dt.GenericExcelExportAsync(stream, skipColumnNames: ["B"]);
+		await dt.GenericExcelExportAsync(stream, exportSettings: new(skipColumnNames: ["B"]));
 
 		using SpreadsheetDocument doc = OpenDoc(stream);
 		SheetData? sheetData = doc.WorkbookPart?.WorksheetParts.First().Worksheet?.GetFirstChild<SheetData>();
@@ -507,7 +486,7 @@ public sealed class SaxExportTests : IDisposable
 		dt.Rows.Add("x", 1);
 
 		using MemoryStream stream = new();
-		await dt.GenericExcelExportAsync(stream, skipColumnNames: ["ALPHA"]);
+		await dt.GenericExcelExportAsync(stream, exportSettings: new(skipColumnNames: ["ALPHA"]));
 
 		using SpreadsheetDocument doc = OpenDoc(stream);
 		SheetData? sheetData = doc.WorkbookPart?.WorksheetParts.First().Worksheet?.GetFirstChild<SheetData>();
@@ -571,7 +550,7 @@ public sealed class SaxExportTests : IDisposable
 		dt.Rows.Add("Value");
 
 		using MemoryStream stream = new();
-		await dt.GenericExcelExportAsync(stream, createTable: false);
+		await dt.GenericExcelExportAsync(stream, exportSettings: new(createTable: false));
 
 		using SpreadsheetDocument doc = OpenDoc(stream);
 		WorksheetPart? wsp = doc.WorkbookPart?.WorksheetParts.FirstOrDefault();
@@ -616,7 +595,7 @@ public sealed class SaxExportTests : IDisposable
 		WorkbookPart wbp = doc.InitializeExcelFile();
 		WorksheetPart wsp = wbp.AddNewPart<WorksheetPart>();
 
-		await Export.ExportFromTableSaxAsync(doc, wsp, data, skipColumnNames: ["Age"]);
+		await Export.ExportFromTableSaxAsync(doc, wsp, data, exportSettings: new(skipColumnNames: ["Age"]));
 
 		doc.WorkbookPart!.Workbook!.Save();
 		doc.Dispose();
@@ -639,7 +618,7 @@ public sealed class SaxExportTests : IDisposable
 		WorkbookPart wbp = doc.InitializeExcelFile();
 		WorksheetPart wsp = wbp.AddNewPart<WorksheetPart>();
 
-		await Export.ExportFromTableSaxAsync(doc, wsp, data, createTable: true, tableName: "LowLevelTable");
+		await Export.ExportFromTableSaxAsync(doc, wsp, data, exportSettings: new(createTable: true, tableName: "LowLevelTable"));
 
 		doc.WorkbookPart!.Workbook!.Save();
 		doc.Dispose();
@@ -663,7 +642,7 @@ public sealed class SaxExportTests : IDisposable
 		WorkbookPart wbp = doc.InitializeExcelFile();
 		WorksheetPart wsp = wbp.AddNewPart<WorksheetPart>();
 
-		await Export.ExportFromTableSaxAsync(doc, wsp, data, createTable: false);
+		await Export.ExportFromTableSaxAsync(doc, wsp, data, exportSettings: new(createTable: false));
 
 		doc.WorkbookPart!.Workbook!.Save();
 		doc.Dispose();
@@ -707,7 +686,7 @@ public sealed class SaxExportTests : IDisposable
 		WorkbookPart wbp = doc.InitializeExcelFile();
 		WorksheetPart wsp = wbp.AddNewPart<WorksheetPart>();
 
-		await Export.ExportFromTableSaxAsync(doc, wsp, ToAsyncEnumerable(source), createTable: true, tableName: "AsyncLowLevel");
+		await Export.ExportFromTableSaxAsync(doc, wsp, ToAsyncEnumerable(source), exportSettings: new(createTable: true, tableName: "AsyncLowLevel"));
 
 		doc.WorkbookPart!.Workbook!.Save();
 		doc.Dispose();
@@ -731,7 +710,7 @@ public sealed class SaxExportTests : IDisposable
 		WorkbookPart wbp = doc.InitializeExcelFile();
 		WorksheetPart wsp = wbp.AddNewPart<WorksheetPart>();
 
-		await Export.ExportFromTableSaxAsync(doc, wsp, ToAsyncEnumerable(source), skipColumnNames: ["Description"]);
+		await Export.ExportFromTableSaxAsync(doc, wsp, ToAsyncEnumerable(source), exportSettings: new(skipColumnNames: ["Description"]));
 
 		doc.WorkbookPart!.Workbook!.Save();
 		doc.Dispose();
@@ -808,7 +787,7 @@ public sealed class SaxExportTests : IDisposable
 		WorkbookPart wbp = doc.InitializeExcelFile();
 		WorksheetPart wsp = wbp.AddNewPart<WorksheetPart>();
 
-		await Export.ExportFromTableSaxAsync(doc, wsp, dt, skipColumnNames: ["Q"]);
+		await Export.ExportFromTableSaxAsync(doc, wsp, dt, new(skipColumnNames: ["Q"]));
 
 		doc.WorkbookPart!.Workbook!.Save();
 		doc.Dispose();
@@ -833,7 +812,7 @@ public sealed class SaxExportTests : IDisposable
 		WorkbookPart wbp = doc.InitializeExcelFile();
 		WorksheetPart wsp = wbp.AddNewPart<WorksheetPart>();
 
-		await Export.ExportFromTableSaxAsync(doc, wsp, dt, createTable: true, tableName: "DtLowLevel");
+		await Export.ExportFromTableSaxAsync(doc, wsp, dt, new(createTable: true, tableName: "DtLowLevel"));
 
 		doc.WorkbookPart!.Workbook!.Save();
 		doc.Dispose();
@@ -859,7 +838,7 @@ public sealed class SaxExportTests : IDisposable
 		WorkbookPart wbp = doc.InitializeExcelFile();
 		WorksheetPart wsp = wbp.AddNewPart<WorksheetPart>();
 
-		await Export.ExportFromTableSaxAsync(doc, wsp, dt, createTable: false);
+		await Export.ExportFromTableSaxAsync(doc, wsp, dt, new(createTable: false));
 
 		doc.WorkbookPart!.Workbook!.Save();
 		doc.Dispose();
@@ -896,7 +875,7 @@ public sealed class SaxExportTests : IDisposable
 	{
 		List<TestModel> data =
 		[
-			new TestModel { Name = "O'Brien <>&\"", Age = 1, Description = "你好 😊" }
+			new TestModel { Name = "O'Brian <>&\"", Age = 1, Description = "你好 😊" }
 		];
 
 		using MemoryStream stream = new();

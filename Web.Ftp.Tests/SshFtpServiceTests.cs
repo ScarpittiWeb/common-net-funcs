@@ -31,7 +31,6 @@ public class SshFtpServiceTests
 		// Setup default behaviors
 		A.CallTo(() => sftpClient.IsConnected).Returns(true);
 
-		//_service = new SshFtpService(_connection);
 		service = new SshFtpService(connection, _ => sftpClient);
 	}
 

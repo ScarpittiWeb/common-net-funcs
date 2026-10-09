@@ -113,35 +113,40 @@ public sealed class ReadToEnumerableTests
 					if (string.IsNullOrEmpty(val)) continue;
 
 					string cellRef = new CellReference((uint)(c + 1), (uint)(r + 1)).ToString();
-					Cell cell = new() { CellReference = cellRef };
-
-					if (useSharedStrings && ssp != null && ssCache != null)
-					{
-						if (!ssCache.TryGetValue(val, out int idx))
-						{
-							idx = ssCache.Count;
-							ssp.SharedStringTable!.AppendChild(new SharedStringItem(new Text(val)));
-							ssCache[val] = idx;
-						}
-						cell.CellValue = new CellValue(idx.ToString());
-						cell.DataType = new EnumValue<CellValues>(CellValues.SharedString);
-					}
-					else
-					{
-						cell.CellValue = new CellValue(val);
-					}
-					row.Append(cell);
+					row.AppendChild(CreateCell(cellRef, val, ssp, ssCache));
 				}
-				sheetData.Append(row);
+				sheetData.AppendChild(row);
 			}
 
-			wsp.Worksheet = new Worksheet(sheetData);
+			Worksheet worksheet = new();
+			worksheet.AppendChild(sheetData);
+			wsp.Worksheet = worksheet;
 			Sheets sheets = wbp.Workbook.AppendChild(new Sheets());
-			sheets.Append(new Sheet { Id = wbp.GetIdOfPart(wsp), SheetId = 1, Name = sheetName });
+			sheets.AppendChild(new Sheet { Id = wbp.GetIdOfPart(wsp), SheetId = 1, Name = sheetName });
 			wbp.Workbook.Save();
 			ssp?.SharedStringTable?.Save();
 		}
 		return new MemoryStream(temp.ToArray());
+	}
+
+	private static Cell CreateCell(string cellRef, string val, SharedStringTablePart? ssp, Dictionary<string, int>? ssCache)
+	{
+		Cell cell = new() { CellReference = cellRef };
+		if (ssp == null || ssCache == null)
+		{
+			cell.CellValue = new CellValue(val);
+			return cell;
+		}
+
+		if (!ssCache.TryGetValue(val, out int idx))
+		{
+			idx = ssCache.Count;
+			ssp.SharedStringTable!.AppendChild(new SharedStringItem { Text = new Text(val) });
+			ssCache[val] = idx;
+		}
+		cell.CellValue = new CellValue(idx.ToString());
+		cell.DataType = new EnumValue<CellValues>(CellValues.SharedString);
+		return cell;
 	}
 
 	// ── ExcelColumnAttribute ─────────────────────────────────────────────────
@@ -408,19 +413,21 @@ public sealed class ReadToEnumerableTests
 
 			// Header row: one cell with CellReference (valid header), one without (skipped).
 			Row headerRow = new() { RowIndex = 1 };
-			headerRow.Append(new Cell { CellValue = new CellValue("Junk") }); // no CellReference
-			headerRow.Append(new Cell { CellReference = "A1", CellValue = new CellValue("Name") });
-			sheetData.Append(headerRow);
+			headerRow.AppendChild(new Cell { CellValue = new CellValue("Junk") }); // no CellReference
+			headerRow.AppendChild(new Cell { CellReference = "A1", CellValue = new CellValue("Name") });
+			sheetData.AppendChild(headerRow);
 
 			// Data row: one cell with CellReference (valid data), one without (skipped).
 			Row dataRow = new() { RowIndex = 2 };
-			dataRow.Append(new Cell { CellValue = new CellValue("Junk") }); // no CellReference
-			dataRow.Append(new Cell { CellReference = "A2", CellValue = new CellValue("Alice") });
-			sheetData.Append(dataRow);
+			dataRow.AppendChild(new Cell { CellValue = new CellValue("Junk") }); // no CellReference
+			dataRow.AppendChild(new Cell { CellReference = "A2", CellValue = new CellValue("Alice") });
+			sheetData.AppendChild(dataRow);
 
-			wsp.Worksheet = new Worksheet(sheetData);
+			Worksheet worksheet = new();
+			worksheet.AppendChild(sheetData);
+			wsp.Worksheet = worksheet;
 			Sheets sheets = wbp.Workbook.AppendChild(new Sheets());
-			sheets.Append(new Sheet { Id = wbp.GetIdOfPart(wsp), SheetId = 1, Name = "Sheet1" });
+			sheets.AppendChild(new Sheet { Id = wbp.GetIdOfPart(wsp), SheetId = 1, Name = "Sheet1" });
 			wbp.Workbook.Save();
 		}
 
@@ -462,7 +469,7 @@ public sealed class ReadToEnumerableTests
 		item.FloatValue.ShouldBe(3.5f);
 		item.DoubleValue.ShouldBe(2.5);
 		item.DecimalValue.ShouldBe(99.99m);
-		item.DateTimeValue.ShouldBe(new DateTime(2024, 6, 15, 10, 0, 0));
+		item.DateTimeValue.ShouldBe(new DateTime(2024, 6, 15, 10, 0, 0, DateTimeKind.Unspecified));
 		item.DateOnlyValue.ShouldBe(new DateOnly(2024, 6, 15));
 		item.TimeOnlyValue.ShouldBe(new TimeOnly(14, 30, 0));
 		item.DateTimeOffsetValue.ShouldBe(new DateTimeOffset(2024, 6, 15, 10, 0, 0, TimeSpan.Zero));
@@ -619,7 +626,7 @@ public sealed class ReadToEnumerableTests
 			await foreach (SimpleModel item in ms.ReadExcelFileToAsyncEnumerable<SimpleModel>(cancellationToken: cts.Token))
 			{
 				received.Add(item);
-				cts.Cancel(); // triggers ThrowIfCancellationRequested on the very next MoveNextAsync call
+				await cts.CancelAsync(); // triggers ThrowIfCancellationRequested on the very next MoveNextAsync call
 			}
 		});
 

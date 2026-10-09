@@ -83,7 +83,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 
 	private DbContext InitializeContext(TimeSpan? queryTimeout = null)
 	{
-		DbContext context = ServiceProvider.GetRequiredService<TContext>()!;
+		DbContext context = ServiceProvider.GetRequiredService<TContext>();
 		if (queryTimeout != null)
 		{
 			context.Database.SetCommandTimeout((TimeSpan)queryTimeout);

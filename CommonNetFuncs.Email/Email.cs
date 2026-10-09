@@ -747,20 +747,8 @@ public static class Email
 #endif
 					await attachments.Where(x => !x.AttachmentName.IsNullOrWhiteSpace()).Select(x => (x.GetStream(), x.AttachmentName!)).AddFilesToZip(archive, zipCompressionLevel, cancellationToken).ConfigureAwait(false);
 
-					//foreach (MailAttachment attachment in attachments)
-					//{
-					//    //await attachment.AttachmentStream.AddZipToArchive(archive, attachment.AttachmentName, CompressionLevel.SmallestSize);
-					//    if (attachment.AttachmentStream != null)
-					//    {
-					//        attachment.AttachmentStream.Position = 0; //Must have this to prevent errors writing data to the attachment
-					//        ZipArchiveEntry entry = archive.CreateEntry(attachment.AttachmentName ?? $"File {archive.Entries.Count}", CompressionLevel.SmallestSize);
-					//        await using Stream entryStream = entry.Open();
-					//        await attachment.AttachmentStream.CopyToAsync(entryStream);
-					//        await entryStream.FlushAsync();
-					//    }
-					//}
 #if NET10_0_OR_GREATER
-					await archive.DisposeAsync();
+					await archive.DisposeAsync().ConfigureAwait(false);
 #else
 					archive.Dispose();
 #endif

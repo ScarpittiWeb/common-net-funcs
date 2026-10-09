@@ -68,7 +68,7 @@ public class EndpointQueue : IDisposable
 			stats.QueuedTasks++;
 		}
 
-		object? result = await queuedTask.CompletionSource.Task;
+		object? result = await queuedTask.CompletionSource.Task.ConfigureAwait(false);
 		return (T?)result;
 	}
 
@@ -158,7 +158,7 @@ public class EndpointQueue : IDisposable
 
 				try
 				{
-					processingTask.Wait(TimeSpan.FromSeconds(5));
+					processingTask.Wait(TimeSpan.FromSeconds(5), cancellationTokenSource.Token);
 				}
 				catch (Exception ex)
 				{

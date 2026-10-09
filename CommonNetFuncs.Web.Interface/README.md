@@ -9,19 +9,19 @@ This lightweight project contains helper methods related to web interface functi
 ## Contents
 
 - [CommonNetFuncs.Web.Interface](#commonnetfuncswebinterface)
-	- [Contents](#contents)
-	- [DataTableHelpers](#datatablehelpers)
-		- [DataTableHelpers Usage Examples](#datatablehelpers-usage-examples)
-			- [GetDataTableRequest](#getdatatablerequest)
-			- [GetSortAndLimitPostModel](#getsortandlimitpostmodel)
-	- [ModelErrorHelpers](#modelerrorhelpers)
-		- [ModelErrorHelpers Usage Examples](#modelerrorhelpers-usage-examples)
-			- [ParseModelStateErrors](#parsemodelstateerrors)
-	- [SelectListItemCreation](#selectlistitemcreation)
-		- [SelectListItemCreation Usage Examples](#selectlistitemcreation-usage-examples)
-			- [ToSelectListItem](#toselectlistitem)
-	- [Installation](#installation)
-	- [License](#license)
+  - [Contents](#contents)
+  - [DataTableHelpers](#datatablehelpers)
+    - [DataTableHelpers Usage Examples](#datatablehelpers-usage-examples)
+      - [GetDataTableRequest](#getdatatablerequest)
+      - [GetSortAndLimitPostModel](#getsortandlimitpostmodel)
+  - [ModelErrorHelpers](#modelerrorhelpers)
+    - [ModelErrorHelpers Usage Examples](#modelerrorhelpers-usage-examples)
+      - [ParseModelStateErrors](#parsemodelstateerrors)
+  - [SelectListItemCreation](#selectlistitemcreation)
+    - [SelectListItemCreation Usage Examples](#selectlistitemcreation-usage-examples)
+      - [ToSelectListItem](#toselectlistitem)
+  - [Installation](#installation)
+  - [License](#license)
 
 ---
 

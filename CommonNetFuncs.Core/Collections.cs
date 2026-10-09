@@ -419,7 +419,11 @@ public static partial class Collections
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static List<string> SingleToList(this string? s, bool allowEmptyValues = false)
 	{
-		return !allowEmptyValues ? (!s.IsNullOrWhiteSpace()) ? [s] : [] : s != null ? [s] : [];
+		if (!allowEmptyValues)
+		{
+			return (!s.IsNullOrWhiteSpace()) ? [s] : [];
+		}
+		return s != null ? [s] : [];
 	}
 
 	/// <summary>
@@ -787,7 +791,7 @@ public static partial class Collections
 			// Handle issue where DB returns Int16 for boolean values
 			if (value is not System.DBNull)
 			{
-				if (pair.IsShort && ((pair.PropertyInfo.PropertyType == typeof(bool)) || (pair.PropertyInfo!.PropertyType == typeof(bool?))))
+				if (pair.IsShort && ((pair.PropertyInfo.PropertyType == typeof(bool)) || (pair.PropertyInfo.PropertyType == typeof(bool?))))
 				{
 					pair.PropertyInfo.SetValue(item, ToBoolean(value));
 				}
@@ -861,97 +865,6 @@ public static partial class Collections
 		return data.ToDataTableExpressionTrees(dataTable, useParallel, approximateCount, degreeOfParallelism, cancellationToken);
 	}
 
-	///// <summary>
-	///// Convert an <see cref="IEnumerable{TObj}"/> into equivalent <see cref="DataTable"/> object using expression trees.
-	///// </summary>
-	///// <typeparam name="TObj">Class to use in table creation.</typeparam>
-	///// <param name="data">Collection to convert into a DataTable.</param>
-	///// <param name="dataTable">DataTable to optionally insert data into.</param>
-	///// <param name="useParallel">Optional: Parallelizes the conversion. Default is <see langword="false"/>.</param>
-	///// <param name="approximateCount">Optional: Used for pre-allocating variable size when using parallelization, default is data.Count().</param>
-	///// <param name="degreeOfParallelism">Optional: Used for setting number of parallel operations when using parallelization, default is -1 (#cores on machine).</param>
-	///// <param name="cancellationToken">Optional: The cancellation token for this operation.</param>
-	///// <returns>A <see cref="DataTable"/> representation of <paramref name="data"/>.</returns>
-	//[Obsolete("Please use ToDataTable<TObj>(this IEnumerable<TObj>? data, DataTable? dataTable = null, bool useExpressionTrees = true, bool useParallel = false, int? approximateCount = null, int degreeOfParallelism = -1, CancellationToken cancellationToken = default) instead", false)]
-	//[return: NotNullIfNotNull(nameof(data))]
-	//public static DataTable? ToDataTableReflection<TObj>(this IEnumerable<TObj>? data, DataTable? dataTable = null, bool useParallel = false, int? approximateCount = null, int degreeOfParallelism = -1, CancellationToken cancellationToken = default) where TObj : class, new()
-	//{
-	//	if (data == null)
-	//	{
-	//		return null;
-	//	}
-
-	//	dataTable ??= new();
-	//	PropertyInfo[] properties = GetOrAddPropertiesFromReflectionCache(typeof(TObj));
-
-	//	// Remove invalid columns
-	//	IEnumerable<string> propertyNames = properties.Select(x => x.Name);
-	//	DataColumn[] columns = new DataColumn[dataTable.Columns.Count];
-	//	dataTable.Columns.CopyTo(columns, 0);
-	//	foreach (DataColumn? col in columns.Where(x => !propertyNames.Contains(x.ColumnName)))
-	//	{
-	//		dataTable.Columns.Remove(col.ColumnName);
-	//	}
-
-	//	// Create columns
-	//	foreach (PropertyInfo? prop in properties.Where(x => !dataTable.Columns.Contains(x.Name)))
-	//	{
-	//		dataTable.Columns.Add(prop.Name, Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType);
-	//	}
-
-	//	// Add rows
-	//	if (!useParallel)
-	//	{
-	//		foreach (TObj item in data.Where(x => x != null))
-	//		{
-	//			cancellationToken.ThrowIfCancellationRequested();
-	//			DataRow row = dataTable.NewRow();
-	//			foreach (PropertyInfo prop in properties)
-	//			{
-	//				row[prop.Name] = prop.GetValue(item) ?? System.DBNull.Value;
-	//			}
-	//			dataTable.Rows.Add(row);
-	//		}
-	//	}
-	//	else
-	//	{
-	//		// Process items in parallel and collect results
-	//		int columnCount = dataTable.Columns.Count;
-	//		List<object[]> rows = new(approximateCount ?? data.Count());
-	//		object lockObj = new();
-
-	//		ParallelOptions options = new() { MaxDegreeOfParallelism = (degreeOfParallelism == -1) ? Environment.ProcessorCount : degreeOfParallelism };
-	//		Parallel.ForEach(data, options, () => new List<object[]>(), (item, _, localRows) =>
-	//		{
-	//			cancellationToken.ThrowIfCancellationRequested();
-	//			object[] rowValues = new object[columnCount];
-	//			for (int i = 0; i < columnCount; i++)
-	//			{
-	//				rowValues[i] = properties[i].GetValue(item) ?? System.DBNull.Value;
-	//			}
-
-	//			localRows.Add(rowValues);
-	//			return localRows;
-	//		},
-	//			localRows =>
-	//			{
-	//				lock (lockObj)
-	//				{
-	//					rows.AddRange(localRows);
-	//				}
-	//			});
-
-	//		// Add all rows to the table
-	//		foreach (object[] rowValues in rows)
-	//		{
-	//			cancellationToken.ThrowIfCancellationRequested();
-	//			dataTable.Rows.Add(rowValues);
-	//		}
-	//	}
-
-	//	return dataTable;
-	//}
-
 	private static readonly ConcurrentDictionary<Type, TypeAccessor> TypeAccessorCache = new();
 
 	private sealed class TypeAccessor
@@ -1010,7 +923,8 @@ public static partial class Collections
 	/// <param name="degreeOfParallelism">The degree of parallelism to use if <paramref name="useParallel"/> is true.</param>
 	/// <param name="cancellationToken">Optional: The cancellation token for this operation.</param>
 	/// <returns>A <see cref="DataTable"/> representation of <paramref name="data"/>.</returns>
-	private static DataTable ToDataTableExpressionTrees<T>(this IEnumerable<T> data, DataTable dataTable, bool useParallel, int? approximateCount, int degreeOfParallelism, CancellationToken cancellationToken = default) where T : class, new()
+	private static DataTable ToDataTableExpressionTrees<T>(this IEnumerable<T> data, DataTable dataTable, bool useParallel, int? approximateCount, int degreeOfParallelism,
+		CancellationToken cancellationToken = default) where T : class, new()
 	{
 		TypeAccessor typeAccessor = TypeAccessorCache.GetOrAdd(typeof(T), t => new TypeAccessor(t));
 
