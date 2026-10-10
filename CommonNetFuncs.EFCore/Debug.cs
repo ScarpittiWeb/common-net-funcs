@@ -101,10 +101,10 @@ public static partial class Debug
 			{
 				// Hand-written raw SQL sometimes already wraps an array parameter in an explicit ARRAY[...] literal (e.g. "ARRAY[@p14]")
 				// replace that whole wrapper first so the self-contained array literal below isn't nested inside another ARRAY[...].
-				commandText = Regex.Replace(commandText, $@"ARRAY\s*\[\s*@{Regex.Escape(name)}(?!\w)\s*\]", escapedLiteral, RegexOptions.IgnoreCase);
+				commandText = Regex.Replace(commandText, $@"ARRAY\s*\[\s*@{Regex.Escape(name)}(?!\w)\s*\]", escapedLiteral, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(5));
 			}
 
-			commandText = Regex.Replace(commandText, $@"@{Regex.Escape(name)}(?!\w)", escapedLiteral);
+			commandText = Regex.Replace(commandText, $@"@{Regex.Escape(name)}(?!\w)", escapedLiteral, RegexOptions.None, TimeSpan.FromSeconds(5));
 		}
 
 		StringBuilder script = new();
@@ -184,9 +184,9 @@ public static partial class Debug
 	/// parameters (e.g. "-- @name='value' (DbType = X)") but not for positional raw-SQL parameters (e.g. "-- p0='value'",
 	/// "-- p1={ 'a', 'b' } (DbType = X)", or "-- p2=NULL (DbType = X)").
 	/// </summary>
-	[GeneratedRegex(@"^-- @?(?<name>\w+)=(?:'(?<value>.*)'|(?<array>\{.*\})|(?<null>NULL))(?: \(Nullable = \w+\))?(?: \(DbType = (?<dbType>\w+)\))?$", RegexOptions.Singleline)]
+	[GeneratedRegex(@"^-- @?(?<name>\w+)=(?:'(?<value>.*)'|(?<array>\{.*\})|(?<null>NULL))(?: \(Nullable = \w+\))?(?: \(DbType = (?<dbType>\w+)\))?$", RegexOptions.Singleline | RegexOptions.Compiled, 5000)]
 	private static partial Regex ParameterCommentLineRegex();
 
-	[GeneratedRegex(@"[+-]\d{2}:\d{2}$")]
+	[GeneratedRegex(@"[+-]\d{2}:\d{2}$", RegexOptions.Compiled, 5000)]
 	private static partial Regex TimeZoneOffsetSuffixRegex();
 }

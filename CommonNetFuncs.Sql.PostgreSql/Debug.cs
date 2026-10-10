@@ -82,7 +82,7 @@ public static partial class Debug
 		});
 	}
 
-	[GeneratedRegex(@"(?<wrapped>ARRAY\s*\[\s*)?(?:(?<![:\w])[@:](?<name>\w+)(?!\w)|\$(?<ordinal>\d+)(?!\d))(?(wrapped)\s*\])", RegexOptions.IgnoreCase)]
+	[GeneratedRegex(@"(?<wrapped>ARRAY\s*\[\s*)?(?:(?<![:\w])[@:](?<name>\w+)(?!\w)|\$(?<ordinal>\d+)(?!\d))(?(wrapped)\s*\])", RegexOptions.IgnoreCase | RegexOptions.Compiled, 5000)]
 	private static partial Regex PlaceholderRegex();
 
 	private static string GetPostgreSqlTypeName(DbParameter parameter)

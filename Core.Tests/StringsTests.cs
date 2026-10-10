@@ -1655,6 +1655,99 @@ public sealed class StringsTests
 	}
 
 	[Theory]
+	[InlineData("abc123", @"\d+", "*", false, RegexOptions.None, "*123")]
+	[InlineData("abc123", @"\d+", "*", false, RegexOptions.IgnoreCase, "*123")]
+	[InlineData("ABC123", "[a-z]+", "#", false, RegexOptions.IgnoreCase, "ABC#")]
+	[InlineData("ABC123", "[a-z]+", "#", false, RegexOptions.None, "#")]
+	[InlineData(null, @"\d+", "*", false, RegexOptions.None, null)]
+	public void ReplaceInverse_String_WithRegexOptions_Works(string? input, string pattern, string? replacement, bool matchFirstOnly, RegexOptions regexOptions, string? expected)
+	{
+		// Act
+		string? result = input.ReplaceInverse(pattern, replacement, matchFirstOnly, regexOptions);
+
+		// Assert
+		result.ShouldBe(expected);
+	}
+
+	[Theory]
+	[InlineData("abc123", @"\d+", "*", false, RegexOptions.None, 5, "*123")]
+	[InlineData("abc123", "[a-z]+", "#", false, RegexOptions.None, 3, "abc#")]
+	[InlineData("ABC123", "[a-z]+", "#", false, RegexOptions.IgnoreCase, 2, "ABC#")]
+	[InlineData(null, @"\d+", "*", false, RegexOptions.None, 5, null)]
+	public void ReplaceInverse_String_WithTimeoutInSeconds_Works(string? input, string pattern, string? replacement, bool matchFirstOnly, RegexOptions regexOptions, int timeoutSeconds, string? expected)
+	{
+		// Act
+		string? result = input.ReplaceInverse(pattern, replacement, matchFirstOnly, regexOptions, TimeSpan.FromSeconds(timeoutSeconds));
+
+		// Assert
+		result.ShouldBe(expected);
+	}
+
+	[Fact]
+	public void ReplaceInverse_String_WithNullTimeout_UsesDefault()
+	{
+		// Arrange
+		string input = "abc123";
+		string pattern = @"\d+";
+		string replacement = "*";
+
+		// Act
+		string? result = input.ReplaceInverse(pattern, replacement, false, RegexOptions.None, null);
+
+		// Assert
+		result.ShouldBe("*123");
+	}
+
+	[Fact]
+	public void ReplaceInverse_String_WithMatchFirstOnlyAndRegexOptions()
+	{
+		// Arrange
+		string input = "ABC123ABC";
+		string pattern = "[a-z]+";
+		string replacement = "#";
+
+		// Act - with matchFirstOnly=true and IgnoreCase, only first match "ABC" is kept, rest are replaced
+		string? result = input.ReplaceInverse(pattern, replacement, true, RegexOptions.IgnoreCase);
+
+		// Assert
+		result.ShouldBe("ABC#");
+	}
+
+	[Fact]
+	public void ReplaceInverse_String_WithIgnoreCasePreservesMatches()
+	{
+		// Arrange
+		string input = "Hello World 123";
+		string pattern = @"\d+";
+		string replacement = "-";
+
+		// Act - replaces non-digits with "-", keeps "123"
+		string? result = input.ReplaceInverse(pattern, replacement, false, RegexOptions.IgnoreCase);
+
+		// Assert
+		result.ShouldBe("-123");
+	}
+
+	[Theory]
+	[InlineData(1)]
+	[InlineData(10)]
+	[InlineData(100)]
+	public void ReplaceInverse_String_WithVariousTimeouts_Works(int timeoutMilliseconds)
+	{
+		// Arrange
+		string input = "test123data456";
+		string pattern = @"\d+";
+		string replacement = "X";
+		TimeSpan timeout = TimeSpan.FromMilliseconds(timeoutMilliseconds);
+
+		// Act - replaces non-digits with "X", keeps "123" and "456"
+		string? result = input.ReplaceInverse(pattern, replacement, false, RegexOptions.None, timeout);
+
+		// Assert
+		result.ShouldBe("X123X456");
+	}
+
+	[Theory]
 	[InlineData(2.5, 3, "2 1/2")]
 	[InlineData(3.25, 2, "3 1/4")]
 	public void ToFractionString_Decimal_Works(decimal input, int maxDecimals, string expected)
