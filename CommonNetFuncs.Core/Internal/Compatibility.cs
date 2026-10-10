@@ -279,10 +279,10 @@ internal static class AsyncCompat
 {
 	public static Task ForEachAsync<TSource>(IEnumerable<TSource> source, Func<TSource, CancellationToken, ValueTask> body)
 	{
-		return ForEachAsync(source, CancellationToken.None, body);
+		return ForEachAsync(source, body, CancellationToken.None);
 	}
 
-	public static async Task ForEachAsync<TSource>(IEnumerable<TSource> source, CancellationToken cancellationToken, Func<TSource, CancellationToken, ValueTask> body)
+	public static async Task ForEachAsync<TSource>(IEnumerable<TSource> source, Func<TSource, CancellationToken, ValueTask> body, CancellationToken cancellationToken)
 	{
 #if NET6_0_OR_GREATER
 		await Parallel.ForEachAsync(source, cancellationToken, body).ConfigureAwait(false);
@@ -297,7 +297,7 @@ internal static class AsyncCompat
 #endif
 	}
 
-	public static async Task ForAsync(int fromInclusive, int toExclusive, CancellationToken cancellationToken, Func<int, CancellationToken, ValueTask> body)
+	public static async Task ForAsync(int fromInclusive, int toExclusive, Func<int, CancellationToken, ValueTask> body, CancellationToken cancellationToken)
 	{
 #if NET6_0_OR_GREATER
 		await Parallel.ForAsync(fromInclusive, toExclusive, cancellationToken, body).ConfigureAwait(false);

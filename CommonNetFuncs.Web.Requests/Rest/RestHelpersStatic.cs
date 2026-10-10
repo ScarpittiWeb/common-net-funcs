@@ -131,7 +131,7 @@ public static class RestHelpersStatic
 			{
 				while (await enumeratedReader.MoveNextAsync().ConfigureAwait(false))
 				{
-					yield return enumeratedReader!.Current;
+					yield return enumeratedReader.Current;
 				}
 			}
 			else
@@ -357,7 +357,7 @@ public static class RestHelpersStatic
 
 					await LogResponse(requestOptions, enumeratedReader.Current, false, cancellationToken).ConfigureAwait(false);
 
-					yield return enumeratedReader!.Current;
+					yield return enumeratedReader.Current;
 				}
 			}
 			else
@@ -584,7 +584,7 @@ public static class RestHelpersStatic
 				httpRequestMessage.Content = new ByteArrayContent(MemoryPackSerializer.Serialize(postObject));
 				httpRequestMessage.Content.Headers.ContentType = new(MemPack);
 			}
-			else if (hasContentType && contentTypeValue!.StrEq(MsgPack))
+			else if (hasContentType && contentTypeValue.StrEq(MsgPack))
 			{
 				httpRequestMessage.Content = new ByteArrayContent(MessagePackSerializer.Serialize(postObject, messagePackSerializerOptions));
 				httpRequestMessage.Content.Headers.ContentType = new(MsgPack);

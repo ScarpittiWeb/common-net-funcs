@@ -85,7 +85,21 @@ public static class Common
 		double scaled = value * factor;
 		double floor = Math.Floor(scaled);
 		double diff = scaled - floor;
-		double rounded = diff < 0.5 ? floor : diff > 0.5 ? floor + 1 : (value >= 0 ? floor : floor + 1);
+		double rounded;
+
+		if(diff < 0.5)
+		{
+			rounded = floor;
+		}
+		else if(diff > 0.5)
+		{
+			rounded = floor + 1;
+		}
+		else
+		{
+			rounded = value >= 0 ? floor : floor + 1;
+		}
+
 		return rounded / factor;
 #endif
 	}
@@ -99,7 +113,21 @@ public static class Common
 		decimal scaled = value * factor;
 		decimal floor = Math.Floor(scaled);
 		decimal diff = scaled - floor;
-		decimal rounded = diff < 0.5m ? floor : diff > 0.5m ? floor + 1 : (value >= 0 ? floor : floor + 1);
+		decimal rounded;
+
+		if (diff < 0.5m)
+		{
+			rounded = floor;
+		}
+		else if (diff > 0.5m)
+		{
+			rounded = floor + 1;
+		}
+		else
+		{
+			rounded = value >= 0 ? floor : floor + 1;
+		}
+
 		return rounded / factor;
 #endif
 	}
