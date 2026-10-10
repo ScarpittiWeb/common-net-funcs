@@ -301,9 +301,10 @@ public static class Helpers
 
 				//frame=   48 fps=5.8 q=0.0 size=       1kB time=00:00:01.77 bitrate=   4.5kbits/s dup=0 drop=45 speed=0.215x
 				string timeLeftString = "Unknown";
-				if (unbrokenData.Contains("time=") && unbrokenData.Contains("bitrate=") && speed != 0)
+				const string bitrateMarker = "bitrate=";
+				if (unbrokenData.Contains("time=") && unbrokenData.Contains(bitrateMarker) && speed != 0)
 				{
-					if (TimeSpan.TryParseExact(unbrokenData[(unbrokenData.IndexOf("time=") + 5)..unbrokenData.IndexOf("bitrate=")], @"hh\:mm\:ss\.ff", CultureInfo.InvariantCulture, out TimeSpan currentTime))
+					if (TimeSpan.TryParseExact(unbrokenData[(unbrokenData.IndexOf("time=") + 5)..unbrokenData.IndexOf(bitrateMarker)], @"hh\:mm\:ss\.ff", CultureInfo.InvariantCulture, out TimeSpan currentTime))
 					{
 						decimal offset = decimal.Parse(videoTimespan.Subtract(currentTime).TotalSeconds.ToString());
 						TimeSpan timeLeft = TimeSpan.FromSeconds((int)Math.Ceiling(offset / speed));
@@ -311,7 +312,7 @@ public static class Helpers
 					}
 					else
 					{
-						timeLeftString = unbrokenData[(unbrokenData.IndexOf("time=") + 5)..unbrokenData.IndexOf("bitrate=")];
+						timeLeftString = unbrokenData[(unbrokenData.IndexOf("time=") + 5)..unbrokenData.IndexOf(bitrateMarker)];
 						if (!timeLeftString.StrEq("N/A"))
 						{
 							logger.Warn($"Unable to parse timeLeftString. Using raw value [{timeLeftString}] instead.\nFull unbroken output from ffmpeg = {unbrokenData}");
@@ -325,7 +326,7 @@ public static class Helpers
 				stringBuilder.Append(" ETA =");
 				stringBuilder.Append(timeLeftString);
 				stringBuilder.Append(' ');
-				stringBuilder.Append(normalizedData[..(normalizedData.Contains("bitrate=") ? normalizedData.IndexOf("bitrate=") : normalizedData.Length)]);
+				stringBuilder.Append(normalizedData[..(normalizedData.Contains(bitrateMarker) ? normalizedData.IndexOf(bitrateMarker) : normalizedData.Length)]);
 				stringBuilder.Append(" - [");
 				stringBuilder.Append(fileToConvert.Name);
 				stringBuilder.Append(']');

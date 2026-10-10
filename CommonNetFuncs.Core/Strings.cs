@@ -53,7 +53,7 @@ public static partial class Strings
 	public const string DateOnlyUrlFormat = "yyyyMMdd";
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"\s+")]
+	[GeneratedRegex(@"\s+", RegexOptions.Compiled, 5000)]
 	private static partial Regex MultiSpaceRegex();
 #else
 	private static readonly Regex multiSpaceRegexInstance = new(@"\s+", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -61,7 +61,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex("^[a-zA-Z0-9]*$")]
+	[GeneratedRegex("^[a-zA-Z0-9]*$", RegexOptions.Compiled, 5000)]
 	private static partial Regex AlphanumericRegex();
 #else
 	private static readonly Regex alphanumericRegexInstance = new("^[a-zA-Z0-9]*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -69,7 +69,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"^[a-zA-Z0-9\s]*$")]
+	[GeneratedRegex(@"^[a-zA-Z0-9\s]*$", RegexOptions.Compiled, 5000)]
 	private static partial Regex AlphanumericWithSpacesRegex();
 #else
 	private static readonly Regex alphanumericWithSpacesRegexInstance = new(@"^[a-zA-Z0-9\s]*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -77,7 +77,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex("^[a-zA-Z]*$")]
+	[GeneratedRegex("^[a-zA-Z]*$", RegexOptions.Compiled, 5000)]
 	private static partial Regex AlphaOnlyRegex();
 #else
 	private static readonly Regex alphaOnlyRegexInstance = new("^[a-zA-Z]*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -85,7 +85,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"^[a-zA-Z\s]*$")]
+	[GeneratedRegex(@"^[a-zA-Z\s]*$", RegexOptions.Compiled, 5000)]
 	private static partial Regex AlphaOnlyWithSpacesRegex();
 #else
 	private static readonly Regex alphaOnlyWithSpacesRegexInstance = new(@"^[a-zA-Z\s]*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -93,7 +93,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex("^[0-9]*$")]
+	[GeneratedRegex("^[0-9]*$", RegexOptions.Compiled, 5000)]
 	private static partial Regex NumericOnlyRegex();
 #else
 	private static readonly Regex numericOnlyRegexInstance = new("^[0-9]*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -101,7 +101,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"^[0-9\s]*$")]
+	[GeneratedRegex(@"^[0-9\s]*$", RegexOptions.Compiled, 5000)]
 	private static partial Regex NumericOnlyWithSpacesRegex();
 #else
 	private static readonly Regex numericOnlyWithSpacesRegexInstance = new(@"^[0-9\s]*$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -109,7 +109,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"\D+")]
+	[GeneratedRegex(@"\D+", RegexOptions.Compiled, 5000)]
 	private static partial Regex ExtractNumbersRegex();
 #else
 	private static readonly Regex extractNumbersRegexInstance = new(@"\D+", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -117,7 +117,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"(\d{3})(\d{4})")]
+	[GeneratedRegex(@"(\d{3})(\d{4})", RegexOptions.Compiled, 5000)]
 	private static partial Regex SevenDigitPhoneNumberRegex();
 #else
 	private static readonly Regex sevenDigitPhoneNumberRegexInstance = new(@"(\d{3})(\d{4})", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -125,7 +125,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"(\d{3})(\d{3})(\d{4})")]
+	[GeneratedRegex(@"(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled, 5000)]
 	private static partial Regex TenDigitPhoneNumberRegex();
 #else
 	private static readonly Regex tenDigitPhoneNumberRegexInstance = new(@"(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -133,7 +133,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"(\d{1})(\d{3})(\d{3})(\d{4})")]
+	[GeneratedRegex(@"(\d{1})(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled, 5000)]
 	private static partial Regex ElevenDigitPhoneNumberRegex();
 #else
 	private static readonly Regex elevenDigitPhoneNumberRegexInstance = new(@"(\d{1})(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -141,7 +141,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"(\d{2})(\d{3})(\d{3})(\d{4})")]
+	[GeneratedRegex(@"(\d{2})(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled, 5000)]
 	private static partial Regex TwelveDigitPhoneNumberRegex();
 #else
 	private static readonly Regex twelveDigitPhoneNumberRegexInstance = new(@"(\d{2})(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -149,7 +149,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex("[A-Za-z]")]
+	[GeneratedRegex("[A-Za-z]", RegexOptions.Compiled, 5000)]
 	internal static partial Regex RemoveLettersRegex();
 #else
 	private static readonly Regex removeLettersRegexInstance = new("[A-Za-z]", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -157,7 +157,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex("[0-9]")]
+	[GeneratedRegex("[0-9]", RegexOptions.Compiled, 5000)]
 	private static partial Regex RemoveNumbersRegex();
 #else
 	private static readonly Regex removeNumbersRegexInstance = new("[0-9]", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -165,7 +165,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex("[A-Za-z ]")]
+	[GeneratedRegex("[A-Za-z ]", RegexOptions.Compiled, 5000)]
 	private static partial Regex LettersOnlyRegex();
 #else
 	private static readonly Regex lettersOnlyRegexInstance = new("[A-Za-z ]", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -173,7 +173,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"[0-9]*\.?[0-9]+")]
+	[GeneratedRegex(@"[0-9]*\.?[0-9]+", RegexOptions.Compiled, 5000)]
 	private static partial Regex NumbersOnlyRegex();
 #else
 	private static readonly Regex numbersOnlyRegexInstance = new(@"[0-9]*\.?[0-9]+", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -181,7 +181,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"[0-9 ]*\.?[0-9]+((\/|\\)[0-9 ]*\.?[0-9]+)?")]
+	[GeneratedRegex(@"[0-9 ]*\.?[0-9]+((\/|\\)[0-9 ]*\.?[0-9]+)?", RegexOptions.Compiled, 5000)]
 	private static partial Regex NumbersWithFractionsOnlyRegex();
 #else
 	private static readonly Regex numbersWithFractionsOnlyRegexInstance = new(@"[0-9 ]*\.?[0-9]+((\/|\\)[0-9 ]*\.?[0-9]+)?", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -189,7 +189,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"(\s+|[^\w\s])")]
+	[GeneratedRegex(@"(\s+|[^\w\s])", RegexOptions.Compiled, 5000)]
 	private static partial Regex TitleCaseSplitRegex();
 #else
 	private static readonly Regex titleCaseSplitRegexInstance = new(@"(\s+|[^\w\s])", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -197,7 +197,7 @@ public static partial class Strings
 #endif
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"\w")]
+	[GeneratedRegex(@"\w", RegexOptions.Compiled, 5000)]
 	private static partial Regex TitleCaseWordRegex();
 #else
 	private static readonly Regex titleCaseWordRegexInstance = new(@"\w", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -2147,14 +2147,14 @@ public static partial class Strings
 	/// <param name="matchFirstOnly">If <see langword="true"/>, will only white list the first match of the regex pattern. If false, all matches with the regex pattern are white listed</param>
 	/// <returns>String with any non-matching characters replaced by the replacement string</returns>
 	[return: NotNullIfNotNull(nameof(input))]
-	public static string? ReplaceInverse(this string? input, string regexPattern, string? replacement = "", bool matchFirstOnly = false)
+	public static string? ReplaceInverse(this string? input, string regexPattern, string? replacement = "", bool matchFirstOnly = false, RegexOptions regexOptions = RegexOptions.None, TimeSpan? matchTimeout = null)
 	{
 		if (input.IsNullOrEmpty())
 		{
 			return input;
 		}
 
-		Regex regex = new(regexPattern);
+		Regex regex = new(regexPattern, regexOptions, matchTimeout ?? TimeSpan.FromSeconds(5));
 		return regex.ReplaceInverse(input, replacement, matchFirstOnly);
 	}
 

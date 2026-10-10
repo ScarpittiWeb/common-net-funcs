@@ -12,7 +12,7 @@ public static partial class HtmlEmailBuilder
 	const string CloseTr = "</tr>";
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"https?://[^\n\t< ]+", RegexOptions.IgnoreCase, "en-US")]
+	[GeneratedRegex(@"https?://[^\n\t< ]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, 5000, "en-US")]
 	private static partial Regex UrlRegex();
 #else
 	private static readonly Regex urlRegexInstance = new(@"https?://[^\n\t< ]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, TimeSpan.FromSeconds(5));

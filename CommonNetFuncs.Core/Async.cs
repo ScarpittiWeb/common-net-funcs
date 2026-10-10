@@ -952,40 +952,48 @@ public static class Async
 		cancellationTokenSource ??= new();
 		ConcurrentBag<T> results = [];
 		CancellationToken token = cancellationTokenSource.Token;
-		await AsyncCompat.ForEachAsync(tasks, async (task, _) =>
+		try
 		{
-			bool semaphoreAcquired = false;
-			try
+			await AsyncCompat.ForEachAsync(tasks, async (task, _) =>
 			{
-				if (token.IsCancellationRequested)
+				bool semaphoreAcquired = false;
+				try
 				{
-					return; // Exit if cancellation is requested
-				}
+					if (token.IsCancellationRequested)
+					{
+						return; // Exit if cancellation is requested
+					}
 
-				if (semaphore != null)
-				{
-					await semaphore.WaitAsync(token).ConfigureAwait(false);
-					semaphoreAcquired = true;
-				}
+					if (semaphore != null)
+					{
+						await semaphore.WaitAsync(token).ConfigureAwait(false);
+						semaphoreAcquired = true;
+					}
 
-				results.Add(await task().ConfigureAwait(false));
-			}
-			catch (Exception ex)
-			{
-				if (breakOnError)
-				{
-					await cancellationTokenSource.CancelAsync().ConfigureAwait(false);
+					results.Add(await task().ConfigureAwait(false));
 				}
-				logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
-			}
-			finally
-			{
-				if (semaphoreAcquired)
+				catch (Exception ex)
 				{
-					semaphore!.Release();
+					if (breakOnError)
+					{
+						await cancellationTokenSource.CancelAsync().ConfigureAwait(false);
+					}
+					logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
 				}
-			}
-		}).ConfigureAwait(false);
+				finally
+				{
+					if (semaphoreAcquired)
+					{
+						semaphore!.Release();
+					}
+				}
+			}, cancellationTokenSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException)
+		{
+			// In .NET 10+, Parallel.ForEachAsync throws OperationCanceledException when cancellation is requested.
+			// This is expected behavior when the CancellationToken is cancelled, so we silently exit.
+		}
 		return results;
 	}
 
@@ -1000,40 +1008,48 @@ public static class Async
 	{
 		cancellationTokenSource ??= new();
 		CancellationToken token = cancellationTokenSource.Token;
-		await AsyncCompat.ForEachAsync(tasks, async (task, _) =>
+		try
 		{
-			bool semaphoreAcquired = false;
-			try
+			await AsyncCompat.ForEachAsync(tasks, async (task, _) =>
 			{
-				if (token.IsCancellationRequested)
+				bool semaphoreAcquired = false;
+				try
 				{
-					return; // Exit if cancellation is requested
-				}
+					if (token.IsCancellationRequested)
+					{
+						return; // Exit if cancellation is requested
+					}
 
-				if (semaphore != null)
-				{
-					await semaphore.WaitAsync(token).ConfigureAwait(false);
-					semaphoreAcquired = true;
-				}
+					if (semaphore != null)
+					{
+						await semaphore.WaitAsync(token).ConfigureAwait(false);
+						semaphoreAcquired = true;
+					}
 
-				await task().ConfigureAwait(false);
-			}
-			catch (Exception ex)
-			{
-				if (breakOnError)
-				{
-					await cancellationTokenSource.CancelAsync().ConfigureAwait(false);
+					await task().ConfigureAwait(false);
 				}
-				logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
-			}
-			finally
-			{
-				if (semaphoreAcquired)
+				catch (Exception ex)
 				{
-					semaphore!.Release();
+					if (breakOnError)
+					{
+						await cancellationTokenSource.CancelAsync().ConfigureAwait(false);
+					}
+					logger.Error(ex, ErrorLocationTemplate, ex.GetLocationOfException());
 				}
-			}
-		}).ConfigureAwait(false);
+				finally
+				{
+					if (semaphoreAcquired)
+					{
+						semaphore!.Release();
+					}
+				}
+			}, cancellationTokenSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException)
+		{
+			// In .NET 10+, Parallel.ForEachAsync throws OperationCanceledException when cancellation is requested.
+			// This is expected behavior when the CancellationToken is cancelled, so we silently exit.
+		}
 	}
 
 	/// <summary>
@@ -1135,7 +1151,7 @@ public sealed class ResultTaskGroup<T>(List<Task<T>>? tasks = null, SemaphoreSli
 		}
 
 		T[] results = new T[Tasks.Count];
-		await AsyncCompat.ForAsync(0, Tasks.Count, cancellationToken ?? new(), async (i, cancellationToken) =>
+		await AsyncCompat.ForAsync(0, Tasks.Count, async (i, cancellationToken) =>
 		{
 			try
 			{
@@ -1152,7 +1168,7 @@ public sealed class ResultTaskGroup<T>(List<Task<T>>? tasks = null, SemaphoreSli
 			{
 				Semaphore.Release();
 			}
-		}).ConfigureAwait(false);
+		}, cancellationToken ?? new()).ConfigureAwait(false);
 
 		return results;
 	}
@@ -1189,7 +1205,7 @@ public sealed class TaskGroup(List<Task>? tasks = null, SemaphoreSlim? semaphore
 			return;
 		}
 
-		await AsyncCompat.ForEachAsync(Tasks, cancellationToken ?? new(), async (task, cancellationToken) =>
+		await AsyncCompat.ForEachAsync(Tasks, async (task, cancellationToken) =>
 		{
 			try
 			{
@@ -1204,7 +1220,7 @@ public sealed class TaskGroup(List<Task>? tasks = null, SemaphoreSlim? semaphore
 			{
 				Semaphore.Release();
 			}
-		}).ConfigureAwait(false);
+		}, cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
 		Tasks.Clear();
 	}
 }

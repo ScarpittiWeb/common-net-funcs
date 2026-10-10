@@ -149,7 +149,7 @@ public static class PdfConversion
 				// Task.Run(action, token) only honors the token before the delegate starts running, not while
 				// process.WaitForExit() is blocked, so register a callback to kill the process on cancellation instead.
 				CancellationToken token = cancellationToken ?? default;
-				using (token.Register(static state => TryKillProcess((Process)state!), process))
+				using (token.Register(static state => TryKillProcess((Process)state), process))
 				{
 					await Task.Run(() => process.WaitForExit(), CancellationToken.None).ConfigureAwait(false);
 				}

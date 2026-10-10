@@ -129,7 +129,7 @@ public static partial class Collections
 		Parallel.ForEach(toAdd.SelectNonNull(), parallelOptions ?? new(), item =>
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			concurrentBag.Add(item!);
+			concurrentBag.Add(item);
 		});
 	}
 
@@ -146,7 +146,7 @@ public static partial class Collections
 		foreach (T? item in toAdd.SelectNonNull())
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			concurrentBag.Add(item!);
+			concurrentBag.Add(item);
 		}
 	}
 
@@ -163,7 +163,7 @@ public static partial class Collections
 		foreach (T? item in toAdd.SelectNonNull())
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			hashSet.Add(item!);
+			hashSet.Add(item);
 		}
 	}
 
@@ -406,7 +406,7 @@ public static partial class Collections
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static List<T> SingleToList<T>(this T? obj)
 	{
-		return obj != null! ? [obj] : [];
+		return obj != null ? [obj] : [];
 	}
 
 	/// <summary>
@@ -711,9 +711,9 @@ public static partial class Collections
 		{
 			IReadOnlyList<(DataColumn DataColumn, PropertyInfo PropertyInfo, bool IsShort)> map = table.GetDataTableMap<T>(convertShortToBool, cancellationToken);
 			Task<T?>? outstandingItem = null;
-			T? Transform(object x)
+			T? Transform(object? x)
 			{
-				return ParseRowValues<T>((DataRow)x, map, cancellationToken);
+				return x is DataRow row ? ParseRowValues<T>(row, map, cancellationToken) : null;
 			}
 
 			foreach (DataRow row in table.AsEnumerable())
