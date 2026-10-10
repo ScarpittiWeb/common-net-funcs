@@ -985,7 +985,7 @@ public static class Async
 					semaphore!.Release();
 				}
 			}
-		}).ConfigureAwait(false);
+		}, cancellationTokenSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
 		return results;
 	}
 
@@ -1033,7 +1033,7 @@ public static class Async
 					semaphore!.Release();
 				}
 			}
-		}).ConfigureAwait(false);
+		}, cancellationTokenSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -1135,7 +1135,7 @@ public sealed class ResultTaskGroup<T>(List<Task<T>>? tasks = null, SemaphoreSli
 		}
 
 		T[] results = new T[Tasks.Count];
-		await AsyncCompat.ForAsync(0, Tasks.Count, cancellationToken ?? new(), async (i, cancellationToken) =>
+		await AsyncCompat.ForAsync(0, Tasks.Count, async (i, cancellationToken) =>
 		{
 			try
 			{
@@ -1152,7 +1152,7 @@ public sealed class ResultTaskGroup<T>(List<Task<T>>? tasks = null, SemaphoreSli
 			{
 				Semaphore.Release();
 			}
-		}).ConfigureAwait(false);
+		}, cancellationToken ?? new()).ConfigureAwait(false);
 
 		return results;
 	}
@@ -1189,7 +1189,7 @@ public sealed class TaskGroup(List<Task>? tasks = null, SemaphoreSlim? semaphore
 			return;
 		}
 
-		await AsyncCompat.ForEachAsync(Tasks, cancellationToken ?? new(), async (task, cancellationToken) =>
+		await AsyncCompat.ForEachAsync(Tasks, async (task, cancellationToken) =>
 		{
 			try
 			{
@@ -1204,7 +1204,7 @@ public sealed class TaskGroup(List<Task>? tasks = null, SemaphoreSlim? semaphore
 			{
 				Semaphore.Release();
 			}
-		}).ConfigureAwait(false);
+		}, cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
 		Tasks.Clear();
 	}
 }
