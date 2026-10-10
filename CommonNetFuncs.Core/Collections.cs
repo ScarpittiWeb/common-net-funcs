@@ -406,7 +406,7 @@ public static partial class Collections
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static List<T> SingleToList<T>(this T? obj)
 	{
-		return obj != null ? [obj] : [];
+		return obj is not null ? [obj] : [];
 	}
 
 	/// <summary>
