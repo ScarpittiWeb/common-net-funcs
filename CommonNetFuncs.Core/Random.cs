@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using CommonNetFuncs.Core.Internal;
 using ZLinq;
+using ZLinq.Linq;
 using static System.Math;
 
 namespace CommonNetFuncs.Core;
@@ -922,7 +923,7 @@ public static class Random
 		else
 		{
 			HashSet<int> blackListCharVals = blacklistedCharacters.Select(x => (int)x).ToHashSet();
-			var whiteListCharVals = ValueEnumerable.Range(lowerAsciiBound, upperAsciiBound - lowerAsciiBound);
+			ValueEnumerable<FromRange, int> whiteListCharVals = ValueEnumerable.Range(lowerAsciiBound, upperAsciiBound - lowerAsciiBound);
 			if (whiteListCharVals.Intersect(blackListCharVals).Count() == whiteListCharVals.Count())
 			{
 				throw new ArgumentException("Black list contains all available values", nameof(blacklistedCharacters));
@@ -1013,7 +1014,7 @@ public static class Random
 		else
 		{
 			HashSet<int> blackListCharVals = blacklistedCharacters.Select(x => (int)x).ToHashSet();
-			var whiteListCharVals = ValueEnumerable.Range(lowerAsciiBound, upperAsciiBound - lowerAsciiBound);
+			ValueEnumerable<FromRange, int> whiteListCharVals = ValueEnumerable.Range(lowerAsciiBound, upperAsciiBound - lowerAsciiBound);
 			if (whiteListCharVals.Intersect(blackListCharVals).Count() == whiteListCharVals.Count())
 			{
 				throw new ArgumentException("Black list contains all available values", nameof(blacklistedCharacters));
