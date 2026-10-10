@@ -285,7 +285,15 @@ internal static class AsyncCompat
 	public static async Task ForEachAsync<TSource>(IEnumerable<TSource> source, Func<TSource, CancellationToken, ValueTask> body, CancellationToken cancellationToken)
 	{
 #if NET6_0_OR_GREATER
-		await Parallel.ForEachAsync(source, cancellationToken, body).ConfigureAwait(false);
+		try
+		{
+			await Parallel.ForEachAsync(source, cancellationToken, body).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException)
+		{
+			// In .NET 10+, Parallel.ForEachAsync throws OperationCanceledException when cancellation is requested.
+			// This is expected behavior when the CancellationToken is cancelled, so we silently exit.
+		}
 #else
 		List<Task> tasks = [];
 		foreach (TSource item in source)
@@ -300,7 +308,15 @@ internal static class AsyncCompat
 	public static async Task ForAsync(int fromInclusive, int toExclusive, Func<int, CancellationToken, ValueTask> body, CancellationToken cancellationToken)
 	{
 #if NET6_0_OR_GREATER
-		await Parallel.ForAsync(fromInclusive, toExclusive, cancellationToken, body).ConfigureAwait(false);
+		try
+		{
+			await Parallel.ForAsync(fromInclusive, toExclusive, cancellationToken, body).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException)
+		{
+			// In .NET 10+, Parallel.ForAsync throws OperationCanceledException when cancellation is requested.
+			// This is expected behavior when the CancellationToken is cancelled, so we silently exit.
+		}
 #else
 		List<Task> tasks = [];
 		for (int i = fromInclusive; i < toExclusive; i++)
