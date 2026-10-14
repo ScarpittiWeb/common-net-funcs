@@ -3734,7 +3734,7 @@ public static partial class Common
 	public partial class CellReference
 	{
 #if NET7_0_OR_GREATER
-		[GeneratedRegex(@"([A-Z]+)(\d+)")]
+		[GeneratedRegex(@"([A-Z]+)(\d+)", RegexOptions.Compiled, 5000)]
 		private static partial Regex CellRefRegex();
 #else
 		private static readonly Regex cellRefRegexInstance = new(@"([A-Z]+)(\d+)", RegexOptions.Compiled, TimeSpan.FromSeconds(5));

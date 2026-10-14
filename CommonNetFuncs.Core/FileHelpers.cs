@@ -20,7 +20,7 @@ public static partial class FileHelpers
 	private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
 #if NET7_0_OR_GREATER
-	[GeneratedRegex(@"\(([^)]*)\)$")]
+	[GeneratedRegex(@"\(([^)]*)\)$", RegexOptions.Compiled, 5000)]
 	private static partial Regex IncrementedFileNameRegex();
 #else
 	private static readonly Regex incrementedFileNameRegexInstance = new(@"\(([^)]*)\)$", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
@@ -88,11 +88,11 @@ public static partial class FileHelpers
 				}
 
 				// Check if file already has an iterator
-				bool hasIterator = Regex.IsMatch(cleanFileName, incrementingPattern);
+				bool hasIterator = Regex.IsMatch(cleanFileName, incrementingPattern, RegexOptions.None, TimeSpan.FromSeconds(5));
 
 				if (hasIterator)
 				{
-					testPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(originalFullFileName) ?? string.Empty, Regex.Replace(cleanFileName, incrementingPattern, $"({i}){ext}")));
+					testPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(originalFullFileName) ?? string.Empty, Regex.Replace(cleanFileName, incrementingPattern, $"({i}){ext}", RegexOptions.None, TimeSpan.FromSeconds(5))));
 				}
 				else
 				{
@@ -152,7 +152,7 @@ public static partial class FileHelpers
 			if (!startFromZero)
 			{
 				// Start at number present
-				Match match = Regex.Match(fileName, incrementingPattern);
+				Match match = Regex.Match(fileName, incrementingPattern, RegexOptions.None, TimeSpan.FromSeconds(5));
 				if (match.Success && int.TryParse(match.Groups[1].Value, out int startNumber))
 				{
 					i = startNumber;
@@ -162,11 +162,11 @@ public static partial class FileHelpers
 			while (File.Exists(testPath))
 			{
 				// Check if file already has an iterator
-				bool hasIterator = Regex.IsMatch(fileName, incrementingPattern);
+				bool hasIterator = Regex.IsMatch(fileName, incrementingPattern, RegexOptions.None, TimeSpan.FromSeconds(5));
 
 				if (hasIterator)
 				{
-					testPath = Path.GetFullPath(Path.Combine(path, Regex.Replace(fileName, incrementingPattern, $"({i}){ext}")));
+					testPath = Path.GetFullPath(Path.Combine(path, Regex.Replace(fileName, incrementingPattern, $"({i}){ext}", RegexOptions.None, TimeSpan.FromSeconds(5))));
 				}
 				else
 				{

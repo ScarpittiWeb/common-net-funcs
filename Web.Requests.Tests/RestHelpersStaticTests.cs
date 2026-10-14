@@ -343,7 +343,7 @@ public sealed class RestHelpersStaticTests
 		result.Result.ShouldNotBeNull();
 
 		List<string?> items = new();
-		await foreach (string? item in result.Result!)
+		await foreach (string? item in result.Result)
 		{
 			items.Add(item);
 		}
