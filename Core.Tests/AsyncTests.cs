@@ -1905,7 +1905,7 @@ public sealed class AsyncTests
 		}
 
 		// Act
-		await list.ObjectFill(func, null!, Current.CancellationToken);
+		await list.ObjectFill(func, null, Current.CancellationToken);
 
 		// Assert
 		list.Count.ShouldBe(3);

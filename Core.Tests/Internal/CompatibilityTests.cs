@@ -323,11 +323,11 @@ public sealed class AsyncCompatTests
 		int[] source = [1, 2, 3];
 		System.Collections.Concurrent.ConcurrentBag<int> processed = [];
 
-		await AsyncCompat.ForEachAsync(source, CancellationToken.None, async (item, ct) =>
+		await AsyncCompat.ForEachAsync(source, async (item, ct) =>
 		{
 			await Task.Yield();
 			processed.Add(item);
-		});
+		}, CancellationToken.None);
 
 		processed.Count.ShouldBe(3);
 	}
@@ -340,10 +340,7 @@ public sealed class AsyncCompatTests
 		await cts.CancelAsync();
 
 		await Should.ThrowAsync<OperationCanceledException>(async () =>
-			await AsyncCompat.ForEachAsync(source, cts.Token, async (item, ct) =>
-			{
-				await Task.Yield();
-			}));
+			await AsyncCompat.ForEachAsync(source, async (item, ct) => await Task.Yield(), cts.Token));
 	}
 
 	[Fact]
@@ -351,11 +348,11 @@ public sealed class AsyncCompatTests
 	{
 		System.Collections.Concurrent.ConcurrentBag<int> processed = [];
 
-		await AsyncCompat.ForAsync(0, 5, CancellationToken.None, async (i, ct) =>
+		await AsyncCompat.ForAsync(0, 5, async (i, ct) =>
 		{
 			await Task.Yield();
 			processed.Add(i);
-		});
+		}, CancellationToken.None);
 
 		processed.OrderBy(x => x).ShouldBe([0, 1, 2, 3, 4]);
 	}
@@ -364,11 +361,11 @@ public sealed class AsyncCompatTests
 	public async Task ForAsync_EmptyRange_ProcessesNothing()
 	{
 		int count = 0;
-		await AsyncCompat.ForAsync(5, 5, CancellationToken.None, (i, ct) =>
+		await AsyncCompat.ForAsync(5, 5, (i, ct) =>
 		{
 			count++;
 			return ValueTask.CompletedTask;
-		});
+		}, CancellationToken.None);
 
 		count.ShouldBe(0);
 	}
