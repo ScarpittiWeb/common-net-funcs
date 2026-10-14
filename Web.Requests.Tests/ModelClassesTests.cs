@@ -248,7 +248,7 @@ public sealed class ModelClassesTests
 
 		// Act
 		List<string?> results = new();
-		await foreach (string? item in streamingObject.Result!)
+		await foreach (string? item in streamingObject.Result)
 		{
 			results.Add(item);
 		}

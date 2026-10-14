@@ -188,7 +188,7 @@ public sealed class RestClientTests
 
 
 		List<TestModel?> items = new();
-		await foreach (TestModel? item in result.Result!) { items.Add(item); }
+		await foreach (TestModel? item in result.Result) { items.Add(item); }
 		items.ShouldBeEmpty();
 	}
 

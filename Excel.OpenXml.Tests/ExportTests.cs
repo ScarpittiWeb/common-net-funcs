@@ -673,7 +673,7 @@ public sealed class ExportTests : IDisposable
 		worksheet.ShouldNotBeNull();
 
 		// Act
-		bool result = Export.ExportFromTable(doc, worksheet, testData!);
+		bool result = Export.ExportFromTable(doc, worksheet, testData);
 
 		// Assert
 		result.ShouldBeTrue();

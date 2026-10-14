@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 
 namespace CommonNetFuncs.Ffmpeg.Internal;
 
@@ -31,23 +31,31 @@ internal static class EnumerableCompatExtensions
 /// </summary>
 internal static class FileSizeCompatExtensions
 {
+	private static readonly string[] ByteUnits = new string[] { "B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB" };
+
 	public static string GetFileSizeFromBytesWithUnits(this long inputBytes, int decimalPlaces = 1)
 	{
 		long bytes = Math.Abs(inputBytes);
-		long multiplier = bytes > inputBytes ? -1L : 1L;
-		decimal kb = Math.Round(bytes / 1024m, decimalPlaces, MidpointRounding.AwayFromZero);
-		decimal mb = Math.Round(kb / 1024m, decimalPlaces, MidpointRounding.AwayFromZero);
-		decimal gb = Math.Round(mb / 1024m, decimalPlaces, MidpointRounding.AwayFromZero);
-		decimal tb = Math.Round(gb / 1024m, decimalPlaces, MidpointRounding.AwayFromZero);
-		return bytes >= 1024
-			? kb >= 1024
-				? mb >= 1024
-					? gb >= 1024
-						? $"{tb * multiplier} TB"
-						: $"{gb * multiplier} GB"
-					: $"{mb * multiplier} MB"
-				: $"{kb * multiplier} KB"
-			: $"{bytes * multiplier} B";
+
+		if (bytes == 0)
+		{
+			return "0 B";
+		}
+
+		const int k = 1024;
+		int dm = decimalPlaces < 0 ? 0 : decimalPlaces;
+
+		int i = (int)Math.Floor(Math.Log(bytes) / Math.Log(k));
+
+		// Ensure index is within bounds
+		if (i >= ByteUnits.Length)
+		{
+			i = ByteUnits.Length - 1;
+		}
+
+		long multiplier = inputBytes < 0 ? -1L : 1L;
+		decimal result = Math.Round((decimal)(multiplier * bytes) / (decimal)Math.Pow(k, i), dm, MidpointRounding.AwayFromZero);
+		return $"{result} {ByteUnits[i]}";
 	}
 
 	public static string GetFileSizeFromBytesWithUnits(this long? nullBytes, int decimalPlaces = 1)
