@@ -47,7 +47,7 @@
 		<PackageVersion Include="MinVer" Version="8.0.0" />
 		<PackageVersion Include="Moq" Version="4.21.0" />
 		<PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
-		<PackageVersion Include="NLog" Version="6.2.1" />
+		<PackageVersion Include="NLog" Version="6.2.2" />
 		<PackageVersion Include="NLog.Extensions.Logging" Version="6.2.1" />
 		<PackageVersion Include="Npgsql" Version="10.0.3" />
 		<PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
