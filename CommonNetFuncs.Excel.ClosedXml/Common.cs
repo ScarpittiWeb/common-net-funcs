@@ -6,6 +6,7 @@ using ClosedXML.Excel.Drawings;
 using CommonNetFuncs.Excel.Common;
 using SkiaSharp;
 using ZLinq;
+using ZLinq.Linq;
 
 namespace CommonNetFuncs.Excel.ClosedXml;
 
@@ -562,7 +563,7 @@ public static class Common
 			IXLTable? table = null;
 
 			// ClosedXML tables are scoped per-worksheet; enumerate all sheets to find a matching table
-			var allTables = wb.Worksheets.AsValueEnumerable().SelectMany(ws => ws.Tables);
+			ValueEnumerable<SelectMany<FromEnumerable<IXLWorksheet>, IXLWorksheet, IXLTable>, IXLTable> allTables = wb.Worksheets.AsValueEnumerable().SelectMany(ws => ws.Tables);
 
 			if (!string.IsNullOrWhiteSpace(tableName))
 			{

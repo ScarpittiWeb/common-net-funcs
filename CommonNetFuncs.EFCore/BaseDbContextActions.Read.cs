@@ -1,10 +1,11 @@
-﻿using System.Linq.Dynamic.Core;
-using System.Linq.Expressions;
-using System.Text.Json.Serialization;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.DependencyInjection;
+using System.Linq.Dynamic.Core;
+using System.Linq.Expressions;
+using System.Reflection;
+using System.Text.Json.Serialization;
 using Z.EntityFramework.Plus;
 using static CommonNetFuncs.Core.ExceptionLocation;
 
@@ -36,7 +37,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	/// <summary>
 	/// Get individual record by the single field primary key.
 	/// </summary>
-	/// <param name="primaryKey">Primary key of the record to be returned.</param>
+	/// <param name="primaryKey">Primary key of the record to be returned. Can be a single value or an anonymous object with properties matching the compound key fields.</param>
 	/// <param name="queryTimeout">Optional: Override the database default for query timeout. Default is <see langword="null"/>.</param>
 	/// <param name="globalFilterOptions">Optional: Options for controlling global query filters. Default is <see langword="null"/>.</param>
 	/// <param name="cancellationToken">Optional: Cancellation token for this operation.</param>
@@ -48,6 +49,40 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 		TEntity? model = null;
 		try
 		{
+			// Check if this is an anonymous object with multiple properties for a compound key
+			IEntityType? entityType = context.Model.FindEntityType(typeof(TEntity));
+			IKey? primaryKeyMetadata = entityType?.FindPrimaryKey();
+
+			if (primaryKeyMetadata != null && primaryKeyMetadata.Properties.Count > 1)
+			{
+				// Entity has a compound primary key
+				// Check if the primaryKey object is an anonymous type with properties
+				Type primaryKeyType = primaryKey.GetType();
+				if (primaryKeyType.Name.Contains("AnonymousType"))
+				{
+					// Extract property values from anonymous object in the correct order
+					PropertyInfo[] properties = primaryKeyType.GetProperties();
+					List<string> keyPropertyNames = primaryKeyMetadata.Properties.Select(p => p.Name).ToList();
+					object[] keyValues = new object[keyPropertyNames.Count];
+
+					for (int i = 0; i < keyPropertyNames.Count; i++)
+					{
+						PropertyInfo? propInfo = properties.FirstOrDefault(p => p.Name == keyPropertyNames[i]);
+						if (propInfo != null)
+						{
+							keyValues[i] = propInfo.GetValue(primaryKey)!;
+						}
+						else
+						{
+							throw new InvalidOperationException($"Anonymous object is missing property '{keyPropertyNames[i]}' required for the compound primary key of {typeof(TEntity).Name}.");
+						}
+					}
+
+					// Delegate to the compound key overload
+					return await GetByKey(keyValues, queryTimeout, globalFilterOptions, cancellationToken).ConfigureAwait(false);
+				}
+			}
+
 			// If we need to disable filters, we can't use FindAsync - need to build a query
 			if (globalFilterOptions?.DisableAllFilters == true || (globalFilterOptions?.FilterNamesToDisable.AnyFast() ?? false))
 			{
