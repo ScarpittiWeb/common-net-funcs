@@ -1,4 +1,5 @@
-﻿using CommonNetFuncs.Web.Common.CachingSupportClasses;
+﻿using System.Collections.Immutable;
+using CommonNetFuncs.Web.Common.CachingSupportClasses;
 using static CommonNetFuncs.Compression.Streams;
 using static CommonNetFuncs.Web.Common.CachingSupportClasses.CacheOptionDefaults;
 
@@ -159,7 +160,7 @@ public class CacheOptionsTests
 	{
 		// Arrange
 		CacheOptions options = new();
-		var newHeaders = DefaultHeadersToCache.Add("X-Custom-Header");
+		ImmutableHashSet<string> newHeaders = DefaultHeadersToCache.Add("X-Custom-Header");
 
 		// Act
 		options.HeadersToCache = newHeaders;
