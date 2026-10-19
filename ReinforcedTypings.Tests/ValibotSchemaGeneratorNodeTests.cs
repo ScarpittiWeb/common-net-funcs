@@ -42,10 +42,12 @@ public sealed class ValibotSchemaGeneratorNodeTests
 	{
 		ExportContext context = new([type.Assembly], new FilesOperations())
 		{
+
 			Hierarchical = true,
-			TargetDirectory = rtOutputDir
+			TargetDirectory = rtOutputDir,
+			ConfigurationMethod = builder => builder.ExportAsInterfaces([type], config => config.WithCodeGenerator<ValibotSchemaGenerator>())
+
 		};
-		context.ConfigurationMethod = builder => builder.ExportAsInterfaces([type], config => config.WithCodeGenerator<ValibotSchemaGenerator>());
 
 		new TsExporter(context).Export();
 	}
