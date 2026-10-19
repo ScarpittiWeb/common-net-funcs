@@ -1,9 +1,9 @@
-﻿using System.Linq.Expressions;
-using AutoFixture;
+﻿using AutoFixture;
 using CommonNetFuncs.EFCore;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using System.Linq.Expressions;
 using static Xunit.TestContext;
 
 namespace EFCore.Tests;
@@ -143,6 +143,145 @@ public sealed partial class BaseDbContextActionsTests
 		result.ShouldNotBeNull();
 		result.Id.ShouldBe(entity.Id);
 	}
+
+	#region Anonymous Type Compound Key Tests
+
+	[Fact]
+	public async Task GetByKey_WithAnonymousObjectForCompoundKey_ShouldRedirectToArrayOverload()
+	{
+		// Arrange
+		TestEntityWithCompoundKey entity = fixture.Create<TestEntityWithCompoundKey>();
+		await context.TestEntitiesWithCompoundKey.AddAsync(entity, Current.CancellationToken);
+		await context.SaveChangesAsync(Current.CancellationToken);
+
+		BaseDbContextActions<TestEntityWithCompoundKey, TestDbContext> testDbContext = new(serviceProvider);
+
+		// Act - Pass an anonymous object with properties matching the compound key
+		var anonymousKey = new { entity.Key1, entity.Key2 };
+		TestEntityWithCompoundKey? result = await testDbContext.GetByKey(anonymousKey, cancellationToken: Current.CancellationToken);
+
+		// Assert
+		result.ShouldNotBeNull();
+		result.Key1.ShouldBe(entity.Key1);
+		result.Key2.ShouldBe(entity.Key2);
+		result.Name.ShouldBe(entity.Name);
+	}
+
+	[Fact]
+	public async Task GetByKey_WithAnonymousObjectForCompoundKey_PropertiesInDifferentOrder_ShouldStillWork()
+	{
+		// Arrange
+		TestEntityWithCompoundKey entity = fixture.Create<TestEntityWithCompoundKey>();
+		await context.TestEntitiesWithCompoundKey.AddAsync(entity, Current.CancellationToken);
+		await context.SaveChangesAsync(Current.CancellationToken);
+
+		BaseDbContextActions<TestEntityWithCompoundKey, TestDbContext> testDbContext = new(serviceProvider);
+
+		// Act - Pass an anonymous object with properties in reverse order
+		// The implementation should reorder them to match the primary key declaration order
+		var anonymousKey = new { entity.Key2, entity.Key1 };
+		TestEntityWithCompoundKey? result = await testDbContext.GetByKey(anonymousKey, cancellationToken: Current.CancellationToken);
+
+		// Assert
+		result.ShouldNotBeNull();
+		result.Key1.ShouldBe(entity.Key1);
+		result.Key2.ShouldBe(entity.Key2);
+	}
+
+	[Fact]
+	public async Task GetByKey_WithAnonymousObjectMissingRequiredProperty_ShouldReturnNull()
+	{
+		// Arrange
+		TestEntityWithCompoundKey entity = fixture.Create<TestEntityWithCompoundKey>();
+		await context.TestEntitiesWithCompoundKey.AddAsync(entity, Current.CancellationToken);
+		await context.SaveChangesAsync(Current.CancellationToken);
+
+		BaseDbContextActions<TestEntityWithCompoundKey, TestDbContext> testDbContext = new(serviceProvider);
+
+		// Act - Pass an anonymous object missing the Key2 property
+		// The method catches the exception internally and logs it, returning null
+		var anonymousKeyMissingProperty = new { entity.Key1 };
+		TestEntityWithCompoundKey? result = await testDbContext.GetByKey(anonymousKeyMissingProperty, cancellationToken: Current.CancellationToken);
+
+		// Assert
+		result.ShouldBeNull();
+	}
+
+	[Fact]
+	public async Task GetByKey_WithAnonymousObjectForCompoundKeyAndGlobalFilterOptions_ShouldWork()
+	{
+		// Arrange
+		TestEntityWithCompoundKey entity = fixture.Create<TestEntityWithCompoundKey>();
+		await context.TestEntitiesWithCompoundKey.AddAsync(entity, Current.CancellationToken);
+		await context.SaveChangesAsync(Current.CancellationToken);
+
+		BaseDbContextActions<TestEntityWithCompoundKey, TestDbContext> testDbContext = new(serviceProvider);
+		GlobalFilterOptions filterOptions = new() { DisableAllFilters = true };
+
+		// Act - Pass an anonymous object with filter options
+		var anonymousKey = new { entity.Key1, entity.Key2 };
+		TestEntityWithCompoundKey? result = await testDbContext.GetByKey(anonymousKey, globalFilterOptions: filterOptions, cancellationToken: Current.CancellationToken);
+
+		// Assert
+		result.ShouldNotBeNull();
+		result.Key1.ShouldBe(entity.Key1);
+		result.Key2.ShouldBe(entity.Key2);
+	}
+
+	[Fact]
+	public async Task GetByKey_WithAnonymousObjectForSingleKey_ShouldNothing()
+	{
+		// Arrange
+		TestEntity entity = fixture.Create<TestEntity>();
+		await context.TestEntities.AddAsync(entity, Current.CancellationToken);
+		await context.SaveChangesAsync(Current.CancellationToken);
+
+		BaseDbContextActions<TestEntity, TestDbContext> testDbContext = new(serviceProvider);
+
+		// Act - Pass an anonymous object with a single key entity
+		// Since TestEntity only has one key, the compound key path shouldn't be triggered
+		var anonymousKey = new { entity.Id };
+		TestEntity? result = await testDbContext.GetByKey(anonymousKey, cancellationToken: Current.CancellationToken);
+
+		// Assert - Should return null because the single-value key doesn't match the anonymous object
+		result.ShouldBeNull();
+	}
+
+	[Fact]
+	public async Task GetByKey_FullOverload_WithAnonymousObjectForCompoundKey_ShouldWork()
+	{
+		// Arrange
+		TestEntityWithCompoundKey entity = fixture.Create<TestEntityWithCompoundKey>();
+		await context.TestEntitiesWithCompoundKey.AddAsync(entity, Current.CancellationToken);
+		await context.SaveChangesAsync(Current.CancellationToken);
+
+		BaseDbContextActions<TestEntityWithCompoundKey, TestDbContext> testDbContext = new(serviceProvider);
+
+		// Act - Use the full overload with bool and anonymous object
+		var anonymousKey = new { entity.Key1, entity.Key2 };
+		TestEntityWithCompoundKey? result = await testDbContext.GetByKey(full: false, anonymousKey, cancellationToken: Current.CancellationToken);
+
+		// Assert
+		result.ShouldNotBeNull();
+		result.Key1.ShouldBe(entity.Key1);
+		result.Key2.ShouldBe(entity.Key2);
+	}
+
+	[Fact]
+	public async Task GetByKey_WithAnonymousObjectForInvalidCompoundKey_ShouldReturnNull()
+	{
+		// Arrange
+		BaseDbContextActions<TestEntityWithCompoundKey, TestDbContext> testDbContext = new(serviceProvider);
+
+		// Act - Pass an anonymous object with non-existent key values
+		var anonymousKey = new { Key1 = int.MaxValue, Key2 = int.MaxValue };
+		TestEntityWithCompoundKey? result = await testDbContext.GetByKey(anonymousKey, cancellationToken: Current.CancellationToken);
+
+		// Assert
+		result.ShouldBeNull();
+	}
+
+	#endregion
 
 	#endregion
 
