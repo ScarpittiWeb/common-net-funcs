@@ -1,6 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
-	<!-- Optimized -->
 	<PropertyGroup>
 		<TargetFrameworks>net10.0;netstandard2.1</TargetFrameworks>
 		<Platforms>AnyCPU;x86;x64</Platforms>
@@ -27,7 +25,7 @@
 	</PropertyGroup>
 
 	<PropertyGroup>
-		<Version>4.4.7</Version>
+		<Version>4.4.8</Version>
 		<MinVerTagPrefix>core-</MinVerTagPrefix>
 		<MinVerIgnoreHeight>true</MinVerIgnoreHeight>
 		<MinVerSkip Condition="'$(Configuration)' == 'Debug'">true</MinVerSkip>
