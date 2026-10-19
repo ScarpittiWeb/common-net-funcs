@@ -73,12 +73,15 @@ public class CacheEntryTests
 	public void CacheEntry_CanSetCompressionType()
 	{
 		// Arrange
-		CacheEntry entry = new();
 
-		// Act
-		entry.CompressionType = 1;
+		CacheEntry entry = new()
+		{
+			// Act
+			CompressionType = 1
+		};
 
 		// Assert
+
 		entry.CompressionType.ShouldBe((short)1);
 	}
 
@@ -235,10 +238,12 @@ public class CacheEntryTests
 	public void CacheEntry_CompressionType_AcceptsVariousValues()
 	{
 		// Arrange
-		CacheEntry entry = new();
 
-		// Act & Assert
-		entry.CompressionType = 0;
+		CacheEntry entry = new()
+		{
+			// Act & Assert
+			CompressionType = 0
+		};
 		entry.CompressionType.ShouldBe((short)0);
 
 		entry.CompressionType = 100;

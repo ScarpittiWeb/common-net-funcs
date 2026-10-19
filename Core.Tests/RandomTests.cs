@@ -1,4 +1,5 @@
 ﻿using FakeItEasy;
+using System.Reflection;
 using static CommonNetFuncs.Core.MathHelpers;
 using static CommonNetFuncs.Core.Random;
 using static Xunit.TestContext;
@@ -1924,4 +1925,628 @@ public sealed class RandomTests
 		byte[] result = GetRepeatableRandomBytes(ref bytes, "seed");
 		result.Length.ShouldBe(1);
 	}
+
+	#region GetFeistelOrdinal Tests
+
+	[Fact]
+	public void GetFeistelOrdinal_WhenDomainIsOne_ReturnsZero()
+	{
+		// Act
+		long result = GetFeistelOrdinal(index: 0, domain: 1, seed: 12345);
+
+		// Assert
+		result.ShouldBe(0);
+	}
+
+	[Theory]
+	[InlineData(0)]
+	[InlineData(-1)]
+	[InlineData(-100)]
+	public void GetFeistelOrdinal_WhenDomainIsLessOrEqualZero_ReturnsZero(long domain)
+	{
+		// Act
+		long result = GetFeistelOrdinal(index: 0, domain, seed: 12345);
+
+		// Assert
+		result.ShouldBe(0);
+	}
+
+	[Theory]
+	[InlineData(10, 5)]
+	[InlineData(100, 100)]
+	[InlineData(1000, 999)]
+	public void GetFeistelOrdinal_WhenIndexGreaterOrEqualDomain_ThrowsArgumentOutOfRangeException(long index, long domain)
+	{
+		// Act & Assert
+		ArgumentOutOfRangeException exception = Should.Throw<ArgumentOutOfRangeException>(() => GetFeistelOrdinal(index, domain, seed: 12345));
+		exception.ParamName.ShouldBe("index");
+	}
+
+	[Fact]
+	public void GetFeistelOrdinal_WhenIndexIsNegative_ThrowsArgumentOutOfRangeException()
+	{
+		// Act & Assert
+		ArgumentOutOfRangeException exception = Should.Throw<ArgumentOutOfRangeException>(() => GetFeistelOrdinal(index: -1, domain: 100, seed: 12345));
+		exception.ParamName.ShouldBe("index");
+	}
+
+	[Theory]
+	[InlineData(0, 10, 12345)]
+	[InlineData(5, 100, 99999)]
+	[InlineData(99, 100, 0)]
+	public void GetFeistelOrdinal_WithValidParameters_ReturnsValueInRange(long index, long domain, long seed)
+	{
+		// Act
+		long result = GetFeistelOrdinal(index, domain, seed);
+
+		// Assert
+		result.ShouldBeGreaterThanOrEqualTo(0);
+		result.ShouldBeLessThan(domain);
+	}
+
+	[Fact]
+	public void GetFeistelOrdinal_WithSameSeed_ProducesDeterministicResults()
+	{
+		// Arrange
+		const long index = 42;
+		const long domain = 1000;
+		const long seed = 54321;
+
+		// Act
+		long result1 = GetFeistelOrdinal(index, domain, seed);
+		long result2 = GetFeistelOrdinal(index, domain, seed);
+
+		// Assert
+		result1.ShouldBe(result2);
+	}
+
+	[Fact]
+	public void GetFeistelOrdinal_WithDifferentSeeds_ProducesDifferentResults()
+	{
+		// Arrange
+		const long index = 42;
+		const long domain = 1000;
+
+		// Act
+		long result1 = GetFeistelOrdinal(index, domain, seed: 111);
+		long result2 = GetFeistelOrdinal(index, domain, seed: 222);
+
+		// Assert
+		result1.ShouldNotBe(result2);
+	}
+
+	[Fact]
+	public void GetFeistelOrdinal_WithSmallDomain_MapsAllIndicesToValidRange()
+	{
+		// Arrange
+		const long domain = 10;
+		const long seed = 12345;
+		HashSet<long> results = new();
+
+		// Act
+		for (long i = 0; i < domain; i++)
+		{
+			long result = GetFeistelOrdinal(i, domain, seed);
+			results.Add(result);
+		}
+
+		// Assert
+		results.Count.ShouldBe((int)domain); // Bijection: all results should be unique
+		results.All(r => r >= 0 && r < domain).ShouldBeTrue();
+	}
+
+	[Fact]
+	public void GetFeistelOrdinal_WithMediumDomain_IsBijective()
+	{
+		// Arrange
+		const long domain = 256;
+		const long seed = 99999;
+		HashSet<long> results = new();
+
+		// Act
+		for (long i = 0; i < domain; i++)
+		{
+			long result = GetFeistelOrdinal(i, domain, seed);
+			results.Add(result);
+		}
+
+		// Assert
+		results.Count.ShouldBe((int)domain); // Bijection property
+		results.All(r => r >= 0 && r < domain).ShouldBeTrue();
+	}
+
+	[Fact]
+	public void GetFeistelOrdinal_WithLargeDomain_ProducesValidResults()
+	{
+		// Arrange
+		const long domain = 100000;
+		const long seed = 12345;
+		const long testIndex = 50000;
+
+		// Act
+		long result = GetFeistelOrdinal(testIndex, domain, seed);
+
+		// Assert
+		result.ShouldBeGreaterThanOrEqualTo(0);
+		result.ShouldBeLessThan(domain);
+	}
+
+	[Theory]
+	[InlineData(1)]
+	[InlineData(3)]
+	[InlineData(6)]
+	[InlineData(12)]
+	public void GetFeistelOrdinal_WithVaryingRounds_ProducesDifferentMappings(int rounds)
+	{
+		// Arrange
+		const long index = 42;
+		const long domain = 1000;
+		const long seed = 12345;
+
+		// Act
+		long result = GetFeistelOrdinal(index, domain, seed, rounds);
+
+		// Assert
+		result.ShouldBeGreaterThanOrEqualTo(0);
+		result.ShouldBeLessThan(domain);
+	}
+
+	[Fact]
+	public void GetFeistelOrdinal_WithZeroRounds_StillProducesValidResults()
+	{
+		// Arrange
+		const long index = 0;
+		const long domain = 100;
+
+		// Act
+		long result = GetFeistelOrdinal(index, domain, seed: 12345, rounds: 0);
+
+		// Assert
+		result.ShouldBeGreaterThanOrEqualTo(0);
+		result.ShouldBeLessThan(domain);
+	}
+
+	[Fact]
+	public void GetFeistelOrdinal_WithPowerOfTwoDomain_ProducesBijectiveMapping()
+	{
+		// Arrange
+		const long domain = 64; // Power of 2
+		const long seed = 12345;
+		HashSet<long> results = new();
+
+		// Act
+		for (long i = 0; i < domain; i++)
+		{
+			results.Add(GetFeistelOrdinal(i, domain, seed));
+		}
+
+		// Assert
+		results.Count.ShouldBe((int)domain);
+	}
+
+	[Fact]
+	public void GetFeistelOrdinal_WithNonPowerOfTwoDomain_ProducesBijectiveMapping()
+	{
+		// Arrange
+		const long domain = 100; // Not a power of 2
+		const long seed = 54321;
+		HashSet<long> results = new();
+
+		// Act
+		for (long i = 0; i < domain; i++)
+		{
+			results.Add(GetFeistelOrdinal(i, domain, seed));
+		}
+
+		// Assert
+		results.Count.ShouldBe((int)domain);
+		results.All(r => r >= 0 && r < domain).ShouldBeTrue();
+	}
+
+	[Fact]
+	public void GetFeistelOrdinal_EdgeCase_IndexZero()
+	{
+		// Arrange
+		const long domain = 1000;
+		const long seed = 12345;
+
+		// Act
+		long result = GetFeistelOrdinal(index: 0, domain, seed);
+
+		// Assert
+		result.ShouldBeGreaterThanOrEqualTo(0);
+		result.ShouldBeLessThan(domain);
+	}
+
+	[Fact]
+	public void GetFeistelOrdinal_EdgeCase_IndexDomainMinusOne()
+	{
+		// Arrange
+		const long domain = 1000;
+		const long seed = 12345;
+		const long index = domain - 1;
+
+		// Act
+		long result = GetFeistelOrdinal(index, domain, seed);
+
+		// Assert
+		result.ShouldBeGreaterThanOrEqualTo(0);
+		result.ShouldBeLessThan(domain);
+	}
+
+	#endregion
+
+	#region Mix Function Tests (via Reflection)
+
+	[Fact]
+	public void Mix_WithZeroValue_ProducesDeterministicResult()
+	{
+		// Arrange
+		const ulong value = 0;
+		const ulong seed = 12345;
+		const int round = 0;
+
+		// Act
+		ulong result = InvokeMix(value, seed, round);
+
+		// Assert
+		result.ShouldNotBe(0UL);
+	}
+
+	[Theory]
+	[InlineData(1UL)]
+	[InlineData(255UL)]
+	[InlineData(ulong.MaxValue)]
+	public void Mix_WithVariousValues_ProducesConsistentResults(ulong value)
+	{
+		// Arrange
+		const ulong seed = 12345;
+		const int round = 5;
+
+		// Act
+		ulong result1 = InvokeMix(value, seed, round);
+		ulong result2 = InvokeMix(value, seed, round);
+
+		// Assert
+		result1.ShouldBe(result2);
+	}
+
+	[Fact]
+	public void Mix_WithDifferentRounds_ProducesDifferentResults()
+	{
+		// Arrange
+		const ulong value = 0x123456789ABCDEEFUL;
+		const ulong seed = 12345;
+
+		// Act
+		ulong result1 = InvokeMix(value, seed, round: 0);
+		ulong result2 = InvokeMix(value, seed, round: 1);
+
+		// Assert
+		result1.ShouldNotBe(result2);
+	}
+
+	[Fact]
+	public void Mix_WithDifferentSeeds_ProducesDifferentResults()
+	{
+		// Arrange
+		const ulong value = 0x123456789ABCDEEFUL;
+		const int round = 3;
+
+		// Act
+		ulong result1 = InvokeMix(value, seed: 111, round);
+		ulong result2 = InvokeMix(value, seed: 222, round);
+
+		// Assert
+		result1.ShouldNotBe(result2);
+	}
+
+	[Fact]
+	public void Mix_FollowsSplitMix64Pattern_ProducesDifferentBitsOnEachCall()
+	{
+		// Arrange
+		const ulong value = 1;
+		const ulong seed = 12345;
+
+		// Act
+		ulong result1 = InvokeMix(value, seed, round: 0);
+		ulong result2 = InvokeMix(value, seed, round: 1);
+		ulong result3 = InvokeMix(value, seed, round: 2);
+
+		// Assert
+		// Each round should produce different results (not equal to previous)
+		result1.ShouldNotBe(result2);
+		result2.ShouldNotBe(result3);
+		result1.ShouldNotBe(result3);
+	}
+
+	[Fact]
+	public void Mix_WithMaxValue_ProducesValidUlongResult()
+	{
+		// Arrange
+		const ulong value = ulong.MaxValue;
+		const ulong seed = ulong.MaxValue;
+		const int round = 0;
+
+		// Act
+		ulong result = InvokeMix(value, seed, round);
+
+		// Assert - should not throw and produce a valid ulong
+		result.ShouldNotBe(0UL);
+	}
+
+	#endregion
+
+	#region Encrypt Function Tests (via Reflection)
+
+	[Fact]
+	public void Encrypt_WithZeroValue_ProducesValidResult()
+	{
+		// Arrange
+		const ulong x = 0;
+		const int half = 32;
+		const ulong mask = 0xFFFFFFFF;
+		const ulong seed = 12345;
+		const int rounds = 6;
+
+		// Act
+		ulong result = InvokeEncrypt(x, half, mask, seed, rounds);
+
+		// Assert
+		result.ShouldBeLessThanOrEqualTo(ulong.MaxValue);
+	}
+
+	[Fact]
+	public void Encrypt_WithSameSeed_ProducesDeterministicResults()
+	{
+		// Arrange
+		const ulong x = 0x123456789ABCDEF0;
+		const int half = 32;
+		const ulong mask = 0xFFFFFFFF;
+		const ulong seed = 12345;
+		const int rounds = 6;
+
+		// Act
+		ulong result1 = InvokeEncrypt(x, half, mask, seed, rounds);
+		ulong result2 = InvokeEncrypt(x, half, mask, seed, rounds);
+
+		// Assert
+		result1.ShouldBe(result2);
+	}
+
+	[Fact]
+	public void Encrypt_WithDifferentSeeds_ProducesDifferentResults()
+	{
+		// Arrange
+		const ulong x = 0x123456789ABCDEF0;
+		const int half = 32;
+		const ulong mask = 0xFFFFFFFF;
+		const int rounds = 6;
+
+		// Act
+		ulong result1 = InvokeEncrypt(x, half, mask, seed: 111, rounds);
+		ulong result2 = InvokeEncrypt(x, half, mask, seed: 222, rounds);
+
+		// Assert
+		result1.ShouldNotBe(result2);
+	}
+
+	[Theory]
+	[InlineData(1)]
+	[InlineData(3)]
+	[InlineData(6)]
+	[InlineData(12)]
+	public void Encrypt_WithVaryingRounds_ProducesDifferentResults(int rounds)
+	{
+		// Arrange
+		const ulong x = 0x123456789ABCDEF0;
+		const int half = 32;
+		const ulong mask = 0xFFFFFFFF;
+		const ulong seed = 12345;
+
+		// Act
+		ulong result = InvokeEncrypt(x, half, mask, seed, rounds);
+
+		// Assert
+		result.ShouldNotBe(0UL);
+	}
+
+	[Theory]
+	[InlineData(16)]
+	[InlineData(24)]
+	[InlineData(32)]
+	public void Encrypt_WithDifferentHalfValues_ProducesDifferentResults(int half)
+	{
+		// Arrange
+		const ulong x = 0x123456789ABCDEF0;
+		ulong mask = (1UL << half) - 1;
+		const ulong seed = 12345;
+		const int rounds = 6;
+
+		// Act
+		ulong result = InvokeEncrypt(x, half, mask, seed, rounds);
+
+		// Assert
+		result.ShouldBeLessThanOrEqualTo(ulong.MaxValue);
+	}
+
+	[Fact]
+	public void Encrypt_FeistelNetwork_SwapsLeftAndRightHalves()
+	{
+		// Arrange
+		const ulong x = 0x00000000FFFFFFFF;
+		const int half = 32;
+		const ulong mask = 0xFFFFFFFF;
+		const ulong seed = 12345;
+		const int rounds = 1;
+
+		// Act
+		ulong result = InvokeEncrypt(x, half, mask, seed, rounds);
+
+		// Assert
+		// Result should be different because Feistel network modifies and swaps halves
+		result.ShouldNotBe(x);
+	}
+
+	#endregion
+
+	#region BitLength Function Tests (via Reflection)
+
+#if !NET6_0_OR_GREATER
+
+	[Theory]
+	[InlineData(0UL, 0)]
+	[InlineData(1UL, 1)]
+	[InlineData(2UL, 2)]
+	[InlineData(3UL, 2)]
+	[InlineData(4UL, 3)]
+	[InlineData(7UL, 3)]
+	[InlineData(8UL, 4)]
+	[InlineData(15UL, 4)]
+	[InlineData(16UL, 5)]
+	[InlineData(255UL, 8)]
+	[InlineData(256UL, 9)]
+	[InlineData(0xFFFFFFFFUL, 32)]
+	public void BitLength_WithVariousValues_ReturnsCorrectBitCount(ulong value, int expectedBitLength)
+	{
+		// Act
+		int result = InvokeBitLength(value);
+
+		// Assert
+		result.ShouldBe(expectedBitLength);
+	}
+
+	[Fact]
+	public void BitLength_WithOne_ReturnsOne()
+	{
+		// Act
+		int result = InvokeBitLength(1UL);
+
+		// Assert
+		result.ShouldBe(1);
+	}
+
+	[Fact]
+	public void BitLength_WithZero_ReturnsZero()
+	{
+		// Act
+		int result = InvokeBitLength(0UL);
+
+		// Assert
+		result.ShouldBe(0);
+	}
+
+	[Fact]
+	public void BitLength_WithPowerOfTwo_ReturnsBitPosition()
+	{
+		// Arrange & Act
+		int result1 = InvokeBitLength(1UL); // 2^0
+		int result2 = InvokeBitLength(2UL); // 2^1
+		int result4 = InvokeBitLength(4UL); // 2^2
+		int result8 = InvokeBitLength(8UL); // 2^3
+
+		// Assert
+		result1.ShouldBe(1);
+		result2.ShouldBe(2);
+		result4.ShouldBe(3);
+		result8.ShouldBe(4);
+	}
+
+	[Fact]
+	public void BitLength_WithMaxValue_ReturnsExpectedBits()
+	{
+		// Act
+		int result = InvokeBitLength(ulong.MaxValue);
+
+		// Assert
+		result.ShouldBe(64);
+	}
+
+	[Fact]
+	public void BitLength_IncrementsWithLargerValues()
+	{
+		// Act
+		int result1 = InvokeBitLength(100UL);
+		int result2 = InvokeBitLength(1000UL);
+		int result3 = InvokeBitLength(10000UL);
+
+		// Assert
+		result1.ShouldBeLessThan(result2);
+		result2.ShouldBeLessThan(result3);
+	}
+
+#endif
+
+	#endregion
+
+	#region Helper Methods for Reflection-based Tests
+
+	/// <summary>
+	/// Invokes the private Mix method via reflection.
+	/// </summary>
+	private static ulong InvokeMix(ulong value, ulong seed, int round)
+	{
+		// Get the CommonNetFuncs.Core assembly and find the Random type
+		Assembly assembly = System.Reflection.Assembly.Load("CommonNetFuncs.Core");
+		Type? randomType = assembly.GetType("CommonNetFuncs.Core.Random");
+		randomType.ShouldNotBeNull("Could not find CommonNetFuncs.Core.Random type");
+
+		MethodInfo? method = randomType.GetMethod("Mix",
+			System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static,
+			null,
+			new[] { typeof(ulong), typeof(ulong), typeof(int) },
+			null);
+
+		method.ShouldNotBeNull("Could not find Mix method");
+		var result = method.Invoke(null, new object[] { value, seed, round });
+		result.ShouldNotBeNull();
+		return (ulong)result;
+	}
+
+	/// <summary>
+	/// Invokes the private Encrypt method via reflection.
+	/// </summary>
+	private static ulong InvokeEncrypt(ulong x, int half, ulong mask, ulong seed, int rounds)
+	{
+		// Get the CommonNetFuncs.Core assembly and find the Random type
+		Assembly assembly = System.Reflection.Assembly.Load("CommonNetFuncs.Core");
+		Type? randomType = assembly.GetType("CommonNetFuncs.Core.Random");
+		randomType.ShouldNotBeNull("Could not find CommonNetFuncs.Core.Random type");
+
+		MethodInfo? method = randomType.GetMethod("Encrypt",
+			System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static,
+			null,
+			new[] { typeof(ulong), typeof(int), typeof(ulong), typeof(ulong), typeof(int) },
+			null);
+
+		method.ShouldNotBeNull("Could not find Encrypt method");
+		var result = method.Invoke(null, new object[] { x, half, mask, seed, rounds });
+		result.ShouldNotBeNull();
+		return (ulong)result;
+	}
+
+	/// <summary>
+	/// Invokes the private BitLength method via reflection.
+	/// Only available when not NET6_0_OR_GREATER.
+	/// </summary>
+	private static int InvokeBitLength(ulong value)
+	{
+		// Get the CommonNetFuncs.Core assembly and find the Random type
+		Assembly assembly = System.Reflection.Assembly.Load("CommonNetFuncs.Core");
+		Type? randomType = assembly.GetType("CommonNetFuncs.Core.Random");
+		randomType.ShouldNotBeNull("Could not find CommonNetFuncs.Core.Random type");
+
+		MethodInfo? method = randomType.GetMethod("BitLength",
+			System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static,
+			null,
+			new[] { typeof(ulong) },
+			null);
+
+		method.ShouldNotBeNull("Could not find BitLength method");
+		var result = method.Invoke(null, new object[] { value });
+		result.ShouldNotBeNull();
+		return (int)result;
+	}
+
+	#endregion
 }
