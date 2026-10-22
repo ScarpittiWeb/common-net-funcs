@@ -76,6 +76,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Data.SqlClient" />
+		<PackageReference Include="System.Security.Cryptography.Pkcs" />
 		<PackageReference Include="MinVer">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

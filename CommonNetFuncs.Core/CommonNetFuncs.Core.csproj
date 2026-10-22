@@ -25,7 +25,7 @@
 	</PropertyGroup>
 
 	<PropertyGroup>
-		<Version>4.4.8</Version>
+		<Version>4.4.9</Version>
 		<MinVerTagPrefix>core-</MinVerTagPrefix>
 		<MinVerIgnoreHeight>true</MinVerIgnoreHeight>
 		<MinVerSkip Condition="'$(Configuration)' == 'Debug'">true</MinVerSkip>
