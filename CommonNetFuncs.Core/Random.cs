@@ -1,12 +1,15 @@
-﻿#if NET8_0_OR_GREATER
-using System.Collections.Frozen;
-#endif
+﻿using CommonNetFuncs.Core.Internal;
 using System.Security.Cryptography;
 using System.Text;
-using CommonNetFuncs.Core.Internal;
 using ZLinq;
 using ZLinq.Linq;
-using static System.Math;
+
+#if NET8_0_OR_GREATER
+
+using System.Collections.Frozen;
+using System.Numerics;
+
+#endif
 
 namespace CommonNetFuncs.Core;
 
@@ -1233,4 +1236,83 @@ public static class Random
 		return GetRandomBytes(ref bytes, quantity, new(seed.GetHashCode()));
 	}
 
+	/// <summary>Stateless, O(1) Feistel-network shuffle permutation. Maps a shuffled position index to a playlist ordinal. Bijective on [0, domain).</summary>
+	/// <param name="index">Shuffled position index.</param>
+	/// <param name="domain">Size of the domain (total number of shuffled items).</param>
+	/// <param name="seed">Seed for the permutation.</param>
+	/// <param name="rounds">Number of Feistel rounds to perform. Defaults to 6.</param>
+	/// <remarks>
+	/// Feistel network ensures a bijective mapping within the domain.
+	/// <para>Rounds = 1-2: Visibly patterned. Not suitable for much.</para>
+	/// <para>Rounds = 3: Minimum for a "random-looking" permutation(the classic Luby-Rackoff result)</para>
+	/// <para>Rounds = 4-6: Good for shuffling playlists</para>
+	/// <para>Rounds = 8+: Cryptographic-leaning, which is overkill here</para>
+	/// </remarks>
+	/// <returns>Ordinal corresponding to the shuffled position index within the domain.</returns>
+	public static long GetFeistelOrdinal(long index, long domain, long seed, int rounds = 6)
+	{
+		if (domain <= 1) return 0;
+		if ((ulong)index >= (ulong)domain) throw new ArgumentOutOfRangeException(nameof(index));
+
+		// Smallest even bit-width such that 2^bits >= domain
+#if NET6_0_OR_GREATER
+		int bits = 64 - BitOperations.LeadingZeroCount((ulong)(domain - 1));
+#else
+		int bits = BitLength((ulong)(domain - 1));
+#endif
+		if ((bits & 1) == 1) bits++;
+		int half = bits / 2;
+		ulong mask = (1UL << half) - 1;
+
+		ulong x = (ulong)index;
+		do
+		{
+			x = Encrypt(x, half, mask, (ulong)seed, rounds);
+		}
+		while (x >= (ulong)domain); // cycle-walk: expected ≤ 4 iterations
+
+		return (long)x;
+	}
+
+	private static ulong Encrypt(ulong x, int half, ulong mask, ulong seed, int rounds)
+	{
+		ulong l = x >> half;
+		ulong r = x & mask;
+
+		for (int round = 0; round < rounds; round++)
+		{
+			ulong f = Mix(r, seed, round) & mask;
+			(l, r) = (r, l ^ f);
+		}
+
+		return (l << half) | r;
+	}
+
+	// splitmix64-style mixer — fully specified so it never depends on runtime internals
+	private static ulong Mix(ulong value, ulong seed, int round)
+	{
+		unchecked
+		{
+			ulong x = value ^ (seed + (ulong)(round + 1) * 0x9E3779B97F4A7C15UL);
+			x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9UL;
+			x = (x ^ (x >> 27)) * 0x94D049BB133111EBUL;
+			return x ^ (x >> 31);
+		}
+	}
+
+#if !NET6_0_OR_GREATER
+
+	// Number of bits needed to represent value (BitLength(0) == 0, BitLength(1) == 1, BitLength(255) == 8).
+	private static int BitLength(ulong value)
+	{
+		int n = 0;
+		while (value != 0)
+		{
+			n++;
+			value >>= 1;
+		}
+		return n;
+	}
+
+#endif
 }

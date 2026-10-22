@@ -1,4 +1,5 @@
 ﻿using CommonNetFuncs.Web.Common.CachingSupportClasses;
+using System.Collections.Immutable;
 using static CommonNetFuncs.Compression.Streams;
 using static CommonNetFuncs.Web.Common.CachingSupportClasses.CacheOptionDefaults;
 
@@ -159,7 +160,7 @@ public class CacheOptionsTests
 	{
 		// Arrange
 		CacheOptions options = new();
-		var newHeaders = DefaultHeadersToCache.Add("X-Custom-Header");
+		ImmutableHashSet<string> newHeaders = DefaultHeadersToCache.Add("X-Custom-Header");
 
 		// Act
 		options.HeadersToCache = newHeaders;
@@ -173,10 +174,11 @@ public class CacheOptionsTests
 	public void CacheOptions_CanSetUseCompression()
 	{
 		// Arrange
-		CacheOptions options = new();
-
-		// Act
-		options.UseCompression = false;
+		CacheOptions options = new()
+		{
+			// Act
+			UseCompression = false
+		};
 
 		// Assert
 		options.UseCompression.ShouldBeFalse();
@@ -186,10 +188,11 @@ public class CacheOptionsTests
 	public void CacheOptions_CanSetCompressionType()
 	{
 		// Arrange
-		CacheOptions options = new();
-
-		// Act
-		options.CompressionType = ECompressionType.Brotli;
+		CacheOptions options = new()
+		{
+			// Act
+			CompressionType = ECompressionType.Brotli
+		};
 
 		// Assert
 		options.CompressionType.ShouldBe(ECompressionType.Brotli);
@@ -199,10 +202,11 @@ public class CacheOptionsTests
 	public void CacheOptions_CanSetSuppressLogs()
 	{
 		// Arrange
-		CacheOptions options = new();
-
-		// Act
-		options.SuppressLogs = false;
+		CacheOptions options = new()
+		{
+			// Act
+			SuppressLogs = false
+		};
 
 		// Assert
 		options.SuppressLogs.ShouldBeFalse();
