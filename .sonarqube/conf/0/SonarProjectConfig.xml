@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SonarProjectConfig xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.sonarsource.com/msbuild/analyzer/2021/1">
+  <AnalysisConfigPath>/home/nick/source/repos/common-net-funcs/.sonarqube/conf/SonarQubeAnalysisConfig.xml</AnalysisConfigPath>
+  <ProjectPath>/tmp/roslyn-canonical-misc/ab1cbdcb-384a-4843-bbb0-f8aa31eb728c/Canonical.csproj</ProjectPath>
+  <FilesToAnalyzePath>/home/nick/source/repos/common-net-funcs/.sonarqube/conf/0/FilesToAnalyze.txt</FilesToAnalyzePath>
+  <OutPath>/home/nick/source/repos/common-net-funcs/.sonarqube/out/0</OutPath>
+  <ProjectType>Product</ProjectType>
+  <TargetFramework>net10.0</TargetFramework>
+</SonarProjectConfig>
