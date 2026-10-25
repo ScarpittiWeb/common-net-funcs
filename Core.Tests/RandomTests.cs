@@ -2498,7 +2498,7 @@ public sealed class RandomTests
 			null);
 
 		method.ShouldNotBeNull("Could not find Mix method");
-		var result = method.Invoke(null, new object[] { value, seed, round });
+		object? result = method.Invoke(null, new object[] { value, seed, round });
 		result.ShouldNotBeNull();
 		return (ulong)result;
 	}
@@ -2520,7 +2520,7 @@ public sealed class RandomTests
 			null);
 
 		method.ShouldNotBeNull("Could not find Encrypt method");
-		var result = method.Invoke(null, new object[] { x, half, mask, seed, rounds });
+		object? result = method.Invoke(null, new object[] { x, half, mask, seed, rounds });
 		result.ShouldNotBeNull();
 		return (ulong)result;
 	}
@@ -2543,7 +2543,7 @@ public sealed class RandomTests
 			null);
 
 		method.ShouldNotBeNull("Could not find BitLength method");
-		var result = method.Invoke(null, new object[] { value });
+		object? result = method.Invoke(null, new object[] { value });
 		result.ShouldNotBeNull();
 		return (int)result;
 	}
