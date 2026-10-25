@@ -33,9 +33,9 @@ public class CoreUnitConversionBenchmarks
 	/// Benchmarks the new implementation (uses logarithmic approach)
 	/// </summary>
 	[Benchmark(Description = "New Implementation (Logarithmic)")]
-	public string[] BenchmarkNewImplementation()
+	public static string[] BenchmarkNewImplementation()
 	{
-		var results = new string[TestValues.Length];
+		string[] results = new string[TestValues.Length];
 		for (int i = 0; i < TestValues.Length; i++)
 		{
 			results[i] = TestValues[i].GetFileSizeFromBytesWithUnits();
@@ -47,9 +47,9 @@ public class CoreUnitConversionBenchmarks
 	/// Benchmarks the old implementation (nested ternary operators)
 	/// </summary>
 	[Benchmark(Description = "Old Implementation (Nested Ternary)")]
-	public string[] BenchmarkOldImplementation()
+	public static string[] BenchmarkOldImplementation()
 	{
-		var results = new string[TestValues.Length];
+		string[] results = new string[TestValues.Length];
 		for (int i = 0; i < TestValues.Length; i++)
 		{
 			results[i] = GetFileSizeFromBytesWithUnitsOldWay(TestValues[i]);
