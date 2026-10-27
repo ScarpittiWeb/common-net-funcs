@@ -1,12 +1,12 @@
-﻿using System.Linq.Expressions;
-using System.Reflection;
-using AutoFixture;
+﻿using AutoFixture;
 using CommonNetFuncs.Hangfire;
 using FakeItEasy;
 using Hangfire;
 using Hangfire.Common;
 using Hangfire.Storage;
 using Hangfire.Storage.Monitoring;
+using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Hangfire.Tests;
 
@@ -765,6 +765,177 @@ public sealed class HangfireJobHelpersTests
 
 		// Assert — GetConnection() must have been called at least once (one per parallel branch)
 		A.CallTo(() => storage.GetConnection()).MustHaveHappened();
+	}
+
+	#endregion
+
+	#region ReleaseJobLocks
+
+	[Fact]
+	public void ReleaseJobLocks_WhenJobDataIsNull_DoesNotThrow()
+	{
+		// Arrange
+		JobStorage storage = A.Fake<JobStorage>();
+		IStorageConnection connection = A.Fake<IStorageConnection>();
+		A.CallTo(() => storage.GetConnection()).Returns(connection);
+		A.CallTo(() => connection.GetJobData("job-1")).Returns(null!);
+		JobStorage.Current = storage;
+
+		// Act & Assert — should not throw
+		HangfireJobHelpers.ReleaseJobLocks("job-1");
+	}
+
+	[Fact]
+	public void ReleaseJobLocks_WhenJobIsNull_DoesNotThrow()
+	{
+		// Arrange
+		JobStorage storage = A.Fake<JobStorage>();
+		IStorageConnection connection = A.Fake<IStorageConnection>();
+		JobData jobData = new() { Job = null };
+		A.CallTo(() => storage.GetConnection()).Returns(connection);
+		A.CallTo(() => connection.GetJobData("job-1")).Returns(jobData);
+		JobStorage.Current = storage;
+
+		// Act & Assert — should not throw
+		HangfireJobHelpers.ReleaseJobLocks("job-1");
+	}
+
+	[Fact]
+	public void ReleaseJobLocks_WhenJobDataAndJobExist_AcquiresConnection()
+	{
+		// Arrange
+		JobStorage storage = A.Fake<JobStorage>();
+		IStorageConnection connection = A.Fake<IStorageConnection>();
+		Job job = CreateJob(nameof(ITestJobService.DoWork));
+		JobData jobData = new() { Job = job };
+		A.CallTo(() => storage.GetConnection()).Returns(connection);
+		A.CallTo(() => connection.GetJobData("job-1")).Returns(jobData);
+		JobStorage.Current = storage;
+
+		// Act
+		HangfireJobHelpers.ReleaseJobLocks("job-1");
+
+		// Assert
+		A.CallTo(() => storage.GetConnection()).MustHaveHappened();
+	}
+
+	[Fact]
+	public void ReleaseJobLocks_WhenJobDataAndJobExist_CallsGetJobData()
+	{
+		// Arrange
+		JobStorage storage = A.Fake<JobStorage>();
+		IStorageConnection connection = A.Fake<IStorageConnection>();
+		Job job = CreateJob(nameof(ITestJobService.DoWork));
+		JobData jobData = new() { Job = job };
+		A.CallTo(() => storage.GetConnection()).Returns(connection);
+		A.CallTo(() => connection.GetJobData("job-1")).Returns(jobData);
+		JobStorage.Current = storage;
+
+		// Act
+		HangfireJobHelpers.ReleaseJobLocks("job-1");
+
+		// Assert
+		A.CallTo(() => connection.GetJobData("job-1")).MustHaveHappened();
+	}
+
+	[Fact]
+	public void ReleaseJobLocks_WhenJobTypeHasFullName_UsesFullName()
+	{
+		// Arrange
+		JobStorage storage = A.Fake<JobStorage>();
+		IStorageConnection connection = A.Fake<IStorageConnection>();
+		Job job = CreateJob(nameof(ITestJobService.DoWork));
+		JobData jobData = new() { Job = job };
+		A.CallTo(() => storage.GetConnection()).Returns(connection);
+		A.CallTo(() => connection.GetJobData("job-1")).Returns(jobData);
+		JobStorage.Current = storage;
+
+		// Act
+		HangfireJobHelpers.ReleaseJobLocks("job-1");
+
+		// Assert — verify the method completes without error (it just logs)
+		A.CallTo(() => connection.GetJobData("job-1")).MustHaveHappened();
+	}
+
+	[Fact]
+	public void ReleaseJobLocks_WhenMultipleJobTypesExist_HandlesEachCorrectly()
+	{
+		// Arrange — test with a different job type to verify type name extraction works
+		JobStorage storage = A.Fake<JobStorage>();
+		IStorageConnection connection = A.Fake<IStorageConnection>();
+		Job job = CreateJob(nameof(ITestJobService.ProcessItem), Guid.NewGuid(), true);
+		JobData jobData = new() { Job = job };
+		A.CallTo(() => storage.GetConnection()).Returns(connection);
+		A.CallTo(() => connection.GetJobData("job-2")).Returns(jobData);
+		JobStorage.Current = storage;
+
+		// Act
+		HangfireJobHelpers.ReleaseJobLocks("job-2");
+
+		// Assert — verify the method completes without error
+		A.CallTo(() => connection.GetJobData("job-2")).MustHaveHappened();
+	}
+
+	[Fact]
+	public void ReleaseJobLocks_WhenGetJobDataThrows_CatchesException()
+	{
+		// Arrange
+		JobStorage storage = A.Fake<JobStorage>();
+		IStorageConnection connection = A.Fake<IStorageConnection>();
+		A.CallTo(() => storage.GetConnection()).Returns(connection);
+		A.CallTo(() => connection.GetJobData("job-1")).Throws<InvalidOperationException>();
+		JobStorage.Current = storage;
+
+		// Act & Assert — should not throw; exception is caught and logged
+		HangfireJobHelpers.ReleaseJobLocks("job-1");
+	}
+
+	[Fact]
+	public void ReleaseJobLocks_WhenGetConnectionThrows_CatchesException()
+	{
+		// Arrange
+		JobStorage storage = A.Fake<JobStorage>();
+		A.CallTo(() => storage.GetConnection()).Throws<InvalidOperationException>();
+		JobStorage.Current = storage;
+
+		// Act & Assert — should not throw; exception is caught and logged
+		HangfireJobHelpers.ReleaseJobLocks("job-1");
+	}
+
+	[Fact]
+	public void ReleaseJobLocks_WhenJobDataIsNull_DisposesConnection()
+	{
+		// Arrange
+		JobStorage storage = A.Fake<JobStorage>();
+		IStorageConnection connection = A.Fake<IStorageConnection>();
+		A.CallTo(() => storage.GetConnection()).Returns(connection);
+		A.CallTo(() => connection.GetJobData("job-1")).Returns(null!);
+		JobStorage.Current = storage;
+
+		// Act
+		HangfireJobHelpers.ReleaseJobLocks("job-1");
+
+		// Assert — connection should be disposed (via using statement)
+		A.CallTo(() => connection.Dispose()).MustHaveHappened();
+	}
+
+	[Fact]
+	public void ReleaseJobLocks_WhenJobDataAndJobExist_DisposesConnection()
+	{
+		// Arrange
+		JobStorage storage = A.Fake<JobStorage>();
+		IStorageConnection connection = A.Fake<IStorageConnection>();
+		Job job = CreateJob(nameof(ITestJobService.DoWork));
+		JobData jobData = new() { Job = job };
+		A.CallTo(() => storage.GetConnection()).Returns(connection);
+		A.CallTo(() => connection.GetJobData("job-1")).Returns(jobData);
+		JobStorage.Current = storage;
+
+		// Act
+		HangfireJobHelpers.ReleaseJobLocks("job-1");
+
+		// Assert — connection should be disposed (via using statement)
+		A.CallTo(() => connection.Dispose()).MustHaveHappened();
 	}
 
 	#endregion
