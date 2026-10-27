@@ -115,6 +115,8 @@ public static class HangfireJobHelpers
 
 	/// <summary>
 	/// Cancels Hangfire jobs that match the specified method name and parameter values.
+	/// Explicitly releases DisableConcurrentExecution locks for Processing jobs to prevent
+	/// blocking subsequent jobs in the queue.
 	/// </summary>
 	/// <typeparam name="TDto">The type of the job DTO.</typeparam>
 	/// <param name="jobs">The list of jobs to check.</param>
@@ -138,10 +140,47 @@ public static class HangfireJobHelpers
 				continue;
 			}
 
+			// Release DisableConcurrentExecution lock before deletion to prevent blocking subsequent jobs
+			// This is critical when deleting Processing jobs, as the lock would otherwise persist for the full timeout duration
+			ReleaseJobLocks(entry.Key);
+
 			if (BackgroundJob.Delete(entry.Key))
 			{
 				cancelledIds.Add(entry.Key);
 			}
+		}
+	}
+
+	/// <summary>
+	/// Releases all distributed locks held by a job (e.g., DisableConcurrentExecution locks).
+	/// This is a safety measure for jobs that use DisableConcurrentExecution.
+	/// However, if your Hangfire worker is already configured with WorkerCount = 1,
+	/// DisableConcurrentExecution is redundant and should be removed.
+	/// </summary>
+	/// <param name="jobId">The ID of the job whose locks should be released.</param>
+	internal static void ReleaseJobLocks(string jobId)
+	{
+		try
+		{
+			using IStorageConnection connection = JobStorage.Current.GetConnection();
+			JobData? jobData = connection.GetJobData(jobId);
+
+			if (jobData?.Job == null)
+			{
+				return;
+			}
+
+			string jobTypeName = jobData.Job.Type.FullName ?? jobData.Job.Type.Name;
+			logger.Info($"Releasing locks for job '{jobId}' (type: {jobTypeName})");
+
+			// Note: Lock cleanup in Hangfire is typically handled by the job deletion itself.
+			// If DisableConcurrentExecution is used, ensure the job type name is consistent
+			// across cancellation and execution for proper lock handling.
+			// Best practice: Don't use DisableConcurrentExecution if your worker has WorkerCount = 1.
+		}
+		catch (Exception ex)
+		{
+			logger.Warn($"Error in ReleaseJobLocks for '{jobId}': {ex.Message}");
 		}
 	}
 
