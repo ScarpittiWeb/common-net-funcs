@@ -2,11 +2,12 @@
 using System.Globalization;
 using AutoFixture;
 using CommonNetFuncs.Csv;
+using CsvHelper;
 using static Xunit.TestContext;
 
 namespace Csv.Tests;
 
-public sealed class CsvReadHelpersTests
+public sealed partial class CsvReadHelpersTests
 {
 	private readonly Fixture fixture;
 	private readonly string testFilePath;
@@ -17,7 +18,8 @@ public sealed class CsvReadHelpersTests
 		testFilePath = Path.GetTempFileName();
 	}
 
-	private sealed record TestRecord(string Name, int Age, DateTime BirthDate);
+	[CsvRecord]
+	internal sealed partial record TestRecord([CsvColumn(Index = 0)] string Name, [CsvColumn(Index = 1)] int Age, [CsvColumn(Index = 2)] DateTime BirthDate);
 
 	[Theory]
 	[InlineData(true, null)]
