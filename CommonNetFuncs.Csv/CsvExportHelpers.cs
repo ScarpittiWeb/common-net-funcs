@@ -1,10 +1,10 @@
-﻿using System.Data;
+﻿using CsvHelper;
+using System.Data;
 using System.Globalization;
 using System.Text;
-using CsvHelper;
-using static System.Convert;
 using static CommonNetFuncs.Core.ExceptionLocation;
 using static CommonNetFuncs.Core.Streams;
+using static System.Convert;
 
 namespace CommonNetFuncs.Csv;
 
@@ -24,11 +24,15 @@ public static class CsvExportHelpers
 	{
 		memoryStream ??= new();
 		await using StreamWriter streamWriter = new(memoryStream, new UTF8Encoding(false), 1024, true);
-		await using CsvWriter csvWriter = new(streamWriter, CultureInfo.InvariantCulture);
+		await using CsvWriter csvWriter = CsvWriter.Create(streamWriter, new()
+		{
+			FormatProvider = CultureInfo.InvariantCulture
+		});
+
 		try
 		{
 			await csvWriter.WriteRecordsAsync(dataList, cancellationToken).ConfigureAwait(false);
-			await csvWriter.FlushAsync().ConfigureAwait(false);
+			await csvWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{

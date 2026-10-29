@@ -1,9 +1,9 @@
-﻿using System.Data;
+﻿using CsvHelper;
+using System.Data;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
-using CsvHelper;
 using static CommonNetFuncs.Core.ReflectionCaches;
 
 namespace CommonNetFuncs.Csv;
@@ -57,15 +57,16 @@ public static class CsvReadHelpers
 	/// <returns><see cref="IEnumerable{T}"/> of TObj read from the CSV <see cref="StreamReader"/></returns>
 	private static IEnumerable<T> ReadCsv<T>(StreamReader reader, bool hasHeaders, CultureInfo? cultureInfo, int bufferSize)
 	{
-		using CsvReader csv = new(reader, new CsvHelper.Configuration.CsvConfiguration(cultureInfo ?? CultureInfo.InvariantCulture)
+		using CsvReader csvReader = CsvReader.Create(reader, new()
 		{
-			HasHeaderRecord = hasHeaders,
-			BufferSize = bufferSize
+			HasHeader = hasHeaders,
+			BufferSize = bufferSize,
+			FormatProvider = cultureInfo ?? CultureInfo.InvariantCulture
 		});
 
-		foreach (T item in csv.GetRecords<T>())
+		while (csvReader.Read())
 		{
-			yield return item;
+			yield return csvReader.GetRecord<T>();
 		}
 	}
 
@@ -160,15 +161,16 @@ public static class CsvReadHelpers
 	/// <returns><see cref="IAsyncEnumerable{T}"/> containing the values read from the CSV in the <see cref="StreamReader"/>.</returns>
 	private static async IAsyncEnumerable<T> ReadCsvAsyncEnumerable<T>(StreamReader reader, bool hasHeaders, CultureInfo? cultureInfo, int bufferSize = 4096, [EnumeratorCancellation] CancellationToken cancellationToken = default)
 	{
-		using CsvReader csv = new(reader, new CsvHelper.Configuration.CsvConfiguration(cultureInfo ?? CultureInfo.InvariantCulture)
+		using CsvReader csvReader = CsvReader.Create(reader, new()
 		{
-			HasHeaderRecord = hasHeaders,
-			BufferSize = bufferSize
+			HasHeader = hasHeaders,
+			BufferSize = bufferSize,
+			FormatProvider = cultureInfo ?? CultureInfo.InvariantCulture
 		});
 
-		await foreach (T record in csv.GetRecordsAsync<T>(cancellationToken).ConfigureAwait(false))
+		while (await csvReader.ReadAsync(cancellationToken).ConfigureAwait(false))
 		{
-			yield return record;
+			yield return csvReader.GetRecord<T>();
 		}
 	}
 
@@ -241,10 +243,11 @@ public static class CsvReadHelpers
 	/// <returns><see cref="DataTable"/> populated by the values in the CSV <see cref="StreamReader"/>.</returns>
 	private static DataTable ReadCsvToDataTable(StreamReader reader, bool hasHeaders, Type? dataType, CultureInfo? cultureInfo, int bufferSize)
 	{
-		using CsvReader csv = new(reader, new CsvHelper.Configuration.CsvConfiguration(cultureInfo ?? CultureInfo.InvariantCulture)
+		using CsvReader csvReader = CsvReader.Create(reader, new()
 		{
-			HasHeaderRecord = hasHeaders,
-			BufferSize = bufferSize
+			HasHeader = hasHeaders,
+			BufferSize = bufferSize,
+			FormatProvider = cultureInfo ?? CultureInfo.InvariantCulture
 		});
 
 		DataTable dataTable = new();
@@ -255,7 +258,7 @@ public static class CsvReadHelpers
 				dataTable.Columns.Add(prop.Name, prop.PropertyType);
 			}
 		}
-		using CsvDataReader dataReader = new(csv);
+		using CsvDataReader dataReader = new(csvReader);
 		dataTable.Load(dataReader);
 
 		return dataTable;

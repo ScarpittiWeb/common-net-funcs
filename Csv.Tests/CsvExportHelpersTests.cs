@@ -1,12 +1,13 @@
-﻿using System.Data;
-using System.Globalization;
-using AutoFixture;
+﻿using AutoFixture;
 using CommonNetFuncs.Csv;
+using CsvHelper;
+using System.Data;
+using System.Globalization;
 using static Xunit.TestContext;
 
 namespace Csv.Tests;
 
-public sealed class CsvExportHelpersTests
+public sealed partial class CsvExportHelpersTests
 {
 	private readonly Fixture fixture;
 
@@ -15,7 +16,8 @@ public sealed class CsvExportHelpersTests
 		fixture = new Fixture();
 	}
 
-	private sealed record TestRecord(string Name, int Age, DateTime BirthDate);
+	[CsvRecord]
+	internal sealed partial record TestRecord(string Name, int Age, DateTime BirthDate);
 
 	[Fact]
 	public async Task ExportListToCsv_Generic_WithValidData_ShouldCreateValidCsvContent()
@@ -43,7 +45,7 @@ public sealed class CsvExportHelpersTests
 		{
 			csvContent.ShouldContain(record.Name);
 			csvContent.ShouldContain(record.Age.ToString());
-			csvContent.ShouldContain(record.BirthDate.ToString(CultureInfo.InvariantCulture));
+			csvContent.ShouldContain(record.BirthDate.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture));
 		}
 	}
 
