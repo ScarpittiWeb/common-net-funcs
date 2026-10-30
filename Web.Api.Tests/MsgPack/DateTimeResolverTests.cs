@@ -222,6 +222,122 @@ public sealed class DateOnlyAsStringFormatterTests
 		result.ShouldBe(original);
 	}
 
+	[Theory]
+	[InlineData("2026-04-14T00:00:00.000Z")]
+	[InlineData("2026-04-14T13:45:10.1234567Z")]
+	[InlineData("2026-04-14T08:00:00")]
+	[InlineData("2026-04-14")]
+	public void Deserialize_AcceptsDateAndIsoDateTimeStrings(string raw)
+	{
+		byte[] bytes = MessagePackSerializer.Serialize(raw, MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		DateOnly result = MessagePackSerializer.Deserialize<DateOnly>(bytes, Options, Current.CancellationToken);
+		result.ShouldBe(new DateOnly(2026, 4, 14));
+	}
+
+	[Theory]
+	[InlineData("2026-04-14T23:30:00-05:00")]
+	[InlineData("2026-04-14T00:30:00+09:00")]
+	[InlineData("2026-04-14 08:00:00")]
+	[InlineData("  2026-04-14  ")]
+	[InlineData("2026-4-14")]
+	[InlineData("04-14-2026")]
+	[InlineData("14-04-2026")]
+	[InlineData("04-14-26")]
+	[InlineData("2026/04/14")]
+	[InlineData("2026/4/14")]
+	[InlineData("04/14/2026")]
+	[InlineData("4/14/2026")]
+	[InlineData("14/04/2026")]
+	[InlineData("14/4/2026")]
+	[InlineData("04/14/26")]
+	[InlineData("4/14/26")]
+	[InlineData("14/04/26")]
+	[InlineData("2026.04.14")]
+	[InlineData("14.04.2026")]
+	[InlineData("14.4.2026")]
+	[InlineData("14.04.26")]
+	[InlineData("20260414")]
+	[InlineData("04142026")]
+	[InlineData("14042026")]
+	[InlineData("260414")]
+	[InlineData("2026-W16-2")]
+	[InlineData("2026W162")]
+	[InlineData("2026-104")]
+	[InlineData("2026104")]
+	[InlineData("April 14, 2026")]
+	[InlineData("Apr 14 2026")]
+	[InlineData("14 April 2026")]
+	[InlineData("14-Apr-2026")]
+	[InlineData("Tuesday, April 14, 2026")]
+	[InlineData("Tue, 14 Apr 2026 00:00:00 GMT")]
+	[InlineData("Tue Apr 14 2026 08:00:00 GMT-0500 (Central Daylight Time)")]
+	public void Deserialize_AcceptsAdditionalFormats(string raw)
+	{
+		byte[] bytes = MessagePackSerializer.Serialize(raw, MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		DateOnly result = MessagePackSerializer.Deserialize<DateOnly>(bytes, Options, Current.CancellationToken);
+		result.ShouldBe(new DateOnly(2026, 4, 14));
+	}
+
+	[Theory]
+	[InlineData("2026-W16", 2026, 4, 13)]
+	[InlineData("2026W01", 2025, 12, 29)]
+	[InlineData("2024-366", 2024, 12, 31)]
+	[InlineData("02/29/2024", 2024, 2, 29)]
+	public void Deserialize_IsoWeekOrdinalAndLeapYearEdgeCases(string raw, int year, int month, int day)
+	{
+		byte[] bytes = MessagePackSerializer.Serialize(raw, MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		DateOnly result = MessagePackSerializer.Deserialize<DateOnly>(bytes, Options, Current.CancellationToken);
+		result.ShouldBe(new DateOnly(year, month, day));
+	}
+
+	[Theory]
+	[InlineData("")]
+	[InlineData("not a date")]
+	[InlineData("2026-13-01")]
+	[InlineData("2026-02-30")]
+	[InlineData("2025-366")]
+	[InlineData("2026-W54-1")]
+	public void Deserialize_InvalidString_Throws(string raw)
+	{
+		byte[] bytes = MessagePackSerializer.Serialize(raw, MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		Should.Throw<MessagePackSerializationException>(() => MessagePackSerializer.Deserialize<DateOnly>(bytes, Options, Current.CancellationToken));
+	}
+
+	[Fact]
+	public void Deserialize_OverlyLongString_Throws()
+	{
+		byte[] bytes = MessagePackSerializer.Serialize(new string('1', 200), MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		Should.Throw<MessagePackSerializationException>(() => MessagePackSerializer.Deserialize<DateOnly>(bytes, Options, Current.CancellationToken));
+	}
+
+	[Fact]
+	public void Deserialize_AcceptsMessagePackTimestampExtension()
+	{
+		DateTime original = new(2026, 4, 14, 23, 0, 0, DateTimeKind.Utc);
+		byte[] bytes = MessagePackSerializer.Serialize(original, MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		DateOnly result = MessagePackSerializer.Deserialize<DateOnly>(bytes, Options, Current.CancellationToken);
+		result.ShouldBe(new DateOnly(2026, 4, 14));
+	}
+
+	[Fact]
+	public void Deserialize_AcceptsIntegerDayNumber()
+	{
+		DateOnly original = new(2026, 4, 14);
+		byte[] bytes = MessagePackSerializer.Serialize(original.DayNumber, MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		DateOnly result = MessagePackSerializer.Deserialize<DateOnly>(bytes, Options, Current.CancellationToken);
+		result.ShouldBe(original);
+	}
+
+	[Theory]
+	[InlineData("2026-04-14T00:00:00.000Z")]
+	[InlineData(null)]
+	public void Deserialize_NullableDateOnly_UsesStringFormatter(string? raw)
+	{
+		byte[] bytes = MessagePackSerializer.Serialize(raw, MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		DateOnly? result = MessagePackSerializer.Deserialize<DateOnly?>(bytes, Options, Current.CancellationToken);
+		result.ShouldBe(raw is null ? null : new DateOnly(2026, 4, 14));
+	}
+
 	[Fact]
 	public void Instance_IsSingleton()
 	{
