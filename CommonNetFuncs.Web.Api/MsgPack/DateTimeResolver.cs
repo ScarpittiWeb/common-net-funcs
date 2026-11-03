@@ -1,9 +1,12 @@
-﻿using System.Globalization;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using MessagePack;
+﻿using MessagePack;
 using MessagePack.Formatters;
 using MessagePack.Resolvers;
+using System.Buffers;
+using System.Globalization;
+using System.Numerics;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace CommonNetFuncs.Web.Api.MsgPack;
 
@@ -103,10 +106,226 @@ public sealed class DateOnlyAsStringFormatter : IMessagePackFormatter<DateOnly>
 		writer.Write(value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
 	}
 
+	// Longest realistic input is a JS Date.toString() value (~80 chars); anything longer is rejected up front.
+	private const int MaxInputLength = 128;
+
+	// "M"/"d" accept 1-2 digits and "yyyy"/"yy" require exactly 4/2 in ParseExact, so these cover zero-padded and unpadded variants.
+	// Ambiguous numeric dates resolve month-first for '-' and '/', and day-first for '.' (the conventional usage of each separator).
+	private static readonly string[] DashFormats = ["yyyy-M-d", "M-d-yyyy", "d-M-yyyy", "M-d-yy", "d-M-yy"];
+	private static readonly string[] SlashFormats = ["yyyy/M/d", "M/d/yyyy", "d/M/yyyy", "M/d/yy", "d/M/yy"];
+	private static readonly string[] DotFormats = ["yyyy.M.d", "d.M.yyyy", "M.d.yyyy", "d.M.yy", "M.d.yy"];
+	private static readonly string[] CompactFormats8 = ["yyyyMMdd", "MMddyyyy", "ddMMyyyy"];
+	private static readonly string[] CompactFormats6 = ["yyMMdd", "MMddyy", "ddMMyy"];
+
+	private static readonly SearchValues<char> DashChars = SearchValues.Create("0123456789-");
+	private static readonly SearchValues<char> SlashChars = SearchValues.Create("0123456789/");
+	private static readonly SearchValues<char> DotChars = SearchValues.Create("0123456789.");
+
+	/// <summary>
+	/// Accepts:
+	/// <list type="bullet">
+	/// <item>The integer <see cref="DateOnly.DayNumber"/> encoding written by the standard MessagePack <see cref="DateOnlyFormatter"/>.</item>
+	/// <item>The MessagePack Timestamp extension (ext -1), e.g. a JS <c>Date</c> encoded by @msgpack/msgpack (UTC date is used).</item>
+	/// <item>ISO 8601 calendar dates / date-times (e.g. JS <c>Date.toISOString()</c>); the literal date part is kept as-is, regardless of any offset.</item>
+	/// <item>ISO 8601 week dates (yyyy-Www-d, yyyyWwwd, yyyy-Www, yyyyWww) and ordinal dates (yyyy-ddd, yyyyddd).</item>
+	/// <item>Numeric dates separated by '-', '/' or '.', with 1-2 digit month/day and 2 or 4 digit years, plus compact yyyyMMdd / yyMMdd variants.</item>
+	/// <item>Anything else <see cref="DateTimeOffset.TryParse(ReadOnlySpan{char}, IFormatProvider?, DateTimeStyles, out DateTimeOffset)"/> understands
+	/// with the invariant culture (month names, RFC 1123 / JS <c>Date.toUTCString()</c>, JS <c>Date.toString()</c>, etc.).</item>
+	/// </list>
+	/// </summary>
 	public DateOnly Deserialize(ref MessagePackReader reader, MessagePackSerializerOptions options)
 	{
-		return DateOnly.Parse(reader.ReadString()!, CultureInfo.InvariantCulture);
+		switch (reader.NextMessagePackType)
+		{
+			case MessagePackType.Integer:
+				return DateOnly.FromDayNumber(reader.ReadInt32());
+			case MessagePackType.Extension:
+				return DateOnly.FromDateTime(reader.ReadDateTime());
+		}
+
+		if (!reader.TryReadStringSpan(out ReadOnlySpan<byte> utf8))
+		{
+			// Nil or a string split across buffer segments (rare)
+			string value = reader.ReadString() ?? throw new MessagePackSerializationException("Cannot deserialize nil as DateOnly.");
+			return value.Length <= MaxInputLength ? ParseChars(value) : throw CreateFormatException();
+		}
+
+		if (TryParseIsoDatePrefix(utf8, out DateOnly result))
+		{
+			return result;
+		}
+
+		if (utf8.Length > MaxInputLength)
+		{
+			throw CreateFormatException();
+		}
+
+		Span<char> chars = stackalloc char[MaxInputLength];
+		int written = Encoding.UTF8.GetChars(utf8, chars);
+		return ParseChars(chars[..written]);
 	}
+
+	private static DateOnly ParseChars(ReadOnlySpan<char> value)
+	{
+		value = value.Trim();
+
+		if (TryParseIsoDatePrefix(value, out DateOnly result) || TryParseNumeric(value, out result) || TryParseIsoWeekOrOrdinal(value, out result))
+		{
+			return result;
+		}
+
+		// .NET can't parse JS Date.toString()'s " GMT-0500 (Eastern Standard Time)" suffix, and only the literal date is needed anyway
+		int zoneIndex = value.IndexOf(" GMT", StringComparison.OrdinalIgnoreCase);
+		if (zoneIndex > 0)
+		{
+			value = value[..zoneIndex];
+		}
+
+		// DateTimeOffset keeps the literal clock time (no conversion to server local time), so the date part is preserved.
+		if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeUniversal, out DateTimeOffset dateTimeOffset))
+		{
+			return DateOnly.FromDateTime(dateTimeOffset.DateTime);
+		}
+
+		throw CreateFormatException();
+	}
+
+	/// <summary>yyyy-MM-dd, optionally followed by a time component starting with 'T' or a space.</summary>
+	private static bool TryParseIsoDatePrefix<T>(ReadOnlySpan<T> value, out DateOnly result) where T : unmanaged, IBinaryInteger<T>
+	{
+		if (value.Length >= 10 && IsChar(value[4], '-') && IsChar(value[7], '-')
+			&& (value.Length == 10 || IsChar(value[10], 'T') || IsChar(value[10], 't') || IsChar(value[10], ' '))
+			&& TryParseDigits(value[..4], out int year) && TryParseDigits(value.Slice(5, 2), out int month) && TryParseDigits(value.Slice(8, 2), out int day))
+		{
+			return TryCreateDate(year, month, day, out result);
+		}
+
+		result = default;
+		return false;
+	}
+
+	private static bool TryParseNumeric(ReadOnlySpan<char> value, out DateOnly result)
+	{
+		int separatorIndex = value.IndexOfAnyExceptInRange('0', '9');
+		string[]? formats;
+		if (separatorIndex < 0)
+		{
+			formats = value.Length switch
+			{
+				8 => CompactFormats8,
+				6 => CompactFormats6,
+				_ => null,
+			};
+		}
+		else
+		{
+			(formats, SearchValues<char>? allowed) = value[separatorIndex] switch
+			{
+				'-' => (DashFormats, DashChars),
+				'/' => (SlashFormats, SlashChars),
+				'.' => (DotFormats, DotChars),
+				_ => (null, null),
+			};
+
+			// Leave anything with letters, times, offsets or mixed separators to the more lenient parsers
+			if (allowed is not null && value.ContainsAnyExcept(allowed))
+			{
+				formats = null;
+			}
+		}
+
+		if (formats is not null)
+		{
+			return DateOnly.TryParseExact(value, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out result);
+		}
+
+		result = default;
+		return false;
+	}
+
+	/// <summary>ISO 8601 week dates (yyyy-Www-d, yyyyWwwd, yyyy-Www, yyyyWww) and ordinal dates (yyyy-ddd, yyyyddd).</summary>
+	private static bool TryParseIsoWeekOrOrdinal(ReadOnlySpan<char> value, out DateOnly result)
+	{
+		result = default;
+		if (value.Length is < 7 or > 10 || !TryParseDigits(value[..4], out int year) || year is < 1 or > 9999)
+		{
+			return false;
+		}
+
+		ReadOnlySpan<char> rest = value[4..];
+		bool extended = rest[0] == '-';
+		if (extended)
+		{
+			rest = rest[1..];
+		}
+
+		if (rest[0] is 'W' or 'w')
+		{
+			int dayOfWeek = 1;
+			bool valid = rest.Length switch
+			{
+				3 => true,
+				4 => !extended && TryParseDigits(rest[3..], out dayOfWeek),
+				5 => extended && rest[3] == '-' && TryParseDigits(rest[4..], out dayOfWeek),
+				_ => false,
+			};
+
+			if (!valid || !TryParseDigits(rest.Slice(1, 2), out int week) || week < 1 || week > ISOWeek.GetWeeksInYear(year) || dayOfWeek is < 1 or > 7)
+			{
+				return false;
+			}
+
+			// The first/last ISO weeks of year 1/9999 can spill outside the DateOnly range
+			DateTime start = ISOWeek.GetYearStart(year);
+			long dayNumber = (start.Ticks / TimeSpan.TicksPerDay) + ((week - 1) * 7L) + (dayOfWeek - 1);
+			if (dayNumber < DateOnly.MinValue.DayNumber || dayNumber > DateOnly.MaxValue.DayNumber)
+			{
+				return false;
+			}
+
+			result = DateOnly.FromDayNumber((int)dayNumber);
+			return true;
+		}
+
+		if (rest.Length == 3 && TryParseDigits(rest, out int dayOfYear) && dayOfYear >= 1 && dayOfYear <= (DateTime.IsLeapYear(year) ? 366 : 365))
+		{
+			result = DateOnly.FromDayNumber(new DateOnly(year, 1, 1).DayNumber + dayOfYear - 1);
+			return true;
+		}
+
+		return false;
+	}
+
+	private static bool TryCreateDate(int year, int month, int day, out DateOnly result)
+	{
+		if (year is >= 1 and <= 9999 && month is >= 1 and <= 12 && day >= 1 && day <= DateTime.DaysInMonth(year, month))
+		{
+			result = new DateOnly(year, month, day);
+			return true;
+		}
+
+		result = default;
+		return false;
+	}
+
+	private static bool TryParseDigits<T>(ReadOnlySpan<T> digits, out int value) where T : unmanaged, IBinaryInteger<T>
+	{
+		value = 0;
+		foreach (T c in digits)
+		{
+			uint digit = uint.CreateTruncating(c) - '0';
+			if (digit > 9)
+			{
+				return false;
+			}
+			value = (value * 10) + (int)digit;
+		}
+		return true;
+	}
+
+	private static bool IsChar<T>(T value, char expected) where T : unmanaged, IBinaryInteger<T> => uint.CreateTruncating(value) == expected;
+
+	private static FormatException CreateFormatException() => new("The string was not recognized as a valid DateOnly.");
 }
 
 public sealed class DateTimeStringResolver : IFormatterResolver
