@@ -1,11 +1,11 @@
-﻿using CommonNetFuncs.Core;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.Extensions.DependencyInjection;
-using System.Linq.Dynamic.Core;
+﻿using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using CommonNetFuncs.Core;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Extensions.DependencyInjection;
 using Z.EntityFramework.Plus;
 using static CommonNetFuncs.Core.ExceptionLocation;
 
@@ -53,7 +53,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 			IEntityType? entityType = context.Model.FindEntityType(typeof(TEntity));
 			IKey? primaryKeyMetadata = entityType?.FindPrimaryKey();
 
-			if (primaryKeyMetadata != null && primaryKeyMetadata.Properties.Count > 1)
+			if (primaryKeyMetadata?.Properties.Count > 1)
 			{
 				// Entity has a compound primary key
 				// Check if the primaryKey object is an anonymous type with properties
