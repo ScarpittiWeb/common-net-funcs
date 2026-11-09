@@ -2,6 +2,7 @@
 using CommonNetFuncs.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using static CommonNetFuncs.Core.Collections;
 using static CommonNetFuncs.Core.ExceptionLocation;
 
 namespace CommonNetFuncs.EFCore;
@@ -12,7 +13,7 @@ public partial class BaseDbContextActions<TEntity, TContext> : IBaseDbContextAct
 	{
 		if (globalFilterOptions?.DisableAllFilters == true || (globalFilterOptions?.FilterNamesToDisable.AnyFast() ?? false))
 		{
-			return (globalFilterOptions.FilterNamesToDisable?.Length > 0)
+			return (globalFilterOptions?.FilterNamesToDisable?.Length > 0)
 				? query.IgnoreQueryFilters(globalFilterOptions.FilterNamesToDisable)
 				: query.IgnoreQueryFilters();
 		}
