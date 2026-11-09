@@ -1,11 +1,11 @@
-﻿using System.Buffers;
+﻿using Amazon.S3;
+using Amazon.S3.Model;
+using NLog;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Net;
-using Amazon.S3;
-using Amazon.S3.Model;
-using NLog;
 using ZLinq;
 using static Amazon.S3.Util.AmazonS3Util;
 using static CommonNetFuncs.Compression.Streams;
@@ -656,10 +656,7 @@ public static class AwsS3HelpersStatic
 			}
 			else
 			{
-				logger.Debug(awsEx, UnableToGetFileTemplate, fileName.UrlEncodeReadable(cancellationToken: cancellationToken),
-					bucketName.UrlEncodeReadable(cancellationToken: cancellationToken), awsEx.GetLocationOfException());
-
-				logger.Warn(UnableToGetFileTemplate, fileName.UrlEncodeReadable(cancellationToken: cancellationToken),
+				logger.Warn(awsEx, UnableToGetFileTemplate, fileName.UrlEncodeReadable(cancellationToken: cancellationToken),
 					bucketName.UrlEncodeReadable(cancellationToken: cancellationToken), awsEx.GetLocationOfException());
 			}
 		}
@@ -753,10 +750,7 @@ public static class AwsS3HelpersStatic
 			}
 			else
 			{
-				logger.Debug(awsEx, UnableToGetFileTemplate, fileName.UrlEncodeReadable(cancellationToken: cancellationToken),
-					bucketName.UrlEncodeReadable(cancellationToken: cancellationToken), awsEx.GetLocationOfException());
-
-				logger.Warn(UnableToGetFileTemplate, fileName.UrlEncodeReadable(cancellationToken: cancellationToken),
+				logger.Warn(awsEx, UnableToGetFileTemplate, fileName.UrlEncodeReadable(cancellationToken: cancellationToken),
 					bucketName.UrlEncodeReadable(cancellationToken: cancellationToken), awsEx.GetLocationOfException());
 			}
 		}
@@ -1026,8 +1020,7 @@ public static class AwsS3HelpersStatic
 			}
 			else
 			{
-				logger.Debug(awsEx, "Unable to get URL for {FileName} from {BucketName}", fileName.UrlEncodeReadable(), bucketName.UrlEncodeReadable());
-				logger.Warn("Unable to get URL for {FileName} from {BucketName}", fileName.UrlEncodeReadable(), bucketName.UrlEncodeReadable());
+				logger.Warn(awsEx, "Unable to get URL for {FileName} from {BucketName}", fileName.UrlEncodeReadable(), bucketName.UrlEncodeReadable());
 			}
 		}
 		catch (Exception ex)
