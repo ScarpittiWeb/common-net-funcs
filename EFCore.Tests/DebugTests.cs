@@ -235,7 +235,7 @@ public sealed class DebugTests
 		FormattableString sql = $"""
 			SELECT * FROM "Entities" WHERE ({nul}::text IS NULL OR "Name" LIKE ANY(ARRAY[{ids}])) AND ({d}::text IS NULL) AND ({n}::text IS NULL OR "Value" = {n}) AND "Name" = ANY(ARRAY[{names.ToArray()}]) AND "Id" = {Microsoft.EntityFrameworkCore.EntityState.Added} AND {empty} = {f} AND x = ANY(ARRAY[{emptyArr}]) AND y = ANY(ARRAY[{weird.ToArray()}]) AND {multi} = 1 AND {d} BETWEEN {d} AND {d}
 			""";
-		string result = context.Entities.FromSqlInterpolated(sql).AsNoTracking().RenderQueryAsScript(SqlDialect.PostgreSql);
+		string result = context.Entities.FromSql(sql).AsNoTracking().RenderQueryAsScript(SqlDialect.PostgreSql);
 
 		result[result.IndexOf("-- ==== Command ====", StringComparison.Ordinal)..].ShouldNotContain("@p");
 		result.ShouldContain("ARRAY['it''s', 'a,b', '100%']");

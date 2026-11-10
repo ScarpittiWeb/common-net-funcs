@@ -25,6 +25,7 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<RootNamespace>CommonNetFuncs.SubsetModelBinder</RootNamespace>
 		<Configurations>Debug;Release;ReducedBuild;no-tests</Configurations>
+		<Features>runtime-async=on</Features>
 	</PropertyGroup>
 
 	<PropertyGroup>

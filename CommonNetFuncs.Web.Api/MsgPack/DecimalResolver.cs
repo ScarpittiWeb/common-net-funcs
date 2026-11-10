@@ -22,7 +22,7 @@ public sealed class DecimalFormatter : IMessagePackFormatter<decimal>
 		MessagePackType type = reader.NextMessagePackType;
 		if (type == MessagePackType.Float)
 		{
-			return (decimal)reader.ReadDouble();
+			return DoubleToDecimal(reader.ReadDouble());
 		}
 
 		if (type == MessagePackType.Integer)
@@ -31,6 +31,10 @@ public sealed class DecimalFormatter : IMessagePackFormatter<decimal>
 		}
 		return decimal.Parse(reader.ReadString()!, CultureInfo.InvariantCulture);
 	}
+
+	// .NET 11 made (decimal)double exact (2.71 -> 2.7099999999999999644728632120m); parse the shortest round-trip text instead to match what the client sent.
+	internal static decimal DoubleToDecimal(double value) =>
+		decimal.Parse(value.ToString("R", CultureInfo.InvariantCulture), NumberStyles.Float, CultureInfo.InvariantCulture);
 }
 
 /// <summary>
@@ -59,7 +63,7 @@ public sealed class NullableDecimalFormatter : IMessagePackFormatter<decimal?>
 		MessagePackType type = reader.NextMessagePackType;
 		if (type == MessagePackType.Float)
 		{
-			return (decimal?)reader.ReadDouble();
+			return DecimalFormatter.DoubleToDecimal(reader.ReadDouble());
 		}
 
 		if (type == MessagePackType.Integer)

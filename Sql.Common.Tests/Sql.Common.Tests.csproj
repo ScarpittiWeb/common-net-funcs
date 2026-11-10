@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net10.0;net8.0</TargetFrameworks>
+		<TargetFrameworks>net11.0;net8.0</TargetFrameworks>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<IsPackable>false</IsPackable>
@@ -9,7 +9,7 @@
 	</PropertyGroup>
 
 	<!-- net8.0 leg exercises the netstandard2.1 build of CommonNetFuncs.Sql.Common on a real runtime -->
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net11.0'">
 		<DefineConstants>$(DefineConstants);CORE_NATIVE_BUILD</DefineConstants>
 	</PropertyGroup>
 
@@ -36,8 +36,8 @@
 	<ItemGroup>
 		<ProjectReference Include="..\CommonNetFuncs.Sql.Common\CommonNetFuncs.Sql.Common.csproj" />
 		<ProjectReference Include="..\CommonNetFuncs.Sql.SqlServer\CommonNetFuncs.Sql.SqlServer.csproj" />
-		<!-- CommonNetFuncs.Sql.PostgreSql only targets net10.0, so it can only be referenced from the net10.0 leg of this test project -->
-		<ProjectReference Include="..\CommonNetFuncs.Sql.PostgreSql\CommonNetFuncs.Sql.PostgreSql.csproj" Condition="'$(TargetFramework)' == 'net10.0'" />
+		<!-- CommonNetFuncs.Sql.PostgreSql only targets net11.0, so it can only be referenced from the net10.0 leg of this test project -->
+		<ProjectReference Include="..\CommonNetFuncs.Sql.PostgreSql\CommonNetFuncs.Sql.PostgreSql.csproj" Condition="'$(TargetFramework)' == 'net11.0'" />
 	</ItemGroup>
 
 	<ItemGroup>

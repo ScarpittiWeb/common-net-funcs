@@ -1,8 +1,8 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.IO.Compression;
-using AutoFixture.Xunit3;
+﻿using AutoFixture.Xunit3;
 using CommonNetFuncs.Email;
 using MimeKit;
+using System.ComponentModel.DataAnnotations;
+using System.IO.Compression;
 using static CommonNetFuncs.Compression.Streams;
 using static CommonNetFuncs.Email.Email;
 using static Xunit.TestContext;
@@ -543,8 +543,11 @@ public sealed class EmailTests
 		MailAttachmentBytes attachment = new("test.txt", (Stream?)null);
 
 		// Assert
+		// .NET 11 GZipStream writes a valid empty gzip frame even when nothing is written, so check the decompressed content rather than the compressed length
 		attachment.AttachmentBytes.ShouldNotBeNull();
-		attachment.AttachmentBytes.Length.ShouldBe(0);
+		using Stream? stream = attachment.GetStream();
+		stream.ShouldNotBeNull();
+		stream.Length.ShouldBe(0);
 	}
 
 	#endregion
@@ -558,9 +561,9 @@ public sealed class EmailTests
 		BodyBuilder bodyBuilder = new();
 		IMailAttachment[] attachments = new IMailAttachment[]
 		{
-						new MailAttachment("test1.txt", new MemoryStream(new byte[] { 1, 2, 3 })),
-						new MailAttachmentBytes("test2.txt", new byte[] { 4, 5, 6 }),
-						new MailAttachment("test3.txt", new MemoryStream(new byte[] { 7, 8, 9 }))
+			new MailAttachment("test1.txt", new MemoryStream(new byte[] { 1, 2, 3 })),
+			new MailAttachmentBytes("test2.txt", new byte[] { 4, 5, 6 }),
+			new MailAttachment("test3.txt", new MemoryStream(new byte[] { 7, 8, 9 }))
 		};
 
 		// Act
@@ -580,8 +583,8 @@ public sealed class EmailTests
 		BodyBuilder bodyBuilder = new();
 		IMailAttachment[] attachments = new IMailAttachment[]
 		{
-						new MailAttachment("test1.txt", new MemoryStream(new byte[] { 1, 2, 3 })),
-						new MailAttachmentBytes("test2.txt", new byte[] { 4, 5, 6 })
+			new MailAttachment("test1.txt", new MemoryStream(new byte[] { 1, 2, 3 })),
+			new MailAttachmentBytes("test2.txt", new byte[] { 4, 5, 6 })
 		};
 
 		// Act
@@ -599,8 +602,8 @@ public sealed class EmailTests
 		BodyBuilder bodyBuilder = new();
 		IMailAttachment[] attachments = new IMailAttachment[]
 		{
-						new MailAttachmentBytes("test1.txt", new byte[] { 1, 2, 3 }),
-						new MailAttachmentBytes("test2.txt", new byte[] { 4, 5, 6 })
+			new MailAttachmentBytes("test1.txt", new byte[] { 1, 2, 3 }),
+			new MailAttachmentBytes("test2.txt", new byte[] { 4, 5, 6 })
 		};
 
 		// Act

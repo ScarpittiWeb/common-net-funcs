@@ -26,6 +26,7 @@
 		<PackageTags>dotnet;helpers;generator;model;binding;source generator;model binding;mvc</PackageTags>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<Configurations>Debug;Release;ReducedBuild;no-tests</Configurations>
+		<Features>runtime-async=on</Features>
 	</PropertyGroup>
 
 	<PropertyGroup>

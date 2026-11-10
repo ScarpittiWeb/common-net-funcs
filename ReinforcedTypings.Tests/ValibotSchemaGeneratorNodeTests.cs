@@ -67,7 +67,7 @@ public sealed class ValibotSchemaGeneratorNodeTests
 	public void FindProjectDirectory_CsprojPresentInAncestor_ReturnsThatAncestor()
 	{
 		string root = CreateTempDir();
-		string nested = Path.Combine(root, "bin", "Debug", "net10.0");
+		string nested = Path.Combine(root, "bin", "Debug", "net11.0");
 		Directory.CreateDirectory(nested);
 		File.WriteAllText(Path.Combine(root, "SomeProject.csproj"), "<Project />");
 

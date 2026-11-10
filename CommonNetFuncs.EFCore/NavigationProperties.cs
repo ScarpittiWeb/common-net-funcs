@@ -13,7 +13,6 @@ using static CommonNetFuncs.Core.Strings;
 
 namespace CommonNetFuncs.EFCore;
 
-
 /// <summary>
 /// Optional configurations for methods in the NavigationProperties class.
 /// </summary>

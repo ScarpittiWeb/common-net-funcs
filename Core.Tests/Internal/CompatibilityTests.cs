@@ -203,7 +203,7 @@ public sealed class MathCompatTests
 	[InlineData(1.0, 0, 1.0)]
 	public void Round_Decimal_TruncatesTowardZero(double value, int digits, double expected)
 	{
-		MathCompat.Round((decimal)value, digits).ShouldBe((decimal)expected);
+		MathCompat.Round(value.ToShortestDecimal(), digits).ShouldBe(expected.ToShortestDecimal());
 	}
 
 	[Theory]

@@ -1452,7 +1452,7 @@ public sealed class StringsTests
 		decimal? result = input.ToNDecimal();
 
 		// Assert
-		result.ShouldBe((decimal?)expected);
+		result.ShouldBe(expected.ToShortestDecimal());
 	}
 
 	[Theory]
@@ -2495,7 +2495,7 @@ public sealed class StringsTests
 		decimal? result = span.ToNDecimal();
 
 		// Assert
-		result.ShouldBe((decimal?)expected);
+		result.ShouldBe(expected.ToShortestDecimal());
 	}
 
 	[Theory]

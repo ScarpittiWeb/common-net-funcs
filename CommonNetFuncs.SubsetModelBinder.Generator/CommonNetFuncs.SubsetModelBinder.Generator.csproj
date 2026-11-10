@@ -31,8 +31,8 @@
 		<IncludeBuildOutput>false</IncludeBuildOutput>
 		<RootNamespace>CommonNetFuncs.SubsetModelBinder</RootNamespace>
 		<SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
-
 		<Configurations>Debug;Release;ReducedBuild;no-tests</Configurations>
+		<Features>runtime-async=on</Features>
 	</PropertyGroup>
 
 	<PropertyGroup>
