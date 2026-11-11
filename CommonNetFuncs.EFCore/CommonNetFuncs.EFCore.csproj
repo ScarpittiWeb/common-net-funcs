@@ -2,7 +2,7 @@
 
 	<!-- Optimized -->
 	<PropertyGroup>
-		<TargetFramework>net10.0</TargetFramework>
+		<TargetFramework>net11.0</TargetFramework>
 		<Platforms>AnyCPU;x86;x64</Platforms>
 		<PlatformTarget>AnyCPU</PlatformTarget>
 		<LangVersion>latest</LangVersion>
@@ -25,16 +25,17 @@
 		<PackageTags>dotnet;helpers;efcore;navigation properties;dbcontext</PackageTags>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<Configurations>Debug;Release;ReducedBuild;no-tests</Configurations>
+		<Features>runtime-async=on</Features>
 	</PropertyGroup>
 
 	<PropertyGroup>
-		<Version>4.4.7</Version>
+		<Version>5.0.0</Version>
 		<MinVerTagPrefix>efcore-</MinVerTagPrefix>
 		<MinVerIgnoreHeight>true</MinVerIgnoreHeight>
 		<MinVerSkip Condition="'$(Configuration)' == 'Debug'">true</MinVerSkip>
 		<MinVerSkip Condition="'$(Configuration)'=='ReducedBuild'">true</MinVerSkip>
 		<!-- Optional: Detect breaking changes from a previous stable version -->
-		<PackageValidationBaselineVersion>4.0.9</PackageValidationBaselineVersion>
+		<!-- <PackageValidationBaselineVersion>5.0.0</PackageValidationBaselineVersion> -->
 		<EnablePackageValidation>true</EnablePackageValidation>
 		<ApiCompatGenerateSuppressionFile>true</ApiCompatGenerateSuppressionFile>
 	</PropertyGroup>
@@ -102,7 +103,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\CommonNetFuncs.Core\CommonNetFuncs.Core.csproj" />
+		<ProjectReference Include="..\CommonNetFuncs.Core\CommonNetFuncs.Core.csproj" />
 	</ItemGroup>
 
 </Project>

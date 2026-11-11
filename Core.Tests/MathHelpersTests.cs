@@ -86,7 +86,7 @@ public sealed class MathHelpersTests
 	[InlineData(0.0, 0)]
 	public void GetPrecision_Decimal_Works(double? value, int expected)
 	{
-		int precision = ((decimal?)value).GetPrecision();
+		int precision = value.ToShortestDecimal().GetPrecision();
 		precision.ShouldBe(expected);
 	}
 
@@ -217,14 +217,14 @@ public sealed class MathHelpersTests
 	[InlineData(123456.6, 9123456.6, 1.8, 68587, 5068587)]  // large numbers with decimals
 	public void GreatestCommonDenominatorDecimal_Works(double initialNum, double initialDen, double expectedGcd, double expectedNum, double expectedDen)
 	{
-		decimal numerator = (decimal)initialNum;
-		decimal denominator = (decimal)initialDen;
+		decimal numerator = initialNum.ToShortestDecimal();
+		decimal denominator = initialDen.ToShortestDecimal();
 
 		GreatestCommonDenominator(ref numerator, ref denominator, out decimal gcd);
 
-		gcd.ShouldBe((decimal)expectedGcd);
-		numerator.ShouldBe((decimal)expectedNum);
-		denominator.ShouldBe((decimal)expectedDen);
+		gcd.ShouldBe(expectedGcd.ToShortestDecimal());
+		numerator.ShouldBe(expectedNum.ToShortestDecimal());
+		denominator.ShouldBe(expectedDen.ToShortestDecimal());
 	}
 #endif
 
@@ -265,7 +265,7 @@ public sealed class MathHelpersTests
 	[InlineData(0.0, 0)]
 	public void GetPrecision_NonNullable_Decimal_Works(double value, int expected)
 	{
-		decimal decimalValue = (decimal)value;
+		decimal decimalValue = value.ToShortestDecimal();
 		int precision = decimalValue.GetPrecision();
 		precision.ShouldBe(expected);
 	}

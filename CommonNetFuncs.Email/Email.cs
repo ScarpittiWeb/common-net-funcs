@@ -5,6 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 using CommonNetFuncs.Compression;
 using CommonNetFuncs.Core;
+using MailKit;
 using MailKit.Net.Proxy;
 using MailKit.Net.Smtp;
 using MailKit.Security;

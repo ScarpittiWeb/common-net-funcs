@@ -77,13 +77,13 @@ public sealed class HelpersTests : IDisposable
 	[InlineData("frame=  48 fps=5.8 q=0.0 size=1kB time=00:00:01.77 bitrate=4.5kbits/s", 5.8)]
 	[InlineData("frame=  48 fps=12.3 q=0.0 size=1kB time=00:00:01.77 bitrate=4.5kbits/s", 12.3)]
 	[InlineData("frame=  48 fps=0.0 q=0.0 size=1kB time=00:00:01.77 bitrate=4.5kbits/s", 0.0)]
-	public void ParseFfmpegLogFps_ShouldParseFpsCorrectly(string data, decimal expected)
+	public void ParseFfmpegLogFps_ShouldParseFpsCorrectly(string data, double expected)
 	{
 		// Act
 		decimal result = data.ParseFfmpegLogFps();
 
 		// Assert
-		result.ShouldBe(expected);
+		result.ShouldBe(decimal.Parse(expected.ToString("R", System.Globalization.CultureInfo.InvariantCulture), System.Globalization.CultureInfo.InvariantCulture));
 	}
 
 	[RetryFact(3)]

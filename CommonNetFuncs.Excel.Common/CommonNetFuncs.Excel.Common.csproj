@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net10.0;netstandard2.1</TargetFrameworks>
+		<TargetFrameworks>net11.0;netstandard2.1</TargetFrameworks>
 		<Platforms>AnyCPU;x86;x64</Platforms>
 		<PlatformTarget>AnyCPU</PlatformTarget>
 		<LangVersion>latest</LangVersion>
@@ -23,16 +23,17 @@
 		<PackageTags>dotnet;helpers;excel;npoi;openxml;closedxml;office;msoffice;</PackageTags>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<Configurations>Debug;Release;ReducedBuild;no-tests</Configurations>
+		<Features>runtime-async=on</Features>
 	</PropertyGroup>
 
 	<PropertyGroup>
-		<Version>4.4.3</Version>
+		<Version>5.0.0</Version>
 		<MinVerTagPrefix>excel.common-</MinVerTagPrefix>
 		<MinVerIgnoreHeight>true</MinVerIgnoreHeight>
 		<MinVerSkip Condition="'$(Configuration)' == 'Debug'">true</MinVerSkip>
 		<MinVerSkip Condition="'$(Configuration)'=='ReducedBuild'">true</MinVerSkip>
 		<!-- Optional: Detect breaking changes from a previous stable version -->
-		<PackageValidationBaselineVersion>4.0.0</PackageValidationBaselineVersion>
+		<!-- <PackageValidationBaselineVersion>5.0.0</PackageValidationBaselineVersion> -->
 		<EnablePackageValidation>true</EnablePackageValidation>
 		<ApiCompatGenerateSuppressionFile>true</ApiCompatGenerateSuppressionFile>
 	</PropertyGroup>

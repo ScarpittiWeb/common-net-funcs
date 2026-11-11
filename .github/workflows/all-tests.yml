@@ -193,7 +193,7 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
-            10.0.x
+            11.0.x
             8.0.x
 
       - name: Add Fonts
@@ -234,8 +234,8 @@ jobs:
           fi
         shell: bash
 
-      - name: Test (net10.0)
-        run: dotnet test -f net10.0 --verbosity normal --results-directory ./coverage/net10.0
+      - name: Test (net11.0)
+        run: dotnet test -f net11.0 --verbosity normal --results-directory ./coverage/net11.0
         working-directory: ./${{ matrix.test-suite }}
 
       - name: Test (net8.0)
@@ -309,7 +309,7 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
-            10.0.x
+            11.0.x
             8.0.x
 
       # SonarQube replaces coverage on every analysis, so suites skipped this run (no changes) must keep their last
@@ -503,8 +503,8 @@ jobs:
 #           fi
 #         shell: bash
 
-#       - name: Test (net10.0)
-#         run: dotnet test -f net10.0 --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage/net10.0 -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByFile="**/*.g.cs;**/*.generated.cs;**/*.designer.cs;**/obj/**;**/bin/**" DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[${{ steps.derive-project.outputs.project-name }}]*"
+#       - name: Test (net11.0)
+#         run: dotnet test -f net11.0 --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage/net11.0 -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByFile="**/*.g.cs;**/*.generated.cs;**/*.designer.cs;**/obj/**;**/bin/**" DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[${{ steps.derive-project.outputs.project-name }}]*"
 #         working-directory: ./${{ matrix.test-suite }}
 
 #       - name: Test (net8.0)
