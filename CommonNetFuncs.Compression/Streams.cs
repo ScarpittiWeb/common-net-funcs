@@ -1,7 +1,7 @@
 ﻿using System.Buffers;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
-#if !NET6_0_OR_GREATER
+#if NETSTANDARD2_1
 using CommonNetFuncs.Compression.Internal;
 #endif
 
@@ -806,7 +806,7 @@ public static class Streams
 			ECompressionType.Brotli => new BrotliStream(stream, level, leaveOpen),
 			ECompressionType.Gzip => new GZipStream(stream, level, leaveOpen),
 			ECompressionType.Deflate => new DeflateStream(stream, level, leaveOpen),
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD2_1
 			ECompressionType.ZLib => new ZLibStream(stream, level, leaveOpen),
 #else
 			ECompressionType.ZLib => new ZLibCompatStream(stream, level, leaveOpen),
@@ -824,7 +824,7 @@ public static class Streams
 			ECompressionType.Brotli => new BrotliStream(stream, CompressionMode.Decompress, leaveOpen),
 			ECompressionType.Gzip => new GZipStream(stream, CompressionMode.Decompress, leaveOpen),
 			ECompressionType.Deflate => new DeflateStream(stream, CompressionMode.Decompress, leaveOpen),
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD2_1
 			ECompressionType.ZLib => new ZLibStream(stream, CompressionMode.Decompress, leaveOpen),
 #else
 			ECompressionType.ZLib => new ZLibCompatStream(stream, CompressionMode.Decompress, leaveOpen),

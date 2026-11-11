@@ -12,7 +12,7 @@ namespace CommonNetFuncs.Images;
 /// </summary>
 public static partial class Base64
 {
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	//[GeneratedRegex(@"data:image\/([^;]+);base64,([^'"")\s]+)")]
 	[GeneratedRegex(@"data:image\/([^;]+);base64,([^'"")\s]+)|base64([^'"")\s]+)", RegexOptions.Compiled, 5000)]
 	private static partial Regex ExtractBase64Regex();

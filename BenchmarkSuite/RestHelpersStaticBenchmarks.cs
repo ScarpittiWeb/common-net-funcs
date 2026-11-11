@@ -17,7 +17,7 @@ using static CommonNetFuncs.Web.Requests.Rest.RestHelpersStatic;
 
 namespace BenchmarkSuite;
 
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.HostProcess)]
 [MemoryDiagnoser]
 [ThreadingDiagnoser]
 [EventPipeProfiler(EventPipeProfile.CpuSampling)]

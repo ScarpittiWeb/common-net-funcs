@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net11.0;net8.0</TargetFrameworks>
+		<TargetFramework>net11.0</TargetFramework>
+		<SupportsNetStandardLibs>true</SupportsNetStandardLibs>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<IsPackable>false</IsPackable>
@@ -9,15 +10,10 @@
 	</PropertyGroup>
 
 	<!--
-		The net8.0 leg exists purely so ProjectReferences to multi-targeted CommonNetFuncs.* projects resolve to
-		their netstandard2.1 build (net8.0 isn't offered by those projects, but netstandard2.1 is compatible with
-		it), letting this same test suite exercise the netstandard2.1 fallback code paths on a real runtime.
-		Tests that only apply to APIs that exist on the net11.0 (native) build should be guarded with
-		`#if CORE_NATIVE_BUILD`.
+		Build with -p:UseNetStandardLibs=true to run this suite against the netstandard2.1 build of CommonNetFuncs.Core
+		(see Directory.Build.targets). Tests that only apply to APIs that exist on the net11.0 (native) build should be
+		guarded with `#if CORE_NATIVE_BUILD`.
 	-->
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net11.0'">
-		<DefineConstants>$(DefineConstants);CORE_NATIVE_BUILD</DefineConstants>
-	</PropertyGroup>
 
 	<PropertyGroup>
 		<CoverletExclude>[*.Tests]*;[*]System.Text.RegularExpressions.Generated.*</CoverletExclude>

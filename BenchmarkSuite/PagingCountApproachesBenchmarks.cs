@@ -17,7 +17,7 @@ namespace BenchmarkSuite;
 /// 1. Single query with projection (BuildPagingResult method)
 /// 2. Two separate queries (separate CountAsync and ToListAsync)
 /// </summary>
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.HostProcess)]
 [EventPipeProfiler(EventPipeProfile.CpuSampling)]
 [CPUUsageDiagnoser]
 [MemoryDiagnoser]

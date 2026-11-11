@@ -107,7 +107,7 @@ public sealed class MathHelpersTests
 		Should.Throw<ArgumentException>(() => GenerateRange(5, 1));
 	}
 
-	// On net10.0+ these resolve to the same generic GenerateRange<TNumber>, but on netstandard2.1 they resolve to the separate long/float/double/decimal overloads, which otherwise go untested.
+	// On net11.0 these resolve to the same generic GenerateRange<TNumber>, but on netstandard2.1 they resolve to the separate long/float/double/decimal overloads, which otherwise go untested.
 	[Theory]
 	[InlineData(1L, 5L, new long[] { 1, 2, 3, 4, 5 })]
 	[InlineData(-2L, 2L, new long[] { -2, -1, 0, 1, 2 })]
@@ -428,7 +428,7 @@ public sealed class MathHelpersTests
 		numbers.GetMedian().ShouldBe(expected);
 	}
 
-	// On net10.0+ these resolve to the same generic GetMedian<TNumber>, but on netstandard2.1 they resolve to the separate long/float overloads, which otherwise go untested.
+	// On net11.0 these resolve to the same generic GetMedian<TNumber>, but on netstandard2.1 they resolve to the separate long/float overloads, which otherwise go untested.
 	[Theory]
 	[InlineData(new long[] { 1, 2, 3 }, 2L)]                // sorted odd count
 	[InlineData(new long[] { 3, 1, 2 }, 2L)]                // unsorted odd count

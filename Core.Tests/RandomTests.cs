@@ -2392,7 +2392,7 @@ public sealed class RandomTests
 
 	#region BitLength Function Tests (via Reflection)
 
-#if !NET6_0_OR_GREATER
+#if !CORE_NATIVE_BUILD
 
 	[Theory]
 	[InlineData(0UL, 0)]
@@ -2527,7 +2527,7 @@ public sealed class RandomTests
 
 	/// <summary>
 	/// Invokes the private BitLength method via reflection.
-	/// Only available when not NET6_0_OR_GREATER.
+	/// Only available in the netstandard2.1 build.
 	/// </summary>
 	private static int InvokeBitLength(ulong value)
 	{

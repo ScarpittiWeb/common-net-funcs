@@ -10,7 +10,7 @@ namespace BenchmarkSuite;
 [MemoryDiagnoser]
 [Orderer(SummaryOrderPolicy.FastestToSlowest)]
 [RankColumn]
-[SimpleJob(RuntimeMoniker.Net10_0)]
+[SimpleJob(RuntimeMoniker.HostProcess)]
 public class CopyBenchmarks
 {
 	private SimpleClass? simpleSource;

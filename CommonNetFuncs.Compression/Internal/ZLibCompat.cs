@@ -1,10 +1,10 @@
-﻿#if !NET6_0_OR_GREATER
+﻿#if NETSTANDARD2_1
 using System.IO.Compression;
 
 namespace CommonNetFuncs.Compression.Internal;
 
 /// <summary>
-/// Minimal RFC 1950 (zlib) stream wrapper used in place of <c>System.IO.Compression.ZLibStream</c> (added in .NET 6) for netstandard2.1 targets.
+/// Minimal RFC 1950 (zlib) stream wrapper used in place of <c>System.IO.Compression.ZLibStream</c> (only available in the native net11.0 build) for netstandard2.1 targets.
 /// </summary>
 /// <remarks>
 /// Compression writes a standard 2-byte zlib header followed by raw deflate data and a trailing big-endian Adler-32 checksum of the uncompressed

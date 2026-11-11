@@ -131,7 +131,7 @@ public sealed class MailAttachment : IMailAttachment, IAsyncDisposable, IDisposa
 /// </summary>
 public sealed class MailAttachmentBytes : IMailAttachment
 {
-#if NET10_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[Newtonsoft.Json.JsonConstructor] // Required for Hangfire serialization
 #endif
 	public MailAttachmentBytes(string? AttachmentName = null, byte[]? AttachmentBytes = null, CompressionLevel compressionLevel = CompressionLevel.Optimal)
@@ -735,20 +735,20 @@ public static class Email
 				else
 				{
 					await using MemoryStream memoryStream = new();
-#if NET10_0_OR_GREATER
+#if !NETSTANDARD2_1
 					await using ZipArchive archive = new(memoryStream, ZipArchiveMode.Create, true);
 #else
 					using ZipArchive archive = new(memoryStream, ZipArchiveMode.Create, true);
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 					const CompressionLevel zipCompressionLevel = CompressionLevel.SmallestSize;
 #else
 					const CompressionLevel zipCompressionLevel = CompressionLevel.Optimal;
 #endif
 					await attachments.Where(x => !x.AttachmentName.IsNullOrWhiteSpace()).Select(x => (x.GetStream(), x.AttachmentName!)).AddFilesToZip(archive, zipCompressionLevel, cancellationToken).ConfigureAwait(false);
 
-#if NET10_0_OR_GREATER
+#if !NETSTANDARD2_1
 					await archive.DisposeAsync().ConfigureAwait(false);
 #else
 					archive.Dispose();

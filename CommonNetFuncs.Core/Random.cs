@@ -4,7 +4,7 @@ using System.Text;
 using ZLinq;
 using ZLinq.Linq;
 
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 
 using System.Collections.Frozen;
 using System.Numerics;
@@ -23,7 +23,7 @@ public static class Random
 	private const string NumberToGenerateError = "Number to generate must be greater than 0.";
 	private const string MaxValueError = "Max value must be greater than 0.";
 
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 	// FrozenSet lookups are faster than HashSet once built, ideal for this never-mutated default set
 	internal static readonly FrozenSet<char> DefaultCharSet = new HashSet<char>(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 		'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']).ToFrozenSet();
@@ -1255,7 +1255,7 @@ public static class Random
 		if ((ulong)index >= (ulong)domain) throw new ArgumentOutOfRangeException(nameof(index));
 
 		// Smallest even bit-width such that 2^bits >= domain
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD2_1
 		int bits = 64 - BitOperations.LeadingZeroCount((ulong)(domain - 1));
 #else
 		int bits = BitLength((ulong)(domain - 1));
@@ -1300,7 +1300,7 @@ public static class Random
 		}
 	}
 
-#if !NET6_0_OR_GREATER
+#if NETSTANDARD2_1
 
 	// Number of bits needed to represent value (BitLength(0) == 0, BitLength(1) == 1, BitLength(255) == 8).
 	private static int BitLength(ulong value)

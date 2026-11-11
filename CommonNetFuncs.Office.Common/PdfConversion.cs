@@ -17,7 +17,7 @@ public static class PdfConversion
 		csv
 	}
 
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 	private static readonly Lock conversionLock = new();
 #else
 	private static readonly object conversionLock = new();
@@ -66,7 +66,7 @@ public static class PdfConversion
 					}
 					else
 					{
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 						process.WaitForExit((TimeSpan)conversionTimeout);
 #else
 						process.WaitForExit((int)((TimeSpan)conversionTimeout).TotalMilliseconds);
@@ -143,7 +143,7 @@ public static class PdfConversion
 			for (int i = 0; i <= maxRetries; i++)
 			{
 				process.Start();
-#if NET5_0_OR_GREATER
+#if !NETSTANDARD2_1
 				await process.WaitForExitAsync(cancellationToken ?? default).ConfigureAwait(false);
 #else
 				// Task.Run(action, token) only honors the token before the delegate starts running, not while
@@ -199,7 +199,7 @@ public static class PdfConversion
 		public LibreOfficeFailedException(string message, Exception inner) : base(message, inner) { }
 	}
 
-#if !NET5_0_OR_GREATER
+#if NETSTANDARD2_1
 	private static void TryKillProcess(Process process)
 	{
 		try
@@ -280,7 +280,7 @@ public static class PdfConversion
 		if (File.Exists(pdfFileName))
 		{
 			string destination = Combine(outputPath ?? string.Empty, $"{GetFileNameWithoutExtension(fileName)}.pdf");
-#if NET5_0_OR_GREATER
+#if !NETSTANDARD2_1
 			File.Move(pdfFileName, destination, overwrite: overwriteExistingFile);
 #else
 			if (overwriteExistingFile && File.Exists(destination))

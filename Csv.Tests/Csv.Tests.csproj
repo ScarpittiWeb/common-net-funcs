@@ -1,16 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net11.0;net8.0</TargetFrameworks>
+		<TargetFramework>net11.0</TargetFramework>
+		<SupportsNetStandardLibs>true</SupportsNetStandardLibs>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<IsPackable>false</IsPackable>
 		<LangVersion>latest</LangVersion>
-	</PropertyGroup>
-
-	<!-- net8.0 leg exercises the netstandard2.1 build of CommonNetFuncs.Csv on a real runtime -->
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net11.0'">
-		<DefineConstants>$(DefineConstants);CORE_NATIVE_BUILD</DefineConstants>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -31,6 +27,19 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="CsvHelper" PrivateAssets="all" />
+	</ItemGroup>
+
+	<!--
+		CsvHelper's net10.0 asset (picked for this net11.0 project) isn't binary compatible with its netstandard2.1 asset that the netstandard2.1
+		build of CommonNetFuncs.Csv is compiled against, so when testing that build use the netstandard2.1 CsvHelper assembly at runtime too.
+		Keep the version in sync with Directory.Packages.props.
+	-->
+	<PropertyGroup>
+		<CsvHelperVersion>34.0.0</CsvHelperVersion>
+	</PropertyGroup>
+	<ItemGroup Condition="'$(UseNetStandardLibs)' == 'true'">
+		<PackageReference Update="CsvHelper" ExcludeAssets="compile;runtime" />
+		<Reference Include="CsvHelper" HintPath="$(NuGetPackageRoot)csvhelper\$(CsvHelperVersion)\lib\netstandard2.1\CsvHelper.dll" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -9,7 +9,7 @@ using CommonNetFuncs.Compression;
 namespace BenchmarkSuite;
 
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.Net10_0)]
+[SimpleJob(RuntimeMoniker.HostProcess)]
 public class CompressionStreamsBenchmarks
 {
 	private byte[] smallData = null!;

@@ -1,13 +1,13 @@
 ﻿namespace CommonNetFuncs.Excel.Npoi.Internal;
 
 /// <summary>
-/// Shim for <see cref="Math.Round(double, int, MidpointRounding)"/> with <see cref="MidpointRounding.ToZero"/> (added in .NET 8).
+/// Shim for <see cref="Math.Round(double, int, MidpointRounding)"/> with <see cref="MidpointRounding.ToZero"/> (not available on netstandard2.1).
 /// </summary>
 internal static class MathCompat
 {
 	public static double Round(double value, int digits)
 	{
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return Math.Round(value, digits, MidpointRounding.ToZero);
 #else
 		// MidpointRounding.ToZero truncates toward zero for every value, not only exact midpoints
@@ -18,7 +18,7 @@ internal static class MathCompat
 
 	public static decimal Round(decimal value, int digits)
 	{
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return Math.Round(value, digits, MidpointRounding.ToZero);
 #else
 		// MidpointRounding.ToZero truncates toward zero for every value, not only exact midpoints

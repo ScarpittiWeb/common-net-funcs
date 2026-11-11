@@ -95,7 +95,7 @@ public static class CsvExportHelpers
 			}
 
 			cancellationToken.ThrowIfCancellationRequested();
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 			await streamWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
 #else
 			await streamWriter.FlushAsync().ConfigureAwait(false);

@@ -5,8 +5,8 @@ namespace CommonNetFuncs.Core.CollectionClasses;
 /// </summary>
 /// <remarks>This dictionary enforces a maximum capacity. When the capacity is exceeded, the oldest item is automatically removed to make room for new entries.
 /// This implementation is thread-safe and uses a <see cref="ReaderWriterLockSlim"/> to synchronize access.
-/// Uses <see cref="System.Collections.Generic.OrderedDictionary{TKey, TValue}"/> on net9.0+ (the fastest option available there), falling back to a
-/// <see cref="Dictionary{TKey, TValue}"/> + <see cref="LinkedList{T}"/> implementation on older target frameworks where OrderedDictionary doesn't exist.</remarks>
+/// Uses <see cref="System.Collections.Generic.OrderedDictionary{TKey, TValue}"/> on the native (net11.0) build (the fastest option available there), falling back to a
+/// <see cref="Dictionary{TKey, TValue}"/> + <see cref="LinkedList{T}"/> implementation on netstandard2.1 where OrderedDictionary doesn't exist.</remarks>
 /// <typeparam name="TKey">The type of the keys in the dictionary. Keys must be non-null.</typeparam>
 /// <typeparam name="TValue">The type of the values in the dictionary.</typeparam>
 public class FixedFifoDictionary<TKey, TValue> : FixedSizeDictionaryBase<TKey, TValue> where TKey : notnull
@@ -30,7 +30,7 @@ public class FixedFifoDictionary<TKey, TValue> : FixedSizeDictionaryBase<TKey, T
 			readWriteLock.EnterReadLock();
 			try
 			{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 				return dictionary[key];
 #else
 				return lookup[key].Value.Value;
@@ -50,7 +50,7 @@ public class FixedFifoDictionary<TKey, TValue> : FixedSizeDictionaryBase<TKey, T
 		readWriteLock.EnterReadLock();
 		try
 		{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 			return dictionary.TryGetValue(key, out value);
 #else
 			if (lookup.TryGetValue(key, out LinkedListNode<KeyValuePair<TKey, TValue?>>? node))
@@ -74,7 +74,7 @@ public class FixedFifoDictionary<TKey, TValue> : FixedSizeDictionaryBase<TKey, T
 		readWriteLock.EnterWriteLock();
 		try
 		{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 			if (dictionary.ContainsKey(key))
 			{
 				// Update existing item - not changing its position in the queue
@@ -114,7 +114,7 @@ public class FixedFifoDictionary<TKey, TValue> : FixedSizeDictionaryBase<TKey, T
 		readWriteLock.EnterUpgradeableReadLock();
 		try
 		{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 			if (dictionary.TryGetValue(key, out TValue? existing))
 			{
 				return existing!;

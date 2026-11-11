@@ -15,7 +15,7 @@ namespace BenchmarkSuite;
 /// </summary>
 [RankColumn]
 [MemoryDiagnoser]
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.HostProcess)]
 public class ZLinqComparisonBenchmarks
 {
 	// Simple reference type used to verify ZLinq works with classes/generics, not just primitives.

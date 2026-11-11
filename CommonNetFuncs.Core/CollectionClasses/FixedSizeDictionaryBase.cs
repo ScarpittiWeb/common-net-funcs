@@ -5,8 +5,8 @@ namespace CommonNetFuncs.Core.CollectionClasses;
 /// <summary>
 /// Shared thread-safe storage and plumbing for fixed-capacity dictionaries that evict their oldest entry when full.
 /// </summary>
-/// <remarks>Uses <see cref="System.Collections.Generic.OrderedDictionary{TKey, TValue}"/> on net9.0+, falling back to a
-/// <see cref="Dictionary{TKey, TValue}"/> + <see cref="LinkedList{T}"/> implementation on older target frameworks where OrderedDictionary doesn't exist.
+/// <remarks>Uses <see cref="System.Collections.Generic.OrderedDictionary{TKey, TValue}"/> on the native (net11.0) build, falling back to a
+/// <see cref="Dictionary{TKey, TValue}"/> + <see cref="LinkedList{T}"/> implementation on netstandard2.1 where OrderedDictionary doesn't exist.
 /// Index 0 / <see cref="LinkedList{T}.First"/> is always the next entry to be evicted.</remarks>
 /// <typeparam name="TKey">The type of the keys in the dictionary. Keys must be non-null.</typeparam>
 /// <typeparam name="TValue">The type of the values in the dictionary.</typeparam>
@@ -15,7 +15,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 	private protected readonly ReaderWriterLockSlim readWriteLock = new();
 	private protected readonly int capacity;
 
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 	private protected readonly OrderedDictionary<TKey, TValue?> dictionary;
 #else
 	private protected readonly Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue?>>> lookup;
@@ -36,7 +36,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 		}
 
 		this.capacity = capacity;
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 		dictionary = new OrderedDictionary<TKey, TValue?>(capacity);
 #else
 		lookup = new Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue?>>>(capacity);
@@ -59,7 +59,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 			readWriteLock.EnterReadLock();
 			try
 			{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 				return dictionary.Keys;
 #else
 				return order.Select(static x => x.Key).ToArray();
@@ -80,7 +80,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 			readWriteLock.EnterReadLock();
 			try
 			{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 				return dictionary.Values;
 #else
 				return order.Select(static x => x.Value).ToArray();
@@ -101,7 +101,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 			readWriteLock.EnterReadLock();
 			try
 			{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 				return dictionary.Count;
 #else
 				return lookup.Count;
@@ -143,7 +143,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 		readWriteLock.EnterReadLock();
 		try
 		{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 			return dictionary.ContainsKey(key);
 #else
 			return lookup.ContainsKey(key);
@@ -161,7 +161,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 		readWriteLock.EnterWriteLock();
 		try
 		{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 			dictionary.Clear();
 #else
 			lookup.Clear();
@@ -179,7 +179,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 		readWriteLock.EnterWriteLock();
 		try
 		{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 			dictionary.TrimExcess();
 #else
 			lookup.TrimExcess();
@@ -202,7 +202,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 		readWriteLock.EnterWriteLock();
 		try
 		{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 			if (dictionary.ContainsKey(key))
 			{
 				return false;
@@ -242,7 +242,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 		readWriteLock.EnterReadLock();
 		try
 		{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 			return dictionary.TryGetValue(item.Key, out TValue? value) && EqualityComparer<TValue?>.Default.Equals(value, item.Value);
 #else
 			return lookup.TryGetValue(item.Key, out LinkedListNode<KeyValuePair<TKey, TValue?>>? node) && EqualityComparer<TValue?>.Default.Equals(node.Value.Value, item.Value);
@@ -260,7 +260,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 		readWriteLock.EnterReadLock();
 		try
 		{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 			((ICollection<KeyValuePair<TKey, TValue?>>)dictionary).CopyTo(array, arrayIndex);
 #else
 			order.ToList().CopyTo(array, arrayIndex);
@@ -278,7 +278,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 		readWriteLock.EnterWriteLock();
 		try
 		{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 			return dictionary.TryGetValue(item.Key, out TValue? value) && EqualityComparer<TValue?>.Default.Equals(value, item.Value) && RemoveInternal(item.Key);
 #else
 			return lookup.TryGetValue(item.Key, out LinkedListNode<KeyValuePair<TKey, TValue?>>? node)
@@ -298,7 +298,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 		readWriteLock.EnterReadLock();
 		try
 		{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 			return dictionary.ToList().GetEnumerator();
 #else
 			return order.ToList().GetEnumerator();
@@ -319,7 +319,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 	// Callers must already hold the write lock.
 	private protected void AddNewest(TKey key, TValue? value)
 	{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 		if (dictionary.Count >= capacity)
 		{
 			dictionary.RemoveAt(0);
@@ -339,7 +339,7 @@ public abstract class FixedSizeDictionaryBase<TKey, TValue> : IDictionary<TKey, 
 	// Callers must already hold the write lock.
 	private protected bool RemoveInternal(TKey key)
 	{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return dictionary.Remove(key);
 #else
 		if (!lookup.TryGetValue(key, out LinkedListNode<KeyValuePair<TKey, TValue?>>? node))

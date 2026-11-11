@@ -172,7 +172,7 @@ public static class MathHelpers
 		return position == -1 ? 0 : valueString.Length - position - 1;
 	}
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	/// <summary>
 	/// Generates a continuous range of numbers between start and end parameters (inclusive)
 	/// </summary>
@@ -298,7 +298,7 @@ public static class MathHelpers
 		}
 	}
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	/// <summary>
 	/// Calculates the greatest common denominator (GCD) of the specified numerator and denominator, and reduces the numerator and denominator to their lowest terms.
 	/// </summary>
@@ -395,7 +395,7 @@ public static class MathHelpers
 		return Math.Abs(a - b) > (double)tolerance;
 	}
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	public static TNumber GetMedian<TNumber>(this IEnumerable<TNumber> numbers) where TNumber : struct, System.Numerics.INumber<TNumber>
 	{
 		if (numbers?.Any() != true)

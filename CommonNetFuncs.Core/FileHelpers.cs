@@ -12,14 +12,14 @@ namespace CommonNetFuncs.Core;
 /// </summary>
 public static partial class FileHelpers
 {
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 	private static readonly SearchValues<char> invalidFileNameChars = SearchValues.Create("/\\:<>\"|?*");
 #else
 	private static readonly char[] invalidFileNameChars = "/\\:<>\"|?*".ToCharArray();
 #endif
 	private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"\(([^)]*)\)$", RegexOptions.Compiled, 5000)]
 	private static partial Regex IncrementedFileNameRegex();
 #else
@@ -318,7 +318,7 @@ public static partial class FileHelpers
 	internal static string CleanFileName(string fileName)
 	{
 		// Early exit if no invalid characters present
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 		if (!fileName.AsSpan().ContainsAny(invalidFileNameChars))
 #else
 		if (fileName.IndexOfAny(invalidFileNameChars) < 0)

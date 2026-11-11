@@ -16,7 +16,7 @@ namespace BenchmarkSuite;
 /// Comprehensive benchmarks comparing FastMapper, FasterMapper, Mapster, and Mapperly.
 /// Measures speed, CPU efficiency, and memory usage across various mapping scenarios.
 /// </summary>
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.HostProcess)]
 [MemoryDiagnoser]
 [EventPipeProfiler(EventPipeProfile.CpuSampling)]
 [CPUUsageDiagnoser] // Only works on Windows

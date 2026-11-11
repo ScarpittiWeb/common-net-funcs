@@ -1,16 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net11.0;net8.0</TargetFrameworks>
+		<TargetFramework>net11.0</TargetFramework>
+		<SupportsNetStandardLibs>true</SupportsNetStandardLibs>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<IsPackable>false</IsPackable>
 		<LangVersion>latest</LangVersion>
-	</PropertyGroup>
-
-	<!-- net8.0 leg exercises the netstandard2.1 build of CommonNetFuncs.Sql.Common on a real runtime -->
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net11.0'">
-		<DefineConstants>$(DefineConstants);CORE_NATIVE_BUILD</DefineConstants>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -36,8 +32,13 @@
 	<ItemGroup>
 		<ProjectReference Include="..\CommonNetFuncs.Sql.Common\CommonNetFuncs.Sql.Common.csproj" />
 		<ProjectReference Include="..\CommonNetFuncs.Sql.SqlServer\CommonNetFuncs.Sql.SqlServer.csproj" />
-		<!-- CommonNetFuncs.Sql.PostgreSql only targets net11.0, so it can only be referenced from the net10.0 leg of this test project -->
-		<ProjectReference Include="..\CommonNetFuncs.Sql.PostgreSql\CommonNetFuncs.Sql.PostgreSql.csproj" Condition="'$(TargetFramework)' == 'net11.0'" />
+		<!-- CommonNetFuncs.Sql.PostgreSql only targets net11.0, so it can't be referenced when testing against the netstandard2.1 builds -->
+		<ProjectReference Include="..\CommonNetFuncs.Sql.PostgreSql\CommonNetFuncs.Sql.PostgreSql.csproj" Condition="'$(UseNetStandardLibs)' != 'true'" />
+	</ItemGroup>
+
+	<!-- The netstandard2.1 build of Sql.SqlServer pins an older Pkcs than the one Microsoft.Data.SqlClient needs on net11.0, so lift it here to avoid a package downgrade error -->
+	<ItemGroup Condition="'$(UseNetStandardLibs)' == 'true'">
+		<PackageReference Include="System.Security.Cryptography.Pkcs" />
 	</ItemGroup>
 
 	<ItemGroup>

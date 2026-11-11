@@ -12,7 +12,7 @@ using Microsoft.VSDiagnostics;
 
 namespace BenchmarkSuite;
 
-[MediumRunJob(RuntimeMoniker.Net10_0)]
+[MediumRunJob(RuntimeMoniker.HostProcess)]
 [EventPipeProfiler(EventPipeProfile.CpuSampling)]
 [CPUUsageDiagnoser]
 [MemoryDiagnoser]

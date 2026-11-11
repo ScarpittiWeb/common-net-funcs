@@ -21,7 +21,7 @@ using static System.Convert;
 using static System.Math;
 
 
-#if !NET6_0_OR_GREATER
+#if NETSTANDARD2_1
 using CommonNetFuncs.Excel.Npoi.Internal;
 #endif
 
@@ -223,7 +223,7 @@ public sealed class CellFont : IFont
 /// </summary>
 public static partial class Common
 {
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$")]
 	private static partial Regex HexColorRegex();
 #else

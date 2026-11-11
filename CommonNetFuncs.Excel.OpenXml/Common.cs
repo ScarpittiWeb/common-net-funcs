@@ -25,7 +25,7 @@ namespace CommonNetFuncs.Excel.OpenXml;
 
 public static partial class Common
 {
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 	private static readonly Lock formatCacheLock = new();
 #else
 	private static readonly object formatCacheLock = new();
@@ -3733,7 +3733,7 @@ public static partial class Common
 	// Helper classes to deal with cell references more easily
 	public partial class CellReference
 	{
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 		[GeneratedRegex(@"([A-Z]+)(\d+)", RegexOptions.Compiled, 5000)]
 		private static partial Regex CellRefRegex();
 #else

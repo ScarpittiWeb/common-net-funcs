@@ -194,7 +194,6 @@ jobs:
         with:
           dotnet-version: |
             11.0.x
-            8.0.x
 
       - name: Add Fonts
         if: matrix.test-suite == 'Office.Common.Tests'
@@ -224,13 +223,13 @@ jobs:
         run: dotnet build --no-restore
         working-directory: ./${{ matrix.test-suite }}
 
-      - name: Check for net8.0 target
-        id: check-net8
+      - name: Check for netstandard2.1 test leg
+        id: check-netstandard
         run: |
-          if grep -q "net8.0" ./${{ matrix.test-suite }}/*.csproj; then
-            echo "has-net8=true" >> $GITHUB_OUTPUT
+          if grep -q "SupportsNetStandardLibs" ./${{ matrix.test-suite }}/*.csproj; then
+            echo "has-netstandard=true" >> $GITHUB_OUTPUT
           else
-            echo "has-net8=false" >> $GITHUB_OUTPUT
+            echo "has-netstandard=false" >> $GITHUB_OUTPUT
           fi
         shell: bash
 
@@ -238,9 +237,10 @@ jobs:
         run: dotnet test -f net11.0 --verbosity normal --results-directory ./coverage/net11.0
         working-directory: ./${{ matrix.test-suite }}
 
-      - name: Test (net8.0)
-        if: steps.check-net8.outputs.has-net8 == 'true'
-        run: dotnet test -f net8.0 --verbosity normal --results-directory ./coverage/net8.0
+      # Same suite against the netstandard2.1 build of the libraries under test, running on the net11.0 runtime
+      - name: Test (netstandard2.1 libraries)
+        if: steps.check-netstandard.outputs.has-netstandard == 'true'
+        run: dotnet test -p:UseNetStandardLibs=true --verbosity normal --results-directory ./coverage/netstandard2.1
         working-directory: ./${{ matrix.test-suite }}
 
       - name: Merge Coverage Reports
@@ -310,7 +310,6 @@ jobs:
         with:
           dotnet-version: |
             11.0.x
-            8.0.x
 
       # SonarQube replaces coverage on every analysis, so suites skipped this run (no changes) must keep their last
       # known coverage. The cache is restored from the newest previous run and re-saved (under a new key) at job end.
@@ -454,7 +453,6 @@ jobs:
 #         with:
 #           dotnet-version: |
 #             10.0.x
-#             8.0.x
 
 #       - name: Add Fonts
 #         if: matrix.test-suite == 'Office.Common.Tests'
@@ -493,13 +491,13 @@ jobs:
 #           echo "Testing project: $PROJECT_NAME"
 #         shell: bash
 
-#       - name: Check for net8.0 target
-#         id: check-net8
+#       - name: Check for netstandard2.1 test leg
+#         id: check-netstandard
 #         run: |
-#           if grep -q "net8.0" ./${{ matrix.test-suite }}/*.csproj; then
-#             echo "has-net8=true" >> $GITHUB_OUTPUT
+#           if grep -q "SupportsNetStandardLibs" ./${{ matrix.test-suite }}/*.csproj; then
+#             echo "has-netstandard=true" >> $GITHUB_OUTPUT
 #           else
-#             echo "has-net8=false" >> $GITHUB_OUTPUT
+#             echo "has-netstandard=false" >> $GITHUB_OUTPUT
 #           fi
 #         shell: bash
 
@@ -507,9 +505,9 @@ jobs:
 #         run: dotnet test -f net11.0 --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage/net11.0 -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByFile="**/*.g.cs;**/*.generated.cs;**/*.designer.cs;**/obj/**;**/bin/**" DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[${{ steps.derive-project.outputs.project-name }}]*"
 #         working-directory: ./${{ matrix.test-suite }}
 
-#       - name: Test (net8.0)
-#         if: steps.check-net8.outputs.has-net8 == 'true'
-#         run: dotnet test -f net8.0 --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage/net8.0 -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByFile="**/*.g.cs;**/*.generated.cs;**/*.designer.cs;**/obj/**;**/bin/**" DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[${{ steps.derive-project.outputs.project-name }}]*"
+#       - name: Test (netstandard2.1 libraries)
+#         if: steps.check-netstandard.outputs.has-netstandard == 'true'
+#         run: dotnet test -p:UseNetStandardLibs=true --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage/netstandard2.1 -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByFile="**/*.g.cs;**/*.generated.cs;**/*.designer.cs;**/obj/**;**/bin/**" DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[${{ steps.derive-project.outputs.project-name }}]*"
 #         working-directory: ./${{ matrix.test-suite }}
 
 #       - name: Merge Coverage Reports

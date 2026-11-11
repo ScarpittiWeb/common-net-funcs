@@ -18,4 +18,22 @@
 		<TestingPlatformCommandLineArguments Condition="'$(CoverletExcludeByFile)' != ''">$(TestingPlatformCommandLineArguments) --coverlet-exclude-by-file "$(CoverletExcludeByFile.Replace(';', '" --coverlet-exclude-by-file "'))"</TestingPlatformCommandLineArguments>
 	</PropertyGroup>
 
+	<!--
+		Test projects that opt in with <SupportsNetStandardLibs>true</SupportsNetStandardLibs> can be built with -p:UseNetStandardLibs=true.
+		That keeps them on net11.0 but restricts every library that targets netstandard2.1 to just that target (the property flows to
+		referenced projects, including during restore, so the test project resolves and restores their netstandard2.1 assets) and omits
+		CORE_NATIVE_BUILD, so the same suite exercises the netstandard2.1 code paths on a real runtime.
+	-->
+	<PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+		<_TestNetStandardLibs Condition="'$(SupportsNetStandardLibs)' == 'true' And '$(UseNetStandardLibs)' == 'true'">true</_TestNetStandardLibs>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests')) And '$(_TestNetStandardLibs)' != 'true'">
+		<DefineConstants>$(DefineConstants);CORE_NATIVE_BUILD</DefineConstants>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(UseNetStandardLibs)' == 'true' And !$(MSBuildProjectName.EndsWith('.Tests')) And $(TargetFrameworks.Contains('netstandard2.1'))">
+		<TargetFrameworks>netstandard2.1</TargetFrameworks>
+	</PropertyGroup>
+
 </Project>

@@ -3,14 +3,14 @@
 namespace CommonNetFuncs.Core.Internal;
 
 /// <summary>
-/// Shims for BCL members that only exist on newer TFMs so this project can multi-target netstandard2.1.
-/// On net6.0+ these simply forward to the real BCL implementation.
+/// Shims for BCL members that don't exist on netstandard2.1 so this project can multi-target it.
+/// On the native (net11.0) build these simply forward to the real BCL implementation.
 /// </summary>
 internal static class ThrowHelper
 {
 	public static void ThrowIfNull([NotNull] object? argument, string? paramName)
 	{
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD2_1
 #pragma warning disable S3236 // Caller information arguments should not be provided explicitly
 		ArgumentNullException.ThrowIfNull(argument, paramName);
 #pragma warning restore S3236 // Caller information arguments should not be provided explicitly
@@ -24,7 +24,7 @@ internal static class ThrowHelper
 
 	public static void ThrowIfNegativeOrZero(int value, string? paramName)
 	{
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 #pragma warning disable S3236 // Caller information arguments should not be provided explicitly
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value, paramName);
 #pragma warning restore S3236 // Caller information arguments should not be provided explicitly
@@ -38,7 +38,7 @@ internal static class ThrowHelper
 
 	public static void ThrowIfDisposed(bool disposed, object instance)
 	{
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 		ObjectDisposedException.ThrowIf(disposed, instance);
 #else
 		if (disposed)
@@ -50,17 +50,17 @@ internal static class ThrowHelper
 }
 
 /// <summary>
-/// Shim for <see cref="System.Random.Shared"/>.Shuffle(...) (added in .NET 8) so netstandard2.1 has an equivalent.
+/// Shim for <see cref="System.Random.Shared"/>.Shuffle(...) (not available on netstandard2.1) so netstandard2.1 has an equivalent.
 /// </summary>
 internal static class RandomCompat
 {
-#if !NET8_0_OR_GREATER
+#if NETSTANDARD2_1
 	private static readonly System.Random SharedFallback = new();
 #endif
 
 	public static void Shuffle<T>(Span<T> values)
 	{
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 		System.Random.Shared.Shuffle(values);
 #else
 		int n = values.Length;
@@ -75,7 +75,7 @@ internal static class RandomCompat
 
 	public static T[] GetItems<T>(T[] source, int count)
 	{
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return System.Random.Shared.GetItems(source, count);
 #else
 		if (source.Length == 0)
@@ -94,14 +94,14 @@ internal static class RandomCompat
 }
 
 /// <summary>
-/// Shim for the <c>DateTime.TryParse(string?, IFormatProvider?, out DateTime)</c> 3-argument overload (added in .NET 7 as part of the IParsable retrofit),
+/// Shim for the <c>DateTime.TryParse(string?, IFormatProvider?, out DateTime)</c> 3-argument overload (from the IParsable retrofit),
 /// which is not available on netstandard2.1.
 /// </summary>
 internal static class DateTimeCompat
 {
 	public static bool TryParse(string? value, IFormatProvider? provider, out DateTime result)
 	{
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return DateTime.TryParse(value, provider, out result);
 #else
 		return DateTime.TryParse(value, provider, System.Globalization.DateTimeStyles.None, out result);
@@ -109,10 +109,10 @@ internal static class DateTimeCompat
 	}
 }
 
-#if !NET9_0_OR_GREATER
+#if NETSTANDARD2_1
 /// <summary>
-/// Shim for <see cref="System.Collections.Generic.CollectionExtensions.AsReadOnly{TKey, TValue}(IDictionary{TKey, TValue})"/> (added in .NET 9).
-/// Not needed on net9.0+, where the real extension method takes precedence.
+/// Shim for <see cref="System.Collections.Generic.CollectionExtensions.AsReadOnly{TKey, TValue}(IDictionary{TKey, TValue})"/> (not available on netstandard2.1).
+/// Not needed on the native (net11.0) build, where the real extension method takes precedence.
 /// </summary>
 internal static class DictionaryCompatExtensions
 {
@@ -124,7 +124,7 @@ internal static class DictionaryCompatExtensions
 #endif
 
 /// <summary>
-/// Shim for <see cref="Math.Round(decimal, int, MidpointRounding)"/>/<see cref="Math.Round(double, int, MidpointRounding)"/> with <see cref="MidpointRounding.ToZero"/> (added in .NET 8).
+/// Shim for <see cref="Math.Round(decimal, int, MidpointRounding)"/>/<see cref="Math.Round(double, int, MidpointRounding)"/> with <see cref="MidpointRounding.ToZero"/> (not available on netstandard2.1).
 /// </summary>
 internal static class MathCompat
 {
@@ -134,7 +134,7 @@ internal static class MathCompat
 		{
 			throw new ArgumentOutOfRangeException(nameof(digits), "Rounding digits must be between 0 and 15, inclusive.");
 		}
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return Math.Round(value, digits, MidpointRounding.ToZero);
 #else
 		// MidpointRounding.ToZero truncates toward zero for every value, not only exact midpoints
@@ -149,7 +149,7 @@ internal static class MathCompat
 		{
 			throw new ArgumentOutOfRangeException(nameof(digits), "Rounding digits must be between 0 and 28, inclusive.");
 		}
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return Math.Round(value, digits, MidpointRounding.ToZero);
 #else
 		// MidpointRounding.ToZero truncates toward zero for every value, not only exact midpoints
@@ -159,7 +159,7 @@ internal static class MathCompat
 	}
 
 	/// <summary>
-	/// Non-generic greatest common denominator, used instead of the generic-math based <c>MathHelpers.GreatestCommonDenominator&lt;T&gt;</c> (net7.0+ only) for netstandard2.1 compatibility.
+	/// Non-generic greatest common denominator, used instead of the generic-math based <c>MathHelpers.GreatestCommonDenominator&lt;T&gt;</c> (not available on netstandard2.1) for netstandard2.1 compatibility.
 	/// </summary>
 	public static long Gcd(long a, long b)
 	{
@@ -176,17 +176,15 @@ internal static class MathCompat
 }
 
 /// <summary>
-/// Shims for <see cref="Cryptography.Convert.ToHexStringLower(byte[])"/> (added in .NET 9) and the static
-/// HashData/HashDataAsync methods added to the hash algorithm classes in .NET 5-7.
+/// Shims for <see cref="Cryptography.Convert.ToHexStringLower(byte[])"/> and the static
+/// HashData/HashDataAsync methods on the hash algorithm classes (not available on netstandard2.1).
 /// </summary>
 internal static class HashCompat
 {
 	public static string ToHexStringLower(byte[] bytes)
 	{
-#if NET9_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return Convert.ToHexStringLower(bytes);
-#elif NET5_0_OR_GREATER
-		return Convert.ToHexString(bytes).ToLowerInvariant();
 #else
 		char[] chars = new char[bytes.Length * 2];
 		for (int i = 0; i < bytes.Length; i++)
@@ -203,7 +201,7 @@ internal static class HashCompat
 
 	public static byte[] Md5HashData(byte[] source)
 	{
-#if NET5_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return System.Security.Cryptography.MD5.HashData(source);
 #else
 		using System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create();
@@ -213,7 +211,7 @@ internal static class HashCompat
 
 	public static byte[] Sha1HashData(byte[] source)
 	{
-#if NET5_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return System.Security.Cryptography.SHA1.HashData(source);
 #else
 		using System.Security.Cryptography.SHA1 sha1 = System.Security.Cryptography.SHA1.Create();
@@ -223,7 +221,7 @@ internal static class HashCompat
 
 	public static byte[] Sha256HashData(byte[] source)
 	{
-#if NET5_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return System.Security.Cryptography.SHA256.HashData(source);
 #else
 		using System.Security.Cryptography.SHA256 sha256 = System.Security.Cryptography.SHA256.Create();
@@ -233,7 +231,7 @@ internal static class HashCompat
 
 	public static byte[] Sha384HashData(byte[] source)
 	{
-#if NET5_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return System.Security.Cryptography.SHA384.HashData(source);
 #else
 		using System.Security.Cryptography.SHA384 sha384 = System.Security.Cryptography.SHA384.Create();
@@ -243,7 +241,7 @@ internal static class HashCompat
 
 	public static byte[] Sha512HashData(byte[] source)
 	{
-#if NET5_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return System.Security.Cryptography.SHA512.HashData(source);
 #else
 		using System.Security.Cryptography.SHA512 sha512 = System.Security.Cryptography.SHA512.Create();
@@ -253,7 +251,7 @@ internal static class HashCompat
 
 	public static async Task<byte[]> Md5HashDataAsync(Stream source, CancellationToken cancellationToken = default)
 	{
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return await System.Security.Cryptography.MD5.HashDataAsync(source, cancellationToken).ConfigureAwait(false);
 #else
 		using System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create();
@@ -263,7 +261,7 @@ internal static class HashCompat
 
 	public static async Task<byte[]> ComputeHashAsync(System.Security.Cryptography.HashAlgorithm algorithm, Stream stream, CancellationToken cancellationToken = default)
 	{
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return await algorithm.ComputeHashAsync(stream, cancellationToken).ConfigureAwait(false);
 #else
 		return await Task.Run(() => algorithm.ComputeHash(stream), cancellationToken).ConfigureAwait(false);
@@ -272,7 +270,7 @@ internal static class HashCompat
 }
 
 /// <summary>
-/// Shims for <see cref="Parallel.ForEachAsync"/> / <see cref="Parallel.ForAsync"/> (added in .NET 6), so netstandard2.1 has an equivalent.
+/// Shims for <see cref="Parallel.ForEachAsync"/> / <see cref="Parallel.ForAsync"/> (not available on netstandard2.1), so netstandard2.1 has an equivalent.
 /// The netstandard2.1 fallback runs all iterations concurrently rather than with a bounded degree of parallelism.
 /// </summary>
 internal static class AsyncCompat
@@ -284,7 +282,7 @@ internal static class AsyncCompat
 
 	public static async Task ForEachAsync<TSource>(IEnumerable<TSource> source, Func<TSource, CancellationToken, ValueTask> body, CancellationToken cancellationToken)
 	{
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD2_1
 		await Parallel.ForEachAsync(source, cancellationToken, body).ConfigureAwait(false);
 #else
 		List<Task> tasks = [];
@@ -299,7 +297,7 @@ internal static class AsyncCompat
 
 	public static async Task ForAsync(int fromInclusive, int toExclusive, Func<int, CancellationToken, ValueTask> body, CancellationToken cancellationToken)
 	{
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD2_1
 		await Parallel.ForAsync(fromInclusive, toExclusive, cancellationToken, body).ConfigureAwait(false);
 #else
 		List<Task> tasks = [];
@@ -313,9 +311,9 @@ internal static class AsyncCompat
 	}
 }
 
-#if !NET8_0_OR_GREATER
+#if NETSTANDARD2_1
 /// <summary>
-/// Shim for <see cref="CancellationTokenSource.CancelAsync"/> (added in .NET 8). Not needed on net8.0+, where the real instance method takes precedence.
+/// Shim for <see cref="CancellationTokenSource.CancelAsync"/> (not available on netstandard2.1). Not needed on the native (net11.0) build, where the real instance method takes precedence.
 /// </summary>
 internal static class CancellationTokenSourceExtensions
 {
@@ -327,9 +325,9 @@ internal static class CancellationTokenSourceExtensions
 }
 #endif
 
-#if !NET7_0_OR_GREATER
+#if NETSTANDARD2_1
 /// <summary>
-/// Shim for <see cref="System.Security.Cryptography.HashAlgorithm.ComputeHashAsync"/> (added in .NET 7). Not needed on net7.0+, where the real instance method takes precedence.
+/// Shim for <see cref="System.Security.Cryptography.HashAlgorithm.ComputeHashAsync"/> (not available on netstandard2.1). Not needed on the native (net11.0) build, where the real instance method takes precedence.
 /// </summary>
 internal static class HashAlgorithmExtensions
 {
@@ -348,7 +346,7 @@ internal static class DateOnlyCompat
 {
 	public static bool TryParse(string? value, IFormatProvider? provider, out DateOnly result)
 	{
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return DateOnly.TryParse(value, provider, out result);
 #else
 		return DateOnly.TryParse(value, provider, System.Globalization.DateTimeStyles.None, out result);
@@ -357,7 +355,7 @@ internal static class DateOnlyCompat
 
 	public static bool TryParse(ReadOnlySpan<char> value, IFormatProvider? provider, out DateOnly result)
 	{
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return DateOnly.TryParse(value, provider, out result);
 #else
 		return TryParse(value.ToString(), provider, out result);

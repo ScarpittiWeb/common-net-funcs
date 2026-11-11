@@ -11,7 +11,7 @@ public static partial class HtmlEmailBuilder
 	const string LineBreak = "<br><br>";
 	const string CloseTr = "</tr>";
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"https?://[^\n\t< ]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, 5000, "en-US")]
 	private static partial Regex UrlRegex();
 #else

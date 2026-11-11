@@ -697,7 +697,7 @@ public sealed class EmailTests
 	private static async Task<byte[]> ReadZipEntryAsync(ZipArchive archive, string entryName)
 	{
 		ZipArchiveEntry entry = archive.GetEntry(entryName)!;
-#if NET10_0_OR_GREATER
+#if CORE_NATIVE_BUILD
 		await using Stream entryStream = await entry.OpenAsync(Current.CancellationToken);
 #else
 		await using Stream entryStream = entry.Open();
