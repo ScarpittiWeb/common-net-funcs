@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Diagnosers;
-using BenchmarkDotNet.Jobs;
 using CommonNetFuncs.FastMap;
 using Microsoft.VSDiagnostics;
 
@@ -12,7 +11,7 @@ using static CommonNetFuncs.FastMap.FastMapper;
 
 namespace BenchmarkSuite;
 
-[MediumRunJob(RuntimeMoniker.HostProcess)]
+[MediumRunJob]
 [EventPipeProfiler(EventPipeProfile.CpuSampling)]
 [CPUUsageDiagnoser]
 [MemoryDiagnoser]

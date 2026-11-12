@@ -1,11 +1,11 @@
-﻿using System.Collections;
+﻿using CommonNetFuncs.Core.Internal;
+using FastExpressionCompiler;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
-using CommonNetFuncs.Core.Internal;
-using FastExpressionCompiler;
 using static CommonNetFuncs.Core.ReflectionCaches;
 
 namespace CommonNetFuncs.Core;
@@ -29,8 +29,19 @@ public static class Inspect
 	/// <returns>Number of properties in a class that are set to their default value</returns>
 	public static int CountDefaultProps<T>(this T obj) where T : class
 	{
-		return GetOrAddPropertiesFromReflectionCache(typeof(T)).Count(x => x.CanWrite && Equals(x.GetValue(obj), x.PropertyType.GetDefaultValue()));
+		int count = 0;
+		foreach (PropertyInfo property in GetOrAddPropertiesFromReflectionCache(typeof(T)))
+		{
+			if (property.CanWrite && Equals(property.GetValue(obj), DefaultValueCache.GetOrAdd(property.PropertyType, static type => type.GetDefaultValue())))
+			{
+				count++;
+			}
+		}
+		return count;
 	}
+
+	// Boxed defaults are only ever compared with Equals, so sharing one instance per type avoids allocating a new box per property per call
+	private static readonly ConcurrentDictionary<Type, object?> DefaultValueCache = new();
 
 	/// <summary>
 	/// Returns whether a Type has the specified attribute or not
@@ -75,7 +86,7 @@ public static class Inspect
 	}
 
 	private static readonly AsyncLocal<ComparisonContext?> CurrentContext = new();
-	private static readonly ConcurrentDictionary<Tuple<Type, bool, bool>, Func<object, object, IEnumerable<string>, bool>> CompareDelegates = [];
+	private static readonly ConcurrentDictionary<(Type Type, bool IgnoreStringCase, bool Recursive), Func<object, object, IEnumerable<string>, bool>> CompareDelegates = [];
 
 	/// <summary>
 	/// Compare two class objects for value equality
@@ -122,12 +133,8 @@ public static class Inspect
 			}
 
 			exemptProps ??= [];
-			Tuple<Type, bool, bool> key = Tuple.Create(type, ignoreStringCase, recursive);
-			if (!CompareDelegates.TryGetValue(key, out Func<object, object, IEnumerable<string>, bool>? compareDelegate))
-			{
-				compareDelegate = CreateCompareDelegate(type, ignoreStringCase, recursive);
-				CompareDelegates[key] = compareDelegate;
-			}
+			Func<object, object, IEnumerable<string>, bool> compareDelegate = CompareDelegates.GetOrAdd((type, ignoreStringCase, recursive),
+				static key => CreateCompareDelegate(key.Type, key.IgnoreStringCase, key.Recursive));
 
 			return compareDelegate(obj1, obj2, exemptProps);
 		}
@@ -210,7 +217,8 @@ public static class Inspect
 			comparisons.Add(Expression.Condition(propExemptCheck, Expression.Constant(true), comparison));
 		}
 
-		Expression andAlsoExpression = comparisons.Aggregate(Expression.And);
+		// AndAlso short-circuits, so the remaining (possibly recursive) property comparisons are skipped after the first mismatch
+		Expression andAlsoExpression = comparisons.Aggregate(Expression.AndAlso);
 
 		Expression<Func<object, object, IEnumerable<string>, bool>> lambda = Expression.Lambda<Func<object, object, IEnumerable<string>, bool>>(andAlsoExpression, obj1Param, obj2Param, exemptPropsParam);
 

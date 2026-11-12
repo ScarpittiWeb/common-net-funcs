@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Diagnosers;
-using BenchmarkDotNet.Jobs;
 using CommonNetFuncs.EFCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +16,7 @@ namespace BenchmarkSuite;
 /// 1. Single query with projection (BuildPagingResult method)
 /// 2. Two separate queries (separate CountAsync and ToListAsync)
 /// </summary>
-[MediumRunJob(RuntimeMoniker.HostProcess)]
+[MediumRunJob]
 [EventPipeProfiler(EventPipeProfile.CpuSampling)]
 [CPUUsageDiagnoser]
 [MemoryDiagnoser]

@@ -156,16 +156,20 @@ public static partial class HtmlEmailBuilder
 			tableHtmlBuilder.Append("<table><tr>");
 			foreach (DataColumn column in tableData.Columns)
 			{
-				tableHtmlBuilder.Append($"<th>{column.ColumnName}</th>");
+				tableHtmlBuilder.Append("<th>").Append(column.ColumnName).Append("</th>");
 			}
 			tableHtmlBuilder.Append(CloseTr);
 
 			//Add data rows
+			int columnCount = tableData.Columns.Count;
 			foreach (DataRow rowData in tableData.Rows)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
 				tableHtmlBuilder.Append("<tr>");
-				tableHtmlBuilder.Append(string.Concat(rowData.ItemArray.Select(x => $"<td>{x?.ToString()}</td>")));
+				for (int i = 0; i < columnCount; i++)
+				{
+					tableHtmlBuilder.Append("<td>").Append(rowData[i]?.ToString()).Append("</td>");
+				}
 				tableHtmlBuilder.Append(CloseTr);
 			}
 			tableHtmlBuilder.Append("</table>");
@@ -209,15 +213,21 @@ public static partial class HtmlEmailBuilder
 
 			//Make headers
 			tableHtmlBuilder.Append("<table><tr>");
-			tableHtmlBuilder.Append(string.Concat(tableHeaders.Select(x => $"<th>{x}</th>")));
+			foreach (string header in tableHeaders)
+			{
+				tableHtmlBuilder.Append("<th>").Append(header).Append("</th>");
+			}
 			tableHtmlBuilder.Append(CloseTr);
 
 			//Add data rows
-			foreach (List<string> rowData in tableData.Skip(1))
+			for (int rowIndex = 1; rowIndex < tableData.Count; rowIndex++)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
 				tableHtmlBuilder.Append("<tr>");
-				tableHtmlBuilder.Append(string.Concat(rowData.Select(x => $"<td>{x}</td>")));
+				foreach (string cell in tableData[rowIndex])
+				{
+					tableHtmlBuilder.Append("<td>").Append(cell).Append("</td>");
+				}
 				tableHtmlBuilder.Append(CloseTr);
 			}
 			tableHtmlBuilder.Append("</table>");

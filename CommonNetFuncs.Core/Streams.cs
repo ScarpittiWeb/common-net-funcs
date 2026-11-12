@@ -1,6 +1,7 @@
 ﻿namespace CommonNetFuncs.Core;
 
 using CommonNetFuncs.Core.Internal;
+using System.Buffers;
 
 public static class Streams
 {
@@ -104,11 +105,18 @@ public sealed class CountingStream(Stream innerStream) : Stream
 		ThrowHelper.ThrowIfNull(destination, nameof(destination));
 		ThrowHelper.ThrowIfNegativeOrZero(bufferSize, nameof(bufferSize));
 
-		byte[] buffer = new byte[bufferSize];
-		int bytesRead;
-		while ((bytesRead = await ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) != 0)
+		byte[] buffer = ArrayPool<byte>.Shared.Rent(bufferSize);
+		try
 		{
-			await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+			int bytesRead;
+			while ((bytesRead = await ReadAsync(buffer.AsMemory(0, bufferSize), cancellationToken).ConfigureAwait(false)) != 0)
+			{
+				await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+			}
+		}
+		finally
+		{
+			ArrayPool<byte>.Shared.Return(buffer);
 		}
 	}
 

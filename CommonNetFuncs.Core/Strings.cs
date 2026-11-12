@@ -1,17 +1,17 @@
-﻿using System.Collections.Concurrent;
+﻿using FastExpressionCompiler;
+using System.Buffers;
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using FastExpressionCompiler;
 using ZLinq;
-using static System.Convert;
-using static System.Web.HttpUtility;
 using static CommonNetFuncs.Core.MathHelpers;
 using static CommonNetFuncs.Core.ReflectionCaches;
+using static System.Convert;
+using static System.Web.HttpUtility;
 
 namespace CommonNetFuncs.Core;
 
@@ -400,24 +400,14 @@ public static partial class Strings
 			return s;
 		}
 
-		StringBuilder result = new(s.Length + 10); // Pre-allocate with buffer
-
-		bool first = true;
-
-		foreach (char c in s.AsSpan())
+		int spaceCount = CountPascalCaseSpaces(s.AsSpan());
+		if (spaceCount == 0)
 		{
-			if (char.IsUpper(c) && !first)
-			{
-				result.Append(' ');
-			}
-
-			result.Append(c);
-			first = false;
+			return s;
 		}
 
-		return result.ToString();
+		return string.Create(s.Length + spaceCount, s, static (destination, source) => WritePascalCaseWithSpaces(source.AsSpan(), destination));
 	}
-
 
 	/// <summary>
 	/// Parses a string that is using pascal casing (works with camel case as well) so that each word is separated by a space
@@ -432,22 +422,43 @@ public static partial class Strings
 			return s;
 		}
 
-		StringBuilder result = new(s.Length + 10); // Pre-allocate with buffer
-
-		bool first = true;
-
-		foreach (char c in s)
+		int spaceCount = CountPascalCaseSpaces(s);
+		if (spaceCount == 0)
 		{
-			if (char.IsUpper(c) && !first)
-			{
-				result.Append(' ');
-			}
-
-			result.Append(c);
-			first = false;
+			return s;
 		}
 
-		return result.ToString();
+		char[] result = new char[s.Length + spaceCount];
+		WritePascalCaseWithSpaces(s, result);
+		return result;
+	}
+
+	private static int CountPascalCaseSpaces(ReadOnlySpan<char> s)
+	{
+		int spaceCount = 0;
+		for (int i = 1; i < s.Length; i++)
+		{
+			if (char.IsUpper(s[i]))
+			{
+				spaceCount++;
+			}
+		}
+		return spaceCount;
+	}
+
+	private static void WritePascalCaseWithSpaces(ReadOnlySpan<char> source, Span<char> destination)
+	{
+		destination[0] = source[0];
+		int position = 1;
+		for (int i = 1; i < source.Length; i++)
+		{
+			char c = source[i];
+			if (char.IsUpper(c))
+			{
+				destination[position++] = ' ';
+			}
+			destination[position++] = c;
+		}
 	}
 
 
@@ -2884,7 +2895,32 @@ public static partial class Strings
 			return null;
 		}
 
+#if !NETSTANDARD2_1
+		// EnumerateMatches yields allocation-free ValueMatch structs, so the matched digits can be copied straight into one buffer
+		string trimmed = value.Trim();
+		Regex regex = !allowFractions ? NumbersOnlyRegex() : NumbersWithFractionsOnlyRegex();
+		char[]? rented = null;
+		Span<char> buffer = trimmed.Length <= 256 ? stackalloc char[trimmed.Length] : (rented = ArrayPool<char>.Shared.Rent(trimmed.Length));
+		try
+		{
+			int position = 0;
+			foreach (ValueMatch match in regex.EnumerateMatches(trimmed))
+			{
+				trimmed.AsSpan(match.Index, match.Length).CopyTo(buffer[position..]);
+				position += match.Length;
+			}
+			return buffer[..position].Trim().ToString();
+		}
+		finally
+		{
+			if (rented != null)
+			{
+				ArrayPool<char>.Shared.Return(rented);
+			}
+		}
+#else
 		return string.Concat(!allowFractions ? NumbersOnlyRegex().Matches(value.Trim()) : NumbersWithFractionsOnlyRegex().Matches(value.Trim())).Trim();
+#endif
 	}
 
 

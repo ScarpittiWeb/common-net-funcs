@@ -3,13 +3,12 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Jobs;
 using CommonNetFuncs.Compression;
 
 namespace BenchmarkSuite;
 
 [MemoryDiagnoser]
-[SimpleJob(RuntimeMoniker.HostProcess)]
+[SimpleJob]
 public class CompressionStreamsBenchmarks
 {
 	private byte[] smallData = null!;

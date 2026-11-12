@@ -7,7 +7,6 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Diagnosers;
-using BenchmarkDotNet.Jobs;
 using CommonNetFuncs.Web.Requests.Rest;
 using MemoryPack;
 using MessagePack;
@@ -17,7 +16,7 @@ using static CommonNetFuncs.Web.Requests.Rest.RestHelpersStatic;
 
 namespace BenchmarkSuite;
 
-[MediumRunJob(RuntimeMoniker.HostProcess)]
+[MediumRunJob]
 [MemoryDiagnoser]
 [ThreadingDiagnoser]
 [EventPipeProfiler(EventPipeProfile.CpuSampling)]

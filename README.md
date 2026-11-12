@@ -6,6 +6,12 @@
 
 #### CommonNetFuncs is a collection of helper classes and methods that aim to make coding in C# easier with less boilerplate code
 
+## Agent skills
+
+The [repository skills](.github/skills/) provide package-specific guidance for
+using CommonNetFuncs APIs, including important defaults and safety limitations.
+Each package has its own discoverable `SKILL.md`.
+
 ## Included Packages
 
 1. [Compression](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Compression)

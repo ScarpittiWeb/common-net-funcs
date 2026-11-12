@@ -32,6 +32,8 @@ public static class Random
 		'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 #endif
 
+	private static readonly char[] DefaultCharArray = [.. DefaultCharSet];
+
 	/// <summary>
 	/// Generate a random integer between 0 and maxValue - 1
 	/// </summary>
@@ -914,14 +916,14 @@ public static class Random
 
 		int length = minLength == -1 ? maxLength : GetRandomInt(minLength, maxLength);
 
-		StringBuilder result = new(length);
-
 		if (blacklistedCharacters == null || blacklistedCharacters.Count == 0)
 		{
-			for (int i = 0; i < length; i++)
+			Span<char> rangeChars = stackalloc char[upperAsciiBound - lowerAsciiBound + 1];
+			for (int i = 0; i < rangeChars.Length; i++)
 			{
-				result.Append((char)GetRandomInt(lowerAsciiBound, upperAsciiBound + 1));
+				rangeChars[i] = (char)(lowerAsciiBound + i);
 			}
+			return GetRandomString(rangeChars, length, CancellationToken.None);
 		}
 		else
 		{
@@ -945,15 +947,8 @@ public static class Random
 				allowedIndex++;
 			}
 
-			for (int i = 0; i < length; i++)
-			{
-				cancellationToken.ThrowIfCancellationRequested();
-				int randomIndex = GetRandomInt(0, allowedChars.Length);
-				result.Append(allowedChars[randomIndex]);
-			}
+			return GetRandomString(allowedChars, length, cancellationToken);
 		}
-
-		return result.ToString();
 	}
 
 	/// <summary>
@@ -1125,18 +1120,79 @@ public static class Random
 			charSet = DefaultCharSet;
 		}
 
-		ReadOnlySpan<char> charSetSpan = new(charSet.ToArray());
-		int setLength = charSetSpan.Length;
+		return GetRandomString(ReferenceEquals(charSet, DefaultCharSet) ? DefaultCharArray : charSet.ToArray(), length, cancellationToken);
+	}
 
-		StringBuilder result = new(length);
-		for (int i = 0; i < length; i++)
+	/// <summary>
+	/// Builds a cryptographically random string from <paramref name="allowedChars"/>, requesting random bytes in bulk rather than one RNG call per character.
+	/// </summary>
+	private static string GetRandomString(ReadOnlySpan<char> allowedChars, int length, CancellationToken cancellationToken)
+	{
+		if (length > 0)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			char randomChar = charSetSpan[GetRandomInt(0, setLength)];
-			result.Append(randomChar);
 		}
 
-		return result.ToString();
+#if !NETSTANDARD2_1
+		return RandomNumberGenerator.GetString(allowedChars, length);
+#else
+		if (length < 0)
+		{
+			throw new ArgumentOutOfRangeException(nameof(length));
+		}
+
+		if (length == 0)
+		{
+			return string.Empty;
+		}
+
+		char[]? rented = null;
+		Span<char> destination = length <= 256 ? stackalloc char[length] : (rented = System.Buffers.ArrayPool<char>.Shared.Rent(length)).AsSpan(0, length);
+		try
+		{
+			int setLength = allowedChars.Length;
+			if (setLength > 256)
+			{
+				// Byte-based sampling can't index sets larger than 256 characters, so fall back to one RNG call per character
+				for (int i = 0; i < destination.Length; i++)
+				{
+					cancellationToken.ThrowIfCancellationRequested();
+					destination[i] = allowedChars[GetRandomInt(0, setLength)];
+				}
+				return new string(destination);
+			}
+
+			// Rejection sampling: only bytes below the largest multiple of setLength are used so every character is equally likely
+			int acceptLimit = 256 - (256 % setLength);
+			Span<byte> randomBytes = stackalloc byte[256];
+			int written = 0;
+			while (written < destination.Length)
+			{
+				cancellationToken.ThrowIfCancellationRequested();
+				Span<byte> chunk = randomBytes.Slice(0, Math.Min(randomBytes.Length, ((destination.Length - written) * 256 / acceptLimit) + 4));
+				rng.GetBytes(chunk);
+				foreach (byte randomByte in chunk)
+				{
+					if (randomByte < acceptLimit)
+					{
+						destination[written++] = allowedChars[randomByte % setLength];
+						if (written == destination.Length)
+						{
+							break;
+						}
+					}
+				}
+			}
+			return new string(destination);
+		}
+		finally
+		{
+			if (rented != null)
+			{
+				System.Buffers.ArrayPool<char>.Shared.Return(rented);
+			}
+		}
+#endif
 	}
 
 	/// <summary>

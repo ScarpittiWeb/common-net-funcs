@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Diagnosers;
-using BenchmarkDotNet.Jobs;
 using CommonNetFuncs.EFCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,7 +11,7 @@ using Microsoft.VSDiagnostics;
 
 namespace BenchmarkSuite;
 
-[MediumRunJob(RuntimeMoniker.HostProcess)]
+[MediumRunJob]
 [EventPipeProfiler(EventPipeProfile.CpuSampling)]
 [CPUUsageDiagnoser]
 [MemoryDiagnoser]

@@ -36,4 +36,17 @@
 		<TargetFrameworks>netstandard2.1</TargetFrameworks>
 	</PropertyGroup>
 
+	<!--
+		Pack each library's agent skill (.github/skills/<project name lowercased, '.' -> '-'>/SKILL.md) into its NuGet package under
+		skills/<skill name>/. Placed at the package root rather than contentFiles so it is not copied into consuming projects.
+	-->
+	<PropertyGroup Condition="'$(IsPackable)' != 'false'">
+		<_AgentSkillName>$(MSBuildProjectName.ToLowerInvariant().Replace('.', '-'))</_AgentSkillName>
+		<_AgentSkillFile>$(MSBuildThisFileDirectory).github\skills\$(_AgentSkillName)\SKILL.md</_AgentSkillFile>
+	</PropertyGroup>
+
+	<ItemGroup Condition="'$(IsPackable)' != 'false' And Exists('$(_AgentSkillFile)')">
+		<None Include="$(_AgentSkillFile)" Pack="True" PackagePath="skills\$(_AgentSkillName)\" Visible="false" />
+	</ItemGroup>
+
 </Project>

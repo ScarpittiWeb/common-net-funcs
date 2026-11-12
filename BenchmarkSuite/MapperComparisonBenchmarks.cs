@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Diagnosers;
-using BenchmarkDotNet.Jobs;
 using CommonNetFuncs.FastMap;
 using Mapster;
 using Microsoft.VSDiagnostics;
@@ -16,7 +15,7 @@ namespace BenchmarkSuite;
 /// Comprehensive benchmarks comparing FastMapper, FasterMapper, Mapster, and Mapperly.
 /// Measures speed, CPU efficiency, and memory usage across various mapping scenarios.
 /// </summary>
-[MediumRunJob(RuntimeMoniker.HostProcess)]
+[MediumRunJob]
 [MemoryDiagnoser]
 [EventPipeProfiler(EventPipeProfile.CpuSampling)]
 [CPUUsageDiagnoser] // Only works on Windows

@@ -1,5 +1,4 @@
 ﻿using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Jobs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,7 +14,7 @@ namespace BenchmarkSuite;
 /// </summary>
 [RankColumn]
 [MemoryDiagnoser]
-[MediumRunJob(RuntimeMoniker.HostProcess)]
+[MediumRunJob]
 public class ZLinqComparisonBenchmarks
 {
 	// Simple reference type used to verify ZLinq works with classes/generics, not just primitives.

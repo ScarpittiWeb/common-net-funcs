@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Order;
 using CommonNetFuncs.Core;
 
@@ -10,7 +9,7 @@ namespace BenchmarkSuite;
 [MemoryDiagnoser]
 [Orderer(SummaryOrderPolicy.FastestToSlowest)]
 [RankColumn]
-[SimpleJob(RuntimeMoniker.HostProcess)]
+[SimpleJob]
 public class CopyBenchmarks
 {
 	private SimpleClass? simpleSource;
