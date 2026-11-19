@@ -1,4 +1,4 @@
-using CommonNetFuncs.Web.Api.MsgPack;
+﻿using CommonNetFuncs.Web.Api.MsgPack;
 using CommonNetFuncs.Web.Requests.MessagePack;
 using MessagePack;
 using MessagePack.AspNetCoreMvcFormatter;
@@ -18,6 +18,9 @@ public sealed class MessagePackStreamingItem
 {
 	[Key(0)]
 	public DateTime Timestamp { get; init; }
+
+	[Key(1)]
+	public DateTimeOffset TimestampOffset { get; init; }
 }
 
 [ApiController]
@@ -41,7 +44,7 @@ public sealed class MessagePackStreamingController : ControllerBase
 	private static async IAsyncEnumerable<MessagePackStreamingItem> GetItems()
 	{
 		await Task.Yield();
-		yield return new MessagePackStreamingItem { Timestamp = Timestamp };
+		yield return new MessagePackStreamingItem { Timestamp = Timestamp, TimestampOffset = Timestamp };
 	}
 }
 
@@ -62,6 +65,7 @@ public sealed class MessagePackStreamingTests
 			mvcOptions,
 			Current.CancellationToken);
 		item.Timestamp.ShouldBe(new DateTime(2026, 11, 19, 15, 30, 0, DateTimeKind.Utc));
+		item.TimestampOffset.ShouldBe(new DateTimeOffset(2026, 11, 19, 15, 30, 0, TimeSpan.Zero));
 	}
 
 	[Fact]

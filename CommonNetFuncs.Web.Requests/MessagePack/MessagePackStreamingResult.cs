@@ -163,8 +163,10 @@ public class MessagePackStreamingResult<T>(
 			return null;
 		}
 
-		return mvcOptions.Value.OutputFormatters.FirstOrDefault(
-			formatter => formatter.GetType().FullName == "MessagePack.AspNetCoreMvcFormatter.MessagePackOutputFormatter");
+		return mvcOptions.Value.OutputFormatters.FirstOrDefault(formatter =>
+			formatter is OutputFormatter outputFormatter &&
+			outputFormatter.SupportedMediaTypes.Any(mediaType =>
+				mediaType.Equals("application/x-msgpack", StringComparison.OrdinalIgnoreCase)));
 	}
 
 	private async Task WriteMessagePackItemAsync(HttpResponse response, ArrayBufferWriter<byte> bufferWriter, T item, CancellationToken cancellationToken)
