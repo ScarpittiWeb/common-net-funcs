@@ -19,9 +19,51 @@ public static class DateTimeHelpers
 			return 0;
 		}
 
-		DateTime sDate = (DateTime)startDate;
-		DateTime eDate = (DateTime)endDate;
+		DateTime sDate = startDate.Value;
+		DateTime eDate = endDate.Value;
+		long tickDiff = eDate.Ticks - sDate.Ticks;
+		if (tickDiff % TimeSpan.TicksPerDay != 0)
+		{
+			// Partial days make the decimal intermediate fractional, so keep the original decimal arithmetic for them
+			return GetBusinessDaysWithPartialDays(sDate, eDate, exceptionDates);
+		}
 
+		DayOfWeek startDayOfWeek = sDate.DayOfWeek;
+		DayOfWeek endDayOfWeek = eDate.DayOfWeek;
+
+		// For whole-day spans endDow - startDow == days (mod 7), so 5 * days - 2 * (startDow - endDow) is a multiple of 7 and the integer division is exact
+		int calcBusinessDays = 1 + ((((int)(tickDiff / TimeSpan.TicksPerDay) * 5) - ((startDayOfWeek - endDayOfWeek) * 2)) / 7);
+
+		if (endDayOfWeek == DayOfWeek.Saturday)
+		{
+			calcBusinessDays--;
+		}
+
+		if (startDayOfWeek == DayOfWeek.Sunday)
+		{
+			calcBusinessDays--;
+		}
+
+		if (exceptionDates?.Count > 0)
+		{
+			int exceptionDays = 0;
+			foreach (DateTime exceptionDate in exceptionDates)
+			{
+				if (exceptionDate >= sDate && exceptionDate <= eDate &&
+					exceptionDate.DayOfWeek != DayOfWeek.Saturday &&
+					exceptionDate.DayOfWeek != DayOfWeek.Sunday)
+				{
+					exceptionDays++;
+				}
+			}
+			calcBusinessDays -= exceptionDays;
+		}
+
+		return calcBusinessDays;
+	}
+
+	private static int GetBusinessDaysWithPartialDays(DateTime sDate, DateTime eDate, List<DateTime>? exceptionDates)
+	{
 		decimal calcBusinessDays = 1 + (((((decimal)(eDate - sDate).TotalDays) * 5m) - ((sDate.DayOfWeek - eDate.DayOfWeek) * 2m)) / 7m);
 
 		if (eDate.DayOfWeek == DayOfWeek.Saturday)

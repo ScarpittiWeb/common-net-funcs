@@ -86,7 +86,7 @@ public sealed class MathHelpersTests
 	[InlineData(0.0, 0)]
 	public void GetPrecision_Decimal_Works(double? value, int expected)
 	{
-		int precision = ((decimal?)value).GetPrecision();
+		int precision = value.ToShortestDecimal().GetPrecision();
 		precision.ShouldBe(expected);
 	}
 
@@ -107,7 +107,7 @@ public sealed class MathHelpersTests
 		Should.Throw<ArgumentException>(() => GenerateRange(5, 1));
 	}
 
-	// On net10.0+ these resolve to the same generic GenerateRange<TNumber>, but on netstandard2.1 they resolve to the separate long/float/double/decimal overloads, which otherwise go untested.
+	// On net11.0 these resolve to the same generic GenerateRange<TNumber>, but on netstandard2.1 they resolve to the separate long/float/double/decimal overloads, which otherwise go untested.
 	[Theory]
 	[InlineData(1L, 5L, new long[] { 1, 2, 3, 4, 5 })]
 	[InlineData(-2L, 2L, new long[] { -2, -1, 0, 1, 2 })]
@@ -217,14 +217,14 @@ public sealed class MathHelpersTests
 	[InlineData(123456.6, 9123456.6, 1.8, 68587, 5068587)]  // large numbers with decimals
 	public void GreatestCommonDenominatorDecimal_Works(double initialNum, double initialDen, double expectedGcd, double expectedNum, double expectedDen)
 	{
-		decimal numerator = (decimal)initialNum;
-		decimal denominator = (decimal)initialDen;
+		decimal numerator = initialNum.ToShortestDecimal();
+		decimal denominator = initialDen.ToShortestDecimal();
 
 		GreatestCommonDenominator(ref numerator, ref denominator, out decimal gcd);
 
-		gcd.ShouldBe((decimal)expectedGcd);
-		numerator.ShouldBe((decimal)expectedNum);
-		denominator.ShouldBe((decimal)expectedDen);
+		gcd.ShouldBe(expectedGcd.ToShortestDecimal());
+		numerator.ShouldBe(expectedNum.ToShortestDecimal());
+		denominator.ShouldBe(expectedDen.ToShortestDecimal());
 	}
 #endif
 
@@ -265,7 +265,7 @@ public sealed class MathHelpersTests
 	[InlineData(0.0, 0)]
 	public void GetPrecision_NonNullable_Decimal_Works(double value, int expected)
 	{
-		decimal decimalValue = (decimal)value;
+		decimal decimalValue = value.ToShortestDecimal();
 		int precision = decimalValue.GetPrecision();
 		precision.ShouldBe(expected);
 	}
@@ -428,7 +428,7 @@ public sealed class MathHelpersTests
 		numbers.GetMedian().ShouldBe(expected);
 	}
 
-	// On net10.0+ these resolve to the same generic GetMedian<TNumber>, but on netstandard2.1 they resolve to the separate long/float overloads, which otherwise go untested.
+	// On net11.0 these resolve to the same generic GetMedian<TNumber>, but on netstandard2.1 they resolve to the separate long/float overloads, which otherwise go untested.
 	[Theory]
 	[InlineData(new long[] { 1, 2, 3 }, 2L)]                // sorted odd count
 	[InlineData(new long[] { 3, 1, 2 }, 2L)]                // unsorted odd count

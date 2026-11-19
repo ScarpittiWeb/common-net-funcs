@@ -143,8 +143,13 @@ public static partial class Collections
 	/// <param name="cancellationToken">Optional: The cancellation token for this operation.</param>
 	public static void AddRange<T>(this ConcurrentBag<T> concurrentBag, IEnumerable<T?> toAdd, CancellationToken cancellationToken = default)
 	{
-		foreach (T? item in toAdd.SelectNonNull())
+		foreach (T? item in toAdd)
 		{
+			if (item == null)
+			{
+				continue;
+			}
+
 			cancellationToken.ThrowIfCancellationRequested();
 			concurrentBag.Add(item);
 		}
@@ -160,8 +165,13 @@ public static partial class Collections
 	/// <param name="cancellationToken">Optional: The cancellation token for this operation.</param>
 	public static void AddRange<T>(this HashSet<T> hashSet, IEnumerable<T?> toAdd, CancellationToken cancellationToken = default)
 	{
-		foreach (T? item in toAdd.SelectNonNull())
+		foreach (T? item in toAdd)
 		{
+			if (item == null)
+			{
+				continue;
+			}
+
 			cancellationToken.ThrowIfCancellationRequested();
 			hashSet.Add(item);
 		}
@@ -1125,8 +1135,47 @@ public static partial class Collections
 	public static int IndexOf<T>(this IEnumerable<T> collection, T value, IEqualityComparer<T>? comparer)
 	{
 		comparer ??= EqualityComparer<T>.Default;
-		var found = collection.AsValueEnumerable().Select((a, i) => new { a, i }).FirstOrDefault(x => comparer.Equals(x.a, value));
-		return (found == null) ? (-1) : found.i;
+		if (collection is null)
+		{
+			// Keep the original enumeration so a null source fails in exactly the same way
+			var found = collection!.AsValueEnumerable().Select((a, i) => new { a, i }).FirstOrDefault(x => comparer.Equals(x.a, value));
+			return (found == null) ? (-1) : found.i;
+		}
+
+		if (collection is T[] array)
+		{
+			for (int i = 0; i < array.Length; i++)
+			{
+				if (comparer.Equals(array[i], value))
+				{
+					return i;
+				}
+			}
+			return -1;
+		}
+
+		if (collection is List<T> list)
+		{
+			for (int i = 0; i < list.Count; i++)
+			{
+				if (comparer.Equals(list[i], value))
+				{
+					return i;
+				}
+			}
+			return -1;
+		}
+
+		int index = 0;
+		foreach (T item in collection)
+		{
+			if (comparer.Equals(item, value))
+			{
+				return index;
+			}
+			index++;
+		}
+		return -1;
 	}
 
 	/// <summary>
@@ -1165,26 +1214,38 @@ public static partial class Collections
 			return [];
 		}
 
-		// Get the number of elements we're combining
-		int length = sourcesArray.Length;
-
 		// Create initial combination with first sequence
-		List<List<string>> current = sourcesArray[0].Select(x => (List<string>)[x?.ToString() ?? string.Empty]).ToList();
-
-		// Build up combinations for remaining sequences
-		for (int i = 1; i < length; i++)
+		string?[] first = sourcesArray[0];
+		List<string> current = new(first.Length);
+		foreach (string? value in first)
 		{
-			current = current.AsValueEnumerable().SelectMany(existingCombo => sourcesArray[i].Select(x => new List<string>(existingCombo) { x?.ToString() ?? string.Empty })).ToList();
+			current.Add(value ?? string.Empty);
+		}
+
+		// Build up the joined combination strings for remaining sequences
+		for (int i = 1; i < sourcesArray.Length; i++)
+		{
+			string?[] next = sourcesArray[i];
+			List<string> combined = new((int)Math.Min((long)current.Count * next.Length, 1 << 20));
+			foreach (string prefix in current)
+			{
+				foreach (string? value in next)
+				{
+					// Equivalent to string.Join(separator, parts): Concat treats a null separator as empty just like Join does
+					combined.Add(string.Concat(prefix, separator, value ?? string.Empty));
+				}
+			}
+
+			current = combined;
 			if (maxCombinations.HasValue && current.Count >= maxCombinations) // Stop making combinations once reaching the maxCombinations
 			{
 				break;
 			}
 		}
 
-		// Convert the results to strings with separator and return as HashSet
-		return maxCombinations == null || !maxCombinations.HasValue || current.Count < maxCombinations
-			? new HashSet<string>(current.Select(x => string.Join(separator, x)))
-			: current.Select(x => string.Join(separator, x)).Take((int)maxCombinations).ToHashSet();
+		return maxCombinations == null || current.Count < maxCombinations
+			? new HashSet<string>(current)
+			: current.Take((int)maxCombinations).ToHashSet();
 	}
 
 	/// <summary>

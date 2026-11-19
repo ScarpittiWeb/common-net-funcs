@@ -10,8 +10,9 @@ public static partial class HtmlEmailBuilder
 {
 	const string LineBreak = "<br><br>";
 	const string CloseTr = "</tr>";
+	private const int MaxSinglePassUrlMatches = 32;
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"https?://[^\n\t< ]+", RegexOptions.IgnoreCase | RegexOptions.Compiled, 5000, "en-US")]
 	private static partial Regex UrlRegex();
 #else
@@ -27,9 +28,10 @@ public static partial class HtmlEmailBuilder
 	/// <returns>HTML Body of an email</returns>
 	public static string BuildHtmlEmail(string body, string? footer = null)
 	{
+		string htmlBody = body.StringToHtml();
 		StringBuilder emailTextBuilder = new("<html><body>");
-		emailTextBuilder.Append(body.StringToHtml());
-		emailTextBuilder.Append(body.StringToHtml());
+		emailTextBuilder.Append(htmlBody);
+		emailTextBuilder.Append(htmlBody);
 		emailTextBuilder.Append(!string.IsNullOrWhiteSpace(footer) ? LineBreak : string.Empty);
 		emailTextBuilder.Append(footer.StringToHtml());
 		emailTextBuilder.Append("</body></html>");
@@ -45,9 +47,10 @@ public static partial class HtmlEmailBuilder
 	/// <returns>HTML Body of an email</returns>
 	public static string BuildHtmlEmail(string body, DataTable? tableData, string? footer = null, CancellationToken cancellationToken = default)
 	{
+		string htmlBody = body.StringToHtml();
 		StringBuilder emailTextBuilder = new("<html><body>");
-		emailTextBuilder.Append(body.StringToHtml());
-		emailTextBuilder.Append(body.StringToHtml());
+		emailTextBuilder.Append(htmlBody);
+		emailTextBuilder.Append(htmlBody);
 		emailTextBuilder.Append(tableData == null || tableData.Rows.Count == 0 ? string.Empty : LineBreak);
 		emailTextBuilder.Append(tableData.CreateHtmlTable(cancellationToken: cancellationToken));
 		emailTextBuilder.Append(!string.IsNullOrWhiteSpace(footer) ? LineBreak : string.Empty);
@@ -85,12 +88,43 @@ public static partial class HtmlEmailBuilder
 	/// <returns>HTML compatible text</returns>
 	public static string StringToHtml(this string? text)
 	{
-		if (text != null)
+		if (text == null)
 		{
-			text = HtmlEncode(text);
-			text = text.Replace(Environment.NewLine, "\r").Replace("\n", "\r").Replace("\r", "<br>").Replace("\t", "&nbsp&nbsp&nbsp");
+			return string.Empty;
 		}
-		return text ?? string.Empty;
+
+		// Single pass equivalent of Replace(Environment.NewLine, "\r").Replace("\n", "\r").Replace("\r", "<br>").Replace("\t", "&nbsp&nbsp&nbsp"):
+		// each Environment.NewLine (greedy, left to right) -> one <br>, every other '\r' or '\n' -> <br>, '\t' -> 3x &nbsp
+		// (where NewLine is "\n", "\r\n" still becomes "<br><br>")
+		string encoded = HtmlEncode(text);
+		int next = encoded.AsSpan().IndexOfAny('\r', '\n', '\t');
+		if (next < 0)
+		{
+			return encoded;
+		}
+
+		string newLine = Environment.NewLine;
+		StringBuilder sb = new(encoded.Length + 64);
+		int position = 0;
+		while (next >= 0)
+		{
+			sb.Append(encoded, position, next - position);
+			if (encoded[next] == '\t')
+			{
+				sb.Append("&nbsp&nbsp&nbsp");
+				position = next + 1;
+			}
+			else
+			{
+				sb.Append("<br>");
+				position = next + (encoded.AsSpan(next).StartsWith(newLine.AsSpan()) ? newLine.Length : 1);
+			}
+
+			int relative = encoded.AsSpan(position).IndexOfAny('\r', '\n', '\t');
+			next = relative < 0 ? -1 : position + relative;
+		}
+		sb.Append(encoded, position, encoded.Length - position);
+		return sb.ToString();
 	}
 
 	/// <summary>
@@ -101,12 +135,65 @@ public static partial class HtmlEmailBuilder
 	/// <returns>HTML Body with formatted HTML links</returns>
 	public static string FormatAllUrlsToHtml(this string text, string? linkText = null)
 	{
+		MatchCollection matches = UrlRegex().Matches(text);
+		int count = matches.Count;
+		if (count == 0)
+		{
+			return text;
+		}
+
+		// Every ordinal occurrence of a matched URL is either its own match or lies inside another match, and an inserted link can only be
+		// re-matched by a later global Replace if that URL is a substring of another URL's link. When that cannot happen, splicing each link in
+		// at its match position in one pass is identical to the sequential global Replace calls; otherwise use those Replace calls.
+		if (count <= MaxSinglePassUrlMatches)
+		{
+			string resolvedLinkText = linkText ?? "Click Here";
+			string[] urls = new string[count];
+			string[] links = new string[count];
+			int extraLength = 0;
+			for (int i = 0; i < count; i++)
+			{
+				urls[i] = matches[i].Value;
+				links[i] = urls[i].CreateHtmlLink(resolvedLinkText);
+				extraLength += links[i].Length - urls[i].Length;
+			}
+
+			if (CanSpliceUrls(urls, links))
+			{
+				StringBuilder sb = new(text.Length + extraLength);
+				int position = 0;
+				for (int i = 0; i < count; i++)
+				{
+					Match match = matches[i];
+					sb.Append(text, position, match.Index - position).Append(links[i]);
+					position = match.Index + match.Length;
+				}
+				sb.Append(text, position, text.Length - position);
+				return sb.ToString();
+			}
+		}
+
 		StringBuilder textToFormat = new(text);
-		foreach (string url in UrlRegex().Matches(text).Select(x => x.Value))
+		foreach (string url in matches.Select(x => x.Value))
 		{
 			textToFormat.Replace(url, url.CreateHtmlLink(linkText ?? "Click Here"));
 		}
 		return textToFormat.ToString();
+	}
+
+	private static bool CanSpliceUrls(string[] urls, string[] links)
+	{
+		for (int i = 0; i < urls.Length; i++)
+		{
+			for (int j = 0; j < links.Length; j++)
+			{
+				if (i != j && links[j].Contains(urls[i], StringComparison.Ordinal))
+				{
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 
 	/// <summary>
@@ -156,16 +243,20 @@ public static partial class HtmlEmailBuilder
 			tableHtmlBuilder.Append("<table><tr>");
 			foreach (DataColumn column in tableData.Columns)
 			{
-				tableHtmlBuilder.Append($"<th>{column.ColumnName}</th>");
+				tableHtmlBuilder.Append("<th>").Append(column.ColumnName).Append("</th>");
 			}
 			tableHtmlBuilder.Append(CloseTr);
 
 			//Add data rows
+			int columnCount = tableData.Columns.Count;
 			foreach (DataRow rowData in tableData.Rows)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
 				tableHtmlBuilder.Append("<tr>");
-				tableHtmlBuilder.Append(string.Concat(rowData.ItemArray.Select(x => $"<td>{x?.ToString()}</td>")));
+				for (int i = 0; i < columnCount; i++)
+				{
+					tableHtmlBuilder.Append("<td>").Append(rowData[i]?.ToString()).Append("</td>");
+				}
 				tableHtmlBuilder.Append(CloseTr);
 			}
 			tableHtmlBuilder.Append("</table>");
@@ -209,15 +300,21 @@ public static partial class HtmlEmailBuilder
 
 			//Make headers
 			tableHtmlBuilder.Append("<table><tr>");
-			tableHtmlBuilder.Append(string.Concat(tableHeaders.Select(x => $"<th>{x}</th>")));
+			foreach (string header in tableHeaders)
+			{
+				tableHtmlBuilder.Append("<th>").Append(header).Append("</th>");
+			}
 			tableHtmlBuilder.Append(CloseTr);
 
 			//Add data rows
-			foreach (List<string> rowData in tableData.Skip(1))
+			for (int rowIndex = 1; rowIndex < tableData.Count; rowIndex++)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
 				tableHtmlBuilder.Append("<tr>");
-				tableHtmlBuilder.Append(string.Concat(rowData.Select(x => $"<td>{x}</td>")));
+				foreach (string cell in tableData[rowIndex])
+				{
+					tableHtmlBuilder.Append("<td>").Append(cell).Append("</td>");
+				}
 				tableHtmlBuilder.Append(CloseTr);
 			}
 			tableHtmlBuilder.Append("</table>");

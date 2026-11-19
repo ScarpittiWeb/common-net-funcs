@@ -700,7 +700,7 @@ public static class RestHelpersStatic
 			{
 				await using MemoryStream outputStream = new();
 				await System.Text.Json.JsonSerializer.SerializeAsync(outputStream, response, cancellationToken: cancellationToken).ConfigureAwait(false);
-				resultJson = Encoding.UTF8.GetString(outputStream.ToArray());
+				resultJson = Encoding.UTF8.GetString(outputStream.GetBuffer(), 0, (int)outputStream.Length);
 			}
 
 			if (includeHeader)

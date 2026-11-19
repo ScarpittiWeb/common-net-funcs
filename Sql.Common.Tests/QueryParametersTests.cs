@@ -74,6 +74,56 @@ public sealed class QueryParametersTests
 	}
 
 	[Theory]
+	[InlineData("   ", true)]
+	[InlineData(";text", false)]
+	[InlineData("--text", false)]
+	[InlineData("/*", false)]
+	[InlineData("*/", false)]
+	[InlineData("xp_", false)]
+	[InlineData("a xp_cmdshell b", false)]
+	[InlineData("a--b", false)]
+	[InlineData("-", true)]
+	[InlineData("a-b-c", true)]
+	[InlineData("/", true)]
+	[InlineData("*", true)]
+	[InlineData("a/b*c", true)]
+	[InlineData("*a/", true)]
+	[InlineData("x", true)]
+	[InlineData("xp", true)]
+	[InlineData("text-", true)]
+	[InlineData("textx", true)]
+	[InlineData("textxp", true)]
+	[InlineData("x_p", true)]
+	[InlineData("XP_", true)]
+	[InlineData("xP_", true)]
+	public void IsClean_WithTokenBoundaries_ShouldMatchOnlyCompleteTokens(string input, bool expectedResult)
+	{
+		// Act
+		bool result = input.IsClean();
+
+		// Assert
+		result.ShouldBe(expectedResult);
+	}
+
+	[Theory]
+	[InlineData("plain value", "plain value")]
+	[InlineData("*", "")]
+	[InlineData("%", "")]
+	[InlineData("'", "''")]
+	[InlineData("a*b%c'd", "abc''d")]
+	[InlineData("a/b-c", "a/b-c")]
+	[InlineData("x*/", "")]
+	[InlineData("xp_cmdshell", "")]
+	public void SanitizeSqlParameter_WithEdgeStrings_ShouldEscapeOrReject(string input, string expected)
+	{
+		// Act
+		string result = input.SanitizeSqlParameter();
+
+		// Assert
+		result.ShouldBe(expected);
+	}
+
+	[Theory]
 	[InlineData("test'name", false, false, false, null, null, "test''name")]
 	[InlineData("Test%Name*", false, false, false, null, null, "TestName")]
 	[InlineData("test;name", false, false, false, null, null, "")]

@@ -1,6 +1,5 @@
 ﻿using System.Text.RegularExpressions;
 using DocumentFormat.OpenXml.Packaging;
-using ZLinq;
 
 namespace CommonNetFuncs.Word.OpenXml;
 
@@ -69,10 +68,12 @@ public static class ChangeUrls
 			MainDocumentPart? mainPart = wordDoc.MainDocumentPart;
 			if (mainPart != null)
 			{
+				Dictionary<string, string>? lookup = null;
 				foreach (HyperlinkRelationship hyperlink in mainPart.HyperlinkRelationships.ToList())
 				{
-					string? newUrl = urlsToUpdate.AsValueEnumerable().Where(x => string.Equals(x.Key, hyperlink.Uri.ToString(), StringComparison.InvariantCultureIgnoreCase)).Select(x => x.Value).FirstOrDefault();
-					if (newUrl != null)
+					// Built on first use so a null dictionary only fails when there is a hyperlink to look up
+					lookup ??= CreateUrlLookup(urlsToUpdate);
+					if (lookup.TryGetValue(hyperlink.Uri.ToString(), out string? newUrl) && (newUrl != null))
 					{
 						mainPart.DeleteReferenceRelationship(hyperlink);
 						mainPart.AddHyperlinkRelationship(new Uri(newUrl), true, hyperlink.Id);
@@ -90,6 +91,17 @@ public static class ChangeUrls
 			wordDoc?.Dispose();
 		}
 		return success;
+	}
+
+	// TryAdd keeps the first key in enumeration order, matching the former FirstOrDefault scan when keys differ only by case
+	private static Dictionary<string, string> CreateUrlLookup(Dictionary<string, string> urlsToUpdate)
+	{
+		Dictionary<string, string> lookup = new(urlsToUpdate.Count, StringComparer.InvariantCultureIgnoreCase);
+		foreach (KeyValuePair<string, string> kvp in urlsToUpdate)
+		{
+			lookup.TryAdd(kvp.Key, kvp.Value);
+		}
+		return lookup;
 	}
 
 	/// <summary>

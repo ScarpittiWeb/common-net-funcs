@@ -1,4 +1,4 @@
-﻿#if NET8_0_OR_GREATER
+﻿#if !NETSTANDARD2_1
 using System.Collections.Frozen;
 #endif
 using CliWrap;
@@ -16,7 +16,7 @@ public static class Optimizer
 {
 	private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 	private static readonly FrozenSet<string> GifsicleExtensions = ["gif"];
 	private static readonly FrozenSet<string> JpegoptimExtensions = ["jpg", "jpeg"];
 	private static readonly FrozenSet<string> OptipngExtensions = ["png", "bmp", "pnm", "tiff"];

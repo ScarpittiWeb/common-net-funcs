@@ -361,6 +361,44 @@ public sealed class StreamsTests
 	}
 
 	[Theory]
+	[InlineData(ECompressionType.Brotli)]
+	[InlineData(ECompressionType.Gzip)]
+	[InlineData(ECompressionType.Deflate)]
+	[InlineData(ECompressionType.ZLib)]
+	public void Decompress_Should_Grow_Output_Buffer_For_Highly_Compressible_Data_Synchronously(ECompressionType compressionType)
+	{
+		// Arrange - expands far beyond both the 4x size estimate and the 1 MB read chunk
+		byte[] originalData = new byte[(9 * 1024 * 1024) + 321];
+		for (int i = 0; i < originalData.Length; i++)
+		{
+			originalData[i] = (byte)(i % 251);
+		}
+		byte[] compressedData = originalData.Compress(compressionType);
+
+		// Act
+		byte[] decompressedData = compressedData.Decompress(compressionType, maxCompressionRatio: int.MaxValue, cancellationToken: Current.CancellationToken);
+
+		// Assert
+		decompressedData.ShouldBe(originalData);
+	}
+
+	[Fact]
+	public void Decompress_Should_Throw_When_Limit_Exceeded_After_Buffer_Growth_Synchronously()
+	{
+		// Arrange
+		byte[] originalData = new byte[8 * 1024 * 1024];
+		for (int i = 0; i < originalData.Length; i++)
+		{
+			originalData[i] = (byte)(i % 251);
+		}
+		byte[] compressedData = originalData.Compress(ECompressionType.Gzip);
+		int maxCompressionRatio = (int)((3L * 1024 * 1024) / compressedData.Length); // ~3 MB limit
+
+		// Act & Assert
+		Should.Throw<CompressionLimitExceededException>(() => compressedData.Decompress(ECompressionType.Gzip, maxCompressionRatio: maxCompressionRatio));
+	}
+
+	[Theory]
 	[MemberData(nameof(GetCompressionTestData))]
 	public async Task DetectCompressionTypeNonSeekable_Should_Detect_Compression_Type(byte[] header, ECompressionType expectedType)
 	{
@@ -916,6 +954,42 @@ public sealed class StreamsTests
 
 		// Assert
 		isDeflate.ShouldBeFalse();
+	}
+
+	[Theory]
+	[InlineData(false, true)]
+	[InlineData(false, false)]
+	[InlineData(true, true)]
+	[InlineData(true, false)]
+	public async Task IsDeflateCompressed_Memory_Should_Handle_Array_Slices_And_Non_Array_Backed_Memory(bool nonArrayBacked, bool deflateData)
+	{
+		// Arrange - surround the payload with other bytes so a slice with a non-zero offset is checked
+		byte[] payload = deflateData ? smallData.Compress(ECompressionType.Deflate) : "Hello, World! This is not compressed data."u8.ToArray();
+		byte[] backing = new byte[payload.Length + 20];
+		backing.AsSpan(0, 10).Fill(0xFF);
+		backing.AsSpan(10 + payload.Length).Fill(0xFF);
+		payload.CopyTo(backing, 10);
+
+		using NonArrayMemoryManager manager = new(backing);
+		Memory<byte> memory = (nonArrayBacked ? manager.Memory : backing.AsMemory()).Slice(10, payload.Length);
+
+		// Act
+		bool isDeflate = await memory.IsDeflateCompressed();
+
+		// Assert
+		isDeflate.ShouldBe(deflateData);
+	}
+
+	/// <summary>Memory owner whose memory is not exposed as an array (MemoryMarshal.TryGetArray returns false).</summary>
+	private sealed class NonArrayMemoryManager(byte[] data) : System.Buffers.MemoryManager<byte>
+	{
+		public override Span<byte> GetSpan() => data;
+
+		public override System.Buffers.MemoryHandle Pin(int elementIndex = 0) => throw new NotSupportedException();
+
+		public override void Unpin() { }
+
+		protected override void Dispose(bool disposing) { }
 	}
 
 	// Tests for DetectCompressionTypeAndReset

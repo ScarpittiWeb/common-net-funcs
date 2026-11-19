@@ -387,7 +387,8 @@ public static class Export
 				int x = 0;
 				int y = 0;
 
-				HashSet<int> skipColumns = [];
+				int columnCount = data.Columns.Count;
+				bool[] skipColumns = new bool[columnCount];
 				Dictionary<int, int> maxColumnWidths = [];
 				List<string> columnNames = [];
 				IRow currentRow = ws.GetRow(y) ?? ws.CreateRow(y);
@@ -406,7 +407,7 @@ public static class Export
 					}
 					else
 					{
-						skipColumns.Add(x);
+						skipColumns[x] = true;
 					}
 					x++;
 				}
@@ -418,9 +419,15 @@ public static class Export
 				{
 					cancellationToken.ThrowIfCancellationRequested();
 					currentRow = ws.GetRow(y) ?? ws.CreateRow(y);
-					foreach (object? value in row.ItemArray)
+					for (x = 0; x < columnCount; x++)
 					{
-						if ((value != null) && !skipColumns.Contains(x))
+						if (skipColumns[x])
+						{
+							continue;
+						}
+
+						object value = row[x]; // Same default-version read ItemArray performs, without copying the whole row
+						if (value != null)
 						{
 							ICell? c = currentRow.GetCell(x) ?? currentRow.CreateCell(x);
 							if (c != null)
@@ -435,7 +442,6 @@ public static class Export
 								}
 							}
 						}
-						x++;
 					}
 					x = 0;
 					y++;

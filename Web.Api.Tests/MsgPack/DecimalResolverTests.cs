@@ -83,7 +83,7 @@ public sealed class FlexibleDecimalFormatterTests
 
 		decimal result = Deserialize(bytes);
 
-		result.ShouldBe((decimal)floatValue);
+		result.ShouldBe(decimal.Parse(floatValue.ToString("R", CultureInfo.InvariantCulture), CultureInfo.InvariantCulture));
 	}
 
 	// -----------------------------------------------------------------------
@@ -216,7 +216,7 @@ public sealed class FlexibleNullableDecimalFormatterTests
 
 		decimal? result = Deserialize(bytes);
 
-		result.ShouldBe((decimal?)floatValue);
+		result.ShouldBe(decimal.Parse(floatValue.ToString("R", CultureInfo.InvariantCulture), CultureInfo.InvariantCulture));
 	}
 
 	// -----------------------------------------------------------------------

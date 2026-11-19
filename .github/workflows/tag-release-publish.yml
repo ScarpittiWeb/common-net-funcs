@@ -186,7 +186,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x" # adjust to match your project's target SDK
+          dotnet-version: "11.0.x" # adjust to match your project's target SDK
 
       # NEW: Re-fetch the same per-project test results here too, since this is a separate job/runner and doesn't have access to files from the "release" job.
       - name: Fetch per-project test results

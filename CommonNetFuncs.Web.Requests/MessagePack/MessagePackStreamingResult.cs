@@ -36,6 +36,8 @@ public class MessagePackStreamingResult<T>(
 	int successStatusCode = StatusCodes.Status200OK,
 	int emptyStatusCode = StatusCodes.Status204NoContent) : IActionResult, IResult
 {
+	private static readonly byte[] NewLine = [(byte)'\n'];
+
 	private readonly IAsyncEnumerable<T> data = data ?? throw new ArgumentNullException(nameof(data));
 	private readonly MessagePackSerializerOptions? messagePackOptions = messagePackOptions;
 	private readonly JsonSerializerOptions? jsonOptions = jsonOptions;
@@ -77,6 +79,9 @@ public class MessagePackStreamingResult<T>(
 			? GetMvcMessagePackFormatter(httpContext)
 			: null;
 
+		// One serialization buffer per response (never shared between concurrent executions), reused for every MessagePack item
+		ArrayBufferWriter<byte>? messagePackBuffer = null;
+
 		try
 		{
 			await foreach (T item in data.WithCancellation(cancellationToken).ConfigureAwait(false))
@@ -91,7 +96,8 @@ public class MessagePackStreamingResult<T>(
 					}
 					else
 					{
-						await WriteMessagePackItemAsync(response, item, cancellationToken).ConfigureAwait(false);
+						messagePackBuffer ??= new ArrayBufferWriter<byte>();
+						await WriteMessagePackItemAsync(response, messagePackBuffer, item, cancellationToken).ConfigureAwait(false);
 					}
 				}
 				else // JSON
@@ -157,14 +163,16 @@ public class MessagePackStreamingResult<T>(
 			return null;
 		}
 
-		return mvcOptions.Value.OutputFormatters.FirstOrDefault(
-			formatter => formatter.GetType().FullName == "MessagePack.AspNetCoreMvcFormatter.MessagePackOutputFormatter");
+		return mvcOptions.Value.OutputFormatters.FirstOrDefault(formatter =>
+			formatter is OutputFormatter outputFormatter &&
+			outputFormatter.SupportedMediaTypes.Any(mediaType =>
+				mediaType.Equals("application/x-msgpack", StringComparison.OrdinalIgnoreCase)));
 	}
 
-	private async Task WriteMessagePackItemAsync(HttpResponse response, T item, CancellationToken cancellationToken)
+	private async Task WriteMessagePackItemAsync(HttpResponse response, ArrayBufferWriter<byte> bufferWriter, T item, CancellationToken cancellationToken)
 	{
-		// Serialize each item to a buffer
-		ArrayBufferWriter<byte> bufferWriter = new();
+		// Serialize each item into the reused buffer
+		bufferWriter.ResetWrittenCount();
 		MessagePackSerializer.Serialize(bufferWriter, item, messagePackOptions ?? MessagePackSerializerOptions.Standard, cancellationToken);
 
 		// Write the serialized bytes to the response stream
@@ -191,7 +199,7 @@ public class MessagePackStreamingResult<T>(
 
 		// Write JSON followed by newline (NDJSON format)
 		await response.Body.WriteAsync(jsonBytes, cancellationToken).ConfigureAwait(false);
-		await response.Body.WriteAsync("\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
+		await response.Body.WriteAsync(NewLine, cancellationToken).ConfigureAwait(false);
 		await response.Body.FlushAsync(cancellationToken).ConfigureAwait(false);
 	}
 

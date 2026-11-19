@@ -15,7 +15,7 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 	private readonly SemaphoreSlim semaphore = new(1, 1);
 	private readonly Lock statsLock = new();
 	private readonly PrioritizedQueueStats stats;
-	private readonly Dictionary<TaskPriority, List<TimeSpan>> processingTimesByPriority = new();
+	private readonly Dictionary<TaskPriority, Queue<TimeSpan>> processingTimesByPriority = new();
 	private readonly int processTimeWindow = 1000;
 	private bool disposed;
 
@@ -29,7 +29,7 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 		foreach (TaskPriority priority in Enum.GetValues<TaskPriority>())
 		{
 			stats.PriorityBreakdown[priority] = new PriorityStats();
-			processingTimesByPriority[priority] = new List<TimeSpan>();
+			processingTimesByPriority[priority] = new Queue<TimeSpan>();
 		}
 
 		writer = queue.Writer;
@@ -44,7 +44,7 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 		foreach (TaskPriority priority in Enum.GetValues<TaskPriority>())
 		{
 			stats.PriorityBreakdown[priority] = new PriorityStats();
-			processingTimesByPriority[priority] = new List<TimeSpan>();
+			processingTimesByPriority[priority] = new Queue<TimeSpan>();
 		}
 
 		writer = queue.Writer;

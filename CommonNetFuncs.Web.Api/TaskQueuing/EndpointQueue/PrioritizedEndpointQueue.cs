@@ -13,7 +13,7 @@ public class PrioritizedEndpointQueue : IDisposable
 	private readonly CancellationTokenSource cancellationTokenSource;
 	private Task? processingTask;
 	private readonly PrioritizedQueueStats stats;
-	private readonly Dictionary<TaskPriority, List<TimeSpan>> processingTimesByPriority = new();
+	private readonly Dictionary<TaskPriority, Queue<TimeSpan>> processingTimesByPriority = new();
 	private readonly Lock statsLock = new();
 	private readonly ManualResetEventSlim newTaskEvent = new(false);
 	private readonly int processTimeWindow;
@@ -37,7 +37,7 @@ public class PrioritizedEndpointQueue : IDisposable
 		foreach (TaskPriority priority in Enum.GetValues<TaskPriority>())
 		{
 			stats.PriorityBreakdown[priority] = new PriorityStats();
-			processingTimesByPriority[priority] = new List<TimeSpan>();
+			processingTimesByPriority[priority] = new Queue<TimeSpan>();
 		}
 
 		// Don't start processing task yet - it will be started lazily on first enqueue
@@ -322,8 +322,8 @@ public class PrioritizedEndpointQueue : IDisposable
 					LastProcessedAt = kvp.Value.LastProcessedAt
 				};
 
-				List<TimeSpan> processingTimes = processingTimesByPriority[kvp.Key];
-				if (processingTimes.AnyFast())
+				Queue<TimeSpan> processingTimes = processingTimesByPriority[kvp.Key];
+				if (processingTimes.Count > 0)
 				{
 					priorityStats.AverageProcessingTime = TimeSpan.FromMilliseconds(processingTimes.Average(t => t.TotalMilliseconds));
 				}

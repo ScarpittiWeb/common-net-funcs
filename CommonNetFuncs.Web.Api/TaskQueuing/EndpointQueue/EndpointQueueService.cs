@@ -68,20 +68,21 @@ public class EndpointQueueService : IEndpointQueueService, IDisposable
 
 	private EndpointQueue GetOrCreateQueue(string endpointKey, BoundedChannelOptions boundedChannelOptions)
 	{
-		return queues.GetOrAdd(endpointKey, key =>
+		// Static lambda + factory argument avoids allocating a closure and delegate on every lookup
+		return queues.GetOrAdd(endpointKey, static (key, options) =>
 		{
 			logger.Info("Creating new queue for endpoint: {EndpointKey}", key);
-			return new EndpointQueue(key, boundedChannelOptions);
-		});
+			return new EndpointQueue(key, options);
+		}, boundedChannelOptions);
 	}
 
 	private EndpointQueue GetOrCreateQueue(string endpointKey, UnboundedChannelOptions unboundedChannelOptions)
 	{
-		return queues.GetOrAdd(endpointKey, key =>
+		return queues.GetOrAdd(endpointKey, static (key, options) =>
 		{
 			logger.Info("Creating new queue for endpoint: {EndpointKey}", key);
-			return new EndpointQueue(key, unboundedChannelOptions);
-		});
+			return new EndpointQueue(key, options);
+		}, unboundedChannelOptions);
 	}
 
 	private void CleanupUnusedQueues(object? state)

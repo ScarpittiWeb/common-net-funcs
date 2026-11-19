@@ -274,6 +274,7 @@ public static class DirectQuery
 		MethodInfo getValueMethod = typeof(IDataRecord).GetMethod("GetValue")!;
 		MethodInfo getOrdinalMethod = typeof(IDataRecord).GetMethod("GetOrdinal")!;
 		MethodInfo isDBNullMethod = typeof(IDataRecord).GetMethod("IsDBNull")!;
+		MethodInfo toInt32Method = typeof(Convert).GetMethod(nameof(Convert.ToInt32), new[] { typeof(object) })!;
 
 		// Create new instance expression
 		NewExpression instanceExp = Expression.New(type);
@@ -286,21 +287,22 @@ public static class DirectQuery
 
 		foreach (PropertyInfo prop in properties)
 		{
-			// Create GetOrdinal call
+			// Resolve the column ordinal once per row and reuse it for both the IsDBNull check and GetValue
+			ParameterExpression ordinal = Expression.Variable(typeof(int), "ordinal");
 			MethodCallExpression getOrdinalCall = Expression.Call(readerParam, getOrdinalMethod, Expression.Constant(prop.Name));
 
 			// Create IsDBNull check
-			MethodCallExpression isDbNullCall = Expression.Call(readerParam, isDBNullMethod, getOrdinalCall);
+			MethodCallExpression isDbNullCall = Expression.Call(readerParam, isDBNullMethod, ordinal);
 
 			// Get value from reader
-			MethodCallExpression getValue = Expression.Call(readerParam, getValueMethod, getOrdinalCall);
+			MethodCallExpression getValue = Expression.Call(readerParam, getValueMethod, ordinal);
 
 			// Convert value to property type if needed
 			Expression convertedValue;
 			if (prop.PropertyType == typeof(int))
 			{
 				// Convert to Int32 from Int64
-				convertedValue = Expression.Convert(Expression.Call(typeof(Convert).GetMethod(nameof(Convert.ToInt32), new[] { typeof(object) })!, getValue), typeof(int));
+				convertedValue = Expression.Convert(Expression.Call(toInt32Method, getValue), typeof(int));
 			}
 			else
 			{
@@ -308,7 +310,9 @@ public static class DirectQuery
 			}
 
 			// Create conditional expression: if IsDBNull then default else converted value
-			ConditionalExpression assignValue = Expression.Condition(isDbNullCall, Expression.Default(prop.PropertyType), convertedValue);
+			BlockExpression assignValue = Expression.Block(prop.PropertyType, new[] { ordinal },
+				Expression.Assign(ordinal, getOrdinalCall),
+				Expression.Condition(isDbNullCall, Expression.Default(prop.PropertyType), convertedValue));
 
 			// Create property binding
 			assignments.Add(Expression.Bind(prop, assignValue));

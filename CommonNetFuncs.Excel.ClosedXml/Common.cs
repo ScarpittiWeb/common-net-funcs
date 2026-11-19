@@ -76,10 +76,10 @@ public static class Common
 
 	private const string ErrorLocationFormat = "{Class}.{Method} Error";
 
-	// Math.Round(..., MidpointRounding.ToZero) is only available on net8.0+; netstandard2.1 needs a manual equivalent.
+	// Math.Round(..., MidpointRounding.ToZero) is only available on net11.0; netstandard2.1 needs a manual equivalent.
 	private static double RoundToZero(double value, int digits)
 	{
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return Math.Round(value, digits, MidpointRounding.ToZero);
 #else
 		double factor = Math.Pow(10, digits);
@@ -107,7 +107,7 @@ public static class Common
 
 	private static decimal RoundToZero(decimal value, int digits)
 	{
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return Math.Round(value, digits, MidpointRounding.ToZero);
 #else
 		decimal factor = (decimal)Math.Pow(10, digits);

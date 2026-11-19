@@ -1,5 +1,4 @@
-﻿using System.Text;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Caching.Distributed;
 
@@ -15,6 +14,8 @@ public static class DistributedCacheExtensions
 		DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
 	};
 
+	private static ReadOnlySpan<byte> Utf8Bom => [0xEF, 0xBB, 0xBF];
+
 	public static Task SetAsync<T>(this IDistributedCache cache, string key, T value)
 	{
 		return SetAsync(cache, key, value, new DistributedCacheEntryOptions());
@@ -22,7 +23,7 @@ public static class DistributedCacheExtensions
 
 	public static Task SetAsync<T>(this IDistributedCache cache, string key, T value, DistributedCacheEntryOptions options)
 	{
-		byte[] bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value, serializerOptions));
+		byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(value, serializerOptions);
 		return cache.SetAsync(key, bytes, options);
 	}
 
@@ -47,7 +48,17 @@ public static class DistributedCacheExtensions
 			return default;
 		}
 
-		await using MemoryStream stream = new(val);
-		return await JsonSerializer.DeserializeAsync<T>(stream, serializerOptions).ConfigureAwait(false);
+		return DeserializeCachedValue<T>(val);
+	}
+
+	// The previous stream-based reader skipped a single leading UTF-8 BOM; span deserialization does not, so strip it here to keep parity
+	private static T? DeserializeCachedValue<T>(byte[] val)
+	{
+		ReadOnlySpan<byte> utf8Json = val;
+		if (utf8Json.StartsWith(Utf8Bom))
+		{
+			utf8Json = utf8Json[Utf8Bom.Length..];
+		}
+		return JsonSerializer.Deserialize<T>(utf8Json, serializerOptions);
 	}
 }

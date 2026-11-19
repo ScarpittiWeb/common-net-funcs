@@ -107,6 +107,9 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 		// Seed the ancestor set with the root type so cycles back to it are detected
 		HashSet<Type> ancestors = [type];
 
+		// NullabilityInfoContext is a cache and not thread-safe: share one for this schema only
+		NullabilityInfoContext nullabilityContext = new();
+
 		// Also build a labels map for DisplayName attributes
 		StringBuilder labelsSb = new();
 		labelsSb.AppendLine($"export const {typeName}Labels: Record<string, string> = {{");
@@ -127,14 +130,7 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 			PropertyInfo effectiveProp = sourceProp ?? prop;
 
 			// Use source property attributes if available, otherwise use the property's own attributes
-			IEnumerable<ValidationAttribute> validationAttrs = effectiveProp
-				.GetCustomAttributes(true)
-				.OfType<ValidationAttribute>();
-
-			// Also check for custom CommonNetFuncs validation attributes via base class name matching
-			IEnumerable<Attribute> allAttrs = effectiveProp.GetCustomAttributes(true).OfType<Attribute>();
-
-			string schema = BuildPropertySchema(prop, validationAttrs, allAttrs, ancestors);
+			string schema = BuildPropertySchema(prop, effectiveProp.GetCustomAttributes(true), ancestors, nullabilityContext);
 			sb.AppendLine($"\t{prop.Name}: {schema},");
 
 			// Extract DisplayName
@@ -203,7 +199,7 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 		}
 		return attr.GetType().GetProperty("ErrorMessage")?.GetValue(attr) as string;
 	}
-	private static string BuildPropertySchema(PropertyInfo prop, IEnumerable<ValidationAttribute> validationAttrs, IEnumerable<Attribute> allAttrs, HashSet<Type> ancestors)
+	private static string BuildPropertySchema(PropertyInfo prop, object[] attributes, HashSet<Type> ancestors, NullabilityInfoContext nullabilityContext)
 	{
 		Type propType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
 		bool isNullable = Nullable.GetUnderlyingType(prop.PropertyType) != null || !prop.PropertyType.IsValueType || (prop.PropertyType.IsGenericType && prop.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>));
@@ -211,8 +207,7 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 		// For reference types (string, arrays, etc.), check if nullable
 		if (!prop.PropertyType.IsValueType)
 		{
-			NullabilityInfoContext nullContext = new();
-			NullabilityInfo nullInfo = nullContext.Create(prop);
+			NullabilityInfo nullInfo = nullabilityContext.Create(prop);
 			isNullable = nullInfo.WriteState != NullabilityState.NotNull;
 		}
 
@@ -220,9 +215,19 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 		List<string> outerPipes = [];
 		// Collect item-level pipe validators (applied to each element of array/list properties)
 		List<string> itemPipes = [];
+		bool isRequired = false;
 
-		foreach (ValidationAttribute attr in validationAttrs)
+		// All ValidationAttribute pipes first, then custom (by-name) pipes
+		foreach (object attribute in attributes)
 		{
+			if (attribute is not ValidationAttribute attr)
+			{
+				continue;
+			}
+
+			// Handle Required attribute specifically
+			isRequired |= attr is RequiredAttribute;
+
 			string? pipe = attr switch
 			{
 				RequiredAttribute => null, // Handled by nullable/optional logic
@@ -246,8 +251,13 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 
 		// Handle custom CommonNetFuncs.Web.Common.ValidationAttributes.
 		// List* attributes produce item-level pipes; others produce outer-level pipes.
-		foreach (Attribute attr in allAttrs)
+		foreach (object attribute in attributes)
 		{
+			if (attribute is not Attribute attr)
+			{
+				continue;
+			}
+
 			(bool isItemLevel, string? pipe) = GetCustomAttributePipe(attr);
 			if (pipe != null)
 			{
@@ -262,22 +272,19 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 			}
 		}
 
-		// Handle Required attribute specifically
-		bool isRequired = validationAttrs.Any(x => x is RequiredAttribute);
-
 		// Build base schema. For array/list types with item validators, embed the validators
 		// into the element schema: v.array(v.pipe(itemType, ...itemPipes))
 		Type? itemType = GetArrayItemType(propType);
 		string baseSchema;
 		if (itemType != null && itemPipes.Count > 0)
 		{
-			string itemBaseSchema = GetBaseSchema(itemType, ancestors);
+			string itemBaseSchema = GetBaseSchema(itemType, ancestors, nullabilityContext);
 			string itemSchema = $"v.pipe({itemBaseSchema}, {string.Join(", ", itemPipes)})";
 			baseSchema = $"v.array({itemSchema})";
 		}
 		else
 		{
-			baseSchema = GetBaseSchema(propType, ancestors);
+			baseSchema = GetBaseSchema(propType, ancestors, nullabilityContext);
 		}
 
 		// Build the final schema
@@ -308,13 +315,13 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 		return schema;
 	}
 
-	private static string GetBaseSchema(Type propType, HashSet<Type> ancestors)
+	private static string GetBaseSchema(Type propType, HashSet<Type> ancestors, NullabilityInfoContext nullabilityContext)
 	{
 		// Check if it's an array or list type
 		if (propType.IsArray)
 		{
 			Type elementType = propType.GetElementType()!;
-			return $"v.array({GetBaseSchema(elementType, ancestors)})";
+			return $"v.array({GetBaseSchema(elementType, ancestors, nullabilityContext)})";
 		}
 
 		if (propType.IsGenericType)
@@ -323,7 +330,7 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 			if (genericDef == typeof(List<>) || genericDef == typeof(IList<>) || genericDef == typeof(IEnumerable<>) || genericDef == typeof(ICollection<>))
 			{
 				Type elementType = propType.GetGenericArguments()[0];
-				return $"v.array({GetBaseSchema(elementType, ancestors)})";
+				return $"v.array({GetBaseSchema(elementType, ancestors, nullabilityContext)})";
 			}
 		}
 
@@ -371,7 +378,7 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 			}
 
 			ancestors.Add(propType);
-			string objectSchema = BuildInlineObjectSchema(propType, ancestors);
+			string objectSchema = BuildInlineObjectSchema(propType, ancestors, nullabilityContext);
 			ancestors.Remove(propType);
 			return objectSchema;
 		}
@@ -385,7 +392,7 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 	/// Validation attributes on the nested type's properties are honoured.
 	/// Cycle detection is enforced by the caller via <paramref name="ancestors"/>.
 	/// </summary>
-	private static string BuildInlineObjectSchema(Type type, HashSet<Type> ancestors)
+	private static string BuildInlineObjectSchema(Type type, HashSet<Type> ancestors, NullabilityInfoContext nullabilityContext)
 	{
 		PropertyInfo[] properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
@@ -400,15 +407,12 @@ public sealed class ValibotSchemaGenerator : InterfaceCodeGenerator
 				continue;
 			}
 
-			IEnumerable<ValidationAttribute> validationAttrs = prop.GetCustomAttributes(true).OfType<ValidationAttribute>();
-			IEnumerable<Attribute> allAttrs = prop.GetCustomAttributes(true).OfType<Attribute>();
-
 			if (!first)
 			{
 				sb.Append(", ");
 			}
 
-			sb.Append($"{prop.Name}: {BuildPropertySchema(prop, validationAttrs, allAttrs, ancestors)}");
+			sb.Append($"{prop.Name}: {BuildPropertySchema(prop, prop.GetCustomAttributes(true), ancestors, nullabilityContext)}");
 			first = false;
 		}
 

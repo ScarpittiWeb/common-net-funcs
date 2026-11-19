@@ -13,6 +13,7 @@ public sealed class HtmlEmailBuilderTests
 	[InlineData("Hello\tWorld", "Hello&nbsp&nbsp&nbspWorld")]
 	[InlineData(null, "")]
 	[InlineData("Hello <script>", "Hello &lt;script&gt;")]
+	[InlineData("A\rB\n\nC\r\n\tD", "A<br>B<br><br>C<br>&nbsp&nbsp&nbspD", "A<br>B<br><br>C<br><br>&nbsp&nbsp&nbspD")]
 	public void StringToHtml_ShouldFormatCorrectly(string? input, string expected, string? unixExpected = null)
 	{
 		// Act
@@ -48,6 +49,40 @@ public sealed class HtmlEmailBuilderTests
 
 		// Assert
 		result.ShouldContain(expected);
+	}
+
+	[Theory]
+	// Distinct URLs: each one is replaced in place
+	[InlineData("See https://a.com/x and http://b.org/y today", "Go",
+		"See <a href=\"https://a.com/x\">Go</a> and <a href=\"http://b.org/y\">Go</a> today")]
+	// Duplicate URL: every Replace pass also rewrites the links inserted by the previous pass
+	[InlineData("a http://x.com b http://x.com c", null,
+		"a <a href=\"<a href=\"http://x.com\">Click Here</a>\">Click Here</a> b <a href=\"<a href=\"http://x.com\">Click Here</a>\">Click Here</a> c")]
+	// URL that is a prefix of another URL: the shorter one is replaced inside the longer one first
+	[InlineData("http://x.com and http://x.com/page", null,
+		"<a href=\"http://x.com\">Click Here</a> and <a href=\"http://x.com\">Click Here</a>/page")]
+	public void FormatAllUrlsToHtml_Should_Match_Sequential_Replace_Semantics(string input, string? linkText, string expected)
+	{
+		// Act
+		string result = input.FormatAllUrlsToHtml(linkText);
+
+		// Assert
+		result.ShouldBe(expected);
+	}
+
+	[Fact]
+	public void FormatAllUrlsToHtml_Should_Replace_Many_Urls()
+	{
+		// Arrange - more URLs than the single-pass limit
+		string[] urls = Enumerable.Range(0, 40).Select(i => $"https://example.com/{i}/").ToArray();
+		string input = string.Join(" text ", urls);
+		string expected = string.Join(" text ", urls.Select(x => x.CreateHtmlLink()));
+
+		// Act
+		string result = input.FormatAllUrlsToHtml();
+
+		// Assert
+		result.ShouldBe(expected);
 	}
 
 	[Theory]

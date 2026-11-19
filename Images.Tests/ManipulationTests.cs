@@ -749,6 +749,107 @@ public sealed class ManipulationTests : IDisposable
 	}
 
 	[RetryTheory(3)]
+	[InlineData("test.bmp")]
+	[InlineData("test.gif")]
+	[InlineData("test.jpeg")]
+	[InlineData("test.jpg")]
+	[InlineData("test.png")]
+	public void TryGetMetadata_AllOverloads_MatchDecodedBitmapDimensions(string fileName)
+	{
+		// Arrange
+		byte[] bytes = GetTestImageBytes(fileName);
+		using SKBitmap decoded = SKBitmap.Decode(bytes);
+		using MemoryStream stream = new(bytes);
+
+		// Act
+		bool pathResult = Manipulation.TryGetMetadata(GetTestImagePath(fileName), out ImageInfo pathMetadata);
+		bool streamResult = Manipulation.TryGetMetadata(stream, out ImageInfo streamMetadata);
+		bool spanResult = Manipulation.TryGetMetadata(bytes, out ImageInfo spanMetadata);
+
+		// Assert
+		pathResult.ShouldBeTrue();
+		streamResult.ShouldBeTrue();
+		spanResult.ShouldBeTrue();
+		foreach (ImageInfo metadata in new[] { pathMetadata, streamMetadata, spanMetadata })
+		{
+			metadata.Width.ShouldBe(decoded.Width);
+			metadata.Height.ShouldBe(decoded.Height);
+		}
+	}
+
+	[RetryTheory(3)]
+	[InlineData("test.jpg")]
+	[InlineData("test.png")]
+	public void StreamOverloads_NonSeekableStream_MatchSeekableResults(string fileName)
+	{
+		// Arrange
+		byte[] bytes = GetTestImageBytes(fileName);
+		using MemoryStream seekable = new(bytes);
+		Manipulation.TryGetMetadata(seekable, out ImageInfo expectedMetadata).ShouldBeTrue();
+		Manipulation.TryDetectImageType(bytes, out SKEncodedImageFormat? expectedFormat).ShouldBeTrue();
+
+		// Act
+		using NonSeekableStream metadataStream = new(bytes);
+		bool metadataResult = Manipulation.TryGetMetadata(metadataStream, out ImageInfo metadata);
+
+		using NonSeekableStream detectStream = new(bytes);
+		bool detectResult = Manipulation.TryDetectImageType(detectStream, out SKEncodedImageFormat? format);
+
+		using NonSeekableStream convertStream = new(bytes);
+		using MemoryStream converted = new();
+		bool convertResult = Manipulation.ConvertImageFormat(convertStream, converted, SKEncodedImageFormat.Png);
+
+		// Assert
+		metadataResult.ShouldBeTrue();
+		metadata.Width.ShouldBe(expectedMetadata.Width);
+		metadata.Height.ShouldBe(expectedMetadata.Height);
+		metadata.EncodedFormat.ShouldBe(expectedMetadata.EncodedFormat);
+
+		detectResult.ShouldBeTrue();
+		format.ShouldBe(expectedFormat);
+
+		convertResult.ShouldBeTrue();
+		using SKBitmap convertedBitmap = SKBitmap.Decode(converted.ToArray());
+		convertedBitmap.Width.ShouldBe(expectedMetadata.Width);
+		convertedBitmap.Height.ShouldBe(expectedMetadata.Height);
+	}
+
+	/// <summary>Forward-only stream that returns data in small chunks (exercises the non-seekable buffering path).</summary>
+	private sealed class NonSeekableStream(byte[] data) : Stream
+	{
+		private readonly MemoryStream inner = new(data, writable: false);
+
+		public override bool CanRead => true;
+
+		public override bool CanSeek => false;
+
+		public override bool CanWrite => false;
+
+		public override long Length => throw new NotSupportedException();
+
+		public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+		public override void Flush() { }
+
+		public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, Math.Min(count, 4096));
+
+		public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+		public override void SetLength(long value) => throw new NotSupportedException();
+
+		public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+			{
+				inner.Dispose();
+			}
+			base.Dispose(disposing);
+		}
+	}
+
+	[RetryTheory(3)]
 	[InlineData("test.jpg", 120, 80)]
 	[InlineData("test.jpeg", 75, 40)]
 	[InlineData("test.png", 50, 25)]

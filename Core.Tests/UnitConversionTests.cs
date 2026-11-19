@@ -85,25 +85,25 @@ public sealed class UnitConversionTests
 	[InlineData(1.0, 25.4)]
 	[InlineData(0.5, 12.7)]
 	[InlineData(0.0, 0.0)]
-	public void InsToMm_NonNullable_ConvertsCorrectly(double inches, decimal expectedMm)
+	public void InsToMm_NonNullable_ConvertsCorrectly(double inches, double expectedMm)
 	{
 		// Act
-		decimal result = ((decimal)inches).InsToMm();
+		decimal result = inches.ToShortestDecimal().InsToMm();
 
 		// Assert
-		result.ShouldBe(expectedMm);
+		result.ShouldBe(expectedMm.ToShortestDecimal());
 	}
 
 	[Theory]
 	[InlineData(1.0, 1, 25.4)]
 	[InlineData(null, 1, 0.0)]
-	public void InsToMm_Nullable_ConvertsCorrectly(double? inches, int decimalPlaces, decimal expectedMm)
+	public void InsToMm_Nullable_ConvertsCorrectly(double? inches, int decimalPlaces, double expectedMm)
 	{
 		// Act
 		decimal result = ((decimal?)inches).InsToMm(decimalPlaces);
 
 		// Assert
-		result.ShouldBe(expectedMm);
+		result.ShouldBe(expectedMm.ToShortestDecimal());
 	}
 
 	[Theory]
@@ -356,10 +356,10 @@ public sealed class UnitConversionTests
 	[InlineData(666666666, 6, 0.000606)]
 	[InlineData(0, 1, 0.0)]
 	[InlineData(-666666666, 6, -0.000606)]
-	public void BytesToTb_Int_ConvertsCorrectly(int bytes, int decimalPlaces, decimal expectedTb)
+	public void BytesToTb_Int_ConvertsCorrectly(int bytes, int decimalPlaces, double expectedTb)
 	{
 		decimal result = bytes.BytesToTb(decimalPlaces);
-		result.ShouldBe(expectedTb);
+		result.ShouldBe(expectedTb.ToShortestDecimal());
 	}
 
 	[Theory]

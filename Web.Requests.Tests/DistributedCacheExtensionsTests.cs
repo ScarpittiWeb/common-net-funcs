@@ -134,4 +134,23 @@ public class DistributedCacheExtensionsTests
 
 		result.ShouldBe(default);
 	}
+
+	[Fact]
+	public async Task TryGetValueAsync_WithUtf8BomPrefixedPayload_ReturnsDeserializedValue()
+	{
+		// Arrange
+
+		IDistributedCache cache = A.Fake<IDistributedCache>();
+		const string key = "bom-key";
+		byte[] bytes = [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize("bom-value", SerializerOptions))];
+		A.CallTo(() => cache.GetAsync(key, default)).Returns(bytes);
+
+		// Act
+
+		string? result = await cache.TryGetValueAsync<string>(key);
+
+		// Assert
+
+		result.ShouldBe("bom-value");
+	}
 }

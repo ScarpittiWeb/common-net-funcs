@@ -1,10 +1,17 @@
-﻿namespace CommonNetFuncs.DeepClone;
+﻿using System.Runtime.CompilerServices;
+
+namespace CommonNetFuncs.DeepClone;
 
 /// <summary>
 /// Reference equality comparer for deep clone operations.
 /// </summary>
 internal sealed class ReferenceEqualityComparer : EqualityComparer<object>
 {
+	/// <summary>
+	/// Shared stateless instance.
+	/// </summary>
+	public static readonly ReferenceEqualityComparer Instance = new();
+
 	/// <summary>
 	/// Determines whether the specified objects are the same instance.
 	/// </summary>
@@ -17,17 +24,13 @@ internal sealed class ReferenceEqualityComparer : EqualityComparer<object>
 	}
 
 	/// <summary>
-	/// Returns a hash code for the specified object.
+	/// Returns an identity-based hash code for the specified object (never invokes an overridden <see cref="object.GetHashCode"/>).
 	/// </summary>
 	/// <param name="obj">The object for which to generate a hash code. Can be <see langword="null"/>.</param>
-	/// <returns>The hash code of the specified object, or 0 if <paramref name="obj"/> is <see langword="null"/>.</returns>
+	/// <returns>The identity hash code of the specified object, or 0 if <paramref name="obj"/> is <see langword="null"/>.</returns>
 	public override int GetHashCode(object obj)
 	{
-		if (obj == null)
-		{
-			return 0;
-		}
-
-		return obj.GetHashCode();
+		// Identity hash keeps the comparer consistent with ReferenceEquals and avoids deep record / boxed struct hashing
+		return RuntimeHelpers.GetHashCode(obj);
 	}
 }

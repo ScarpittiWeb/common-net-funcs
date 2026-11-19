@@ -1,17 +1,17 @@
-﻿using System.Collections.Concurrent;
+﻿using FastExpressionCompiler;
+using System.Buffers;
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using FastExpressionCompiler;
 using ZLinq;
-using static System.Convert;
-using static System.Web.HttpUtility;
 using static CommonNetFuncs.Core.MathHelpers;
 using static CommonNetFuncs.Core.ReflectionCaches;
+using static System.Convert;
+using static System.Web.HttpUtility;
 
 namespace CommonNetFuncs.Core;
 
@@ -52,15 +52,7 @@ public static partial class Strings
 	public const string TimestampUrlFormat = "yyyyMMddHHmmssFFF";
 	public const string DateOnlyUrlFormat = "yyyyMMdd";
 
-#if NET7_0_OR_GREATER
-	[GeneratedRegex(@"\s+", RegexOptions.Compiled, 5000)]
-	private static partial Regex MultiSpaceRegex();
-#else
-	private static readonly Regex multiSpaceRegexInstance = new(@"\s+", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-	private static Regex MultiSpaceRegex() => multiSpaceRegexInstance;
-#endif
-
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex("^[a-zA-Z0-9]*$", RegexOptions.Compiled, 5000)]
 	private static partial Regex AlphanumericRegex();
 #else
@@ -68,7 +60,7 @@ public static partial class Strings
 	private static Regex AlphanumericRegex() => alphanumericRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"^[a-zA-Z0-9\s]*$", RegexOptions.Compiled, 5000)]
 	private static partial Regex AlphanumericWithSpacesRegex();
 #else
@@ -76,7 +68,7 @@ public static partial class Strings
 	private static Regex AlphanumericWithSpacesRegex() => alphanumericWithSpacesRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex("^[a-zA-Z]*$", RegexOptions.Compiled, 5000)]
 	private static partial Regex AlphaOnlyRegex();
 #else
@@ -84,7 +76,7 @@ public static partial class Strings
 	private static Regex AlphaOnlyRegex() => alphaOnlyRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"^[a-zA-Z\s]*$", RegexOptions.Compiled, 5000)]
 	private static partial Regex AlphaOnlyWithSpacesRegex();
 #else
@@ -92,7 +84,7 @@ public static partial class Strings
 	private static Regex AlphaOnlyWithSpacesRegex() => alphaOnlyWithSpacesRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex("^[0-9]*$", RegexOptions.Compiled, 5000)]
 	private static partial Regex NumericOnlyRegex();
 #else
@@ -100,7 +92,7 @@ public static partial class Strings
 	private static Regex NumericOnlyRegex() => numericOnlyRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"^[0-9\s]*$", RegexOptions.Compiled, 5000)]
 	private static partial Regex NumericOnlyWithSpacesRegex();
 #else
@@ -108,7 +100,7 @@ public static partial class Strings
 	private static Regex NumericOnlyWithSpacesRegex() => numericOnlyWithSpacesRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"\D+", RegexOptions.Compiled, 5000)]
 	private static partial Regex ExtractNumbersRegex();
 #else
@@ -116,7 +108,7 @@ public static partial class Strings
 	private static Regex ExtractNumbersRegex() => extractNumbersRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"(\d{3})(\d{4})", RegexOptions.Compiled, 5000)]
 	private static partial Regex SevenDigitPhoneNumberRegex();
 #else
@@ -124,7 +116,7 @@ public static partial class Strings
 	private static Regex SevenDigitPhoneNumberRegex() => sevenDigitPhoneNumberRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled, 5000)]
 	private static partial Regex TenDigitPhoneNumberRegex();
 #else
@@ -132,7 +124,7 @@ public static partial class Strings
 	private static Regex TenDigitPhoneNumberRegex() => tenDigitPhoneNumberRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"(\d{1})(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled, 5000)]
 	private static partial Regex ElevenDigitPhoneNumberRegex();
 #else
@@ -140,7 +132,7 @@ public static partial class Strings
 	private static Regex ElevenDigitPhoneNumberRegex() => elevenDigitPhoneNumberRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"(\d{2})(\d{3})(\d{3})(\d{4})", RegexOptions.Compiled, 5000)]
 	private static partial Regex TwelveDigitPhoneNumberRegex();
 #else
@@ -148,7 +140,7 @@ public static partial class Strings
 	private static Regex TwelveDigitPhoneNumberRegex() => twelveDigitPhoneNumberRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex("[A-Za-z]", RegexOptions.Compiled, 5000)]
 	internal static partial Regex RemoveLettersRegex();
 #else
@@ -156,7 +148,7 @@ public static partial class Strings
 	internal static Regex RemoveLettersRegex() => removeLettersRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex("[0-9]", RegexOptions.Compiled, 5000)]
 	private static partial Regex RemoveNumbersRegex();
 #else
@@ -164,15 +156,7 @@ public static partial class Strings
 	private static Regex RemoveNumbersRegex() => removeNumbersRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
-	[GeneratedRegex("[A-Za-z ]", RegexOptions.Compiled, 5000)]
-	private static partial Regex LettersOnlyRegex();
-#else
-	private static readonly Regex lettersOnlyRegexInstance = new("[A-Za-z ]", RegexOptions.Compiled, TimeSpan.FromSeconds(5));
-	private static Regex LettersOnlyRegex() => lettersOnlyRegexInstance;
-#endif
-
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"[0-9]*\.?[0-9]+", RegexOptions.Compiled, 5000)]
 	private static partial Regex NumbersOnlyRegex();
 #else
@@ -180,7 +164,7 @@ public static partial class Strings
 	private static Regex NumbersOnlyRegex() => numbersOnlyRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"[0-9 ]*\.?[0-9]+((\/|\\)[0-9 ]*\.?[0-9]+)?", RegexOptions.Compiled, 5000)]
 	private static partial Regex NumbersWithFractionsOnlyRegex();
 #else
@@ -188,7 +172,7 @@ public static partial class Strings
 	private static Regex NumbersWithFractionsOnlyRegex() => numbersWithFractionsOnlyRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"(\s+|[^\w\s])", RegexOptions.Compiled, 5000)]
 	private static partial Regex TitleCaseSplitRegex();
 #else
@@ -196,7 +180,7 @@ public static partial class Strings
 	private static Regex TitleCaseSplitRegex() => titleCaseSplitRegexInstance;
 #endif
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	[GeneratedRegex(@"\w", RegexOptions.Compiled, 5000)]
 	private static partial Regex TitleCaseWordRegex();
 #else
@@ -379,11 +363,30 @@ public static partial class Strings
 	/// <returns>Null if the string passed in is null or is the word null with no other text characters other than whitespace</returns>
 	public static string? MakeNullNull(this string? s)
 	{
-		if (!s.IsNullOrWhiteSpace() && (s?.StrEq("Null") != false || s.ToUpperInvariant().Replace("NULL", string.Empty)?.Length == 0))
+		if (!s.IsNullOrWhiteSpace() && (s.StrEq("Null") || IsRepeatedNull(s)))
 		{
 			return null;
 		}
 		return s;
+	}
+
+	// Equivalent to s.ToUpperInvariant().Replace("NULL", "").Length == 0 without the upper-cased copy: "NULL" cannot overlap itself, so the ordinal Replace
+	// only empties the string when it is exactly "NULL" repeated. ToUpperInvariant is a per-UTF-16-unit simple mapping for BMP chars and maps surrogates to surrogates.
+	private static bool IsRepeatedNull(string s)
+	{
+		if ((s.Length & 3) != 0)
+		{
+			return false;
+		}
+
+		for (int i = 0; i < s.Length; i += 4)
+		{
+			if (char.ToUpperInvariant(s[i]) != 'N' || char.ToUpperInvariant(s[i + 1]) != 'U' || char.ToUpperInvariant(s[i + 2]) != 'L' || char.ToUpperInvariant(s[i + 3]) != 'L')
+			{
+				return false;
+			}
+		}
+		return true;
 	}
 
 
@@ -400,24 +403,14 @@ public static partial class Strings
 			return s;
 		}
 
-		StringBuilder result = new(s.Length + 10); // Pre-allocate with buffer
-
-		bool first = true;
-
-		foreach (char c in s.AsSpan())
+		int spaceCount = CountPascalCaseSpaces(s.AsSpan());
+		if (spaceCount == 0)
 		{
-			if (char.IsUpper(c) && !first)
-			{
-				result.Append(' ');
-			}
-
-			result.Append(c);
-			first = false;
+			return s;
 		}
 
-		return result.ToString();
+		return string.Create(s.Length + spaceCount, s, static (destination, source) => WritePascalCaseWithSpaces(source.AsSpan(), destination));
 	}
-
 
 	/// <summary>
 	/// Parses a string that is using pascal casing (works with camel case as well) so that each word is separated by a space
@@ -432,22 +425,43 @@ public static partial class Strings
 			return s;
 		}
 
-		StringBuilder result = new(s.Length + 10); // Pre-allocate with buffer
-
-		bool first = true;
-
-		foreach (char c in s)
+		int spaceCount = CountPascalCaseSpaces(s);
+		if (spaceCount == 0)
 		{
-			if (char.IsUpper(c) && !first)
-			{
-				result.Append(' ');
-			}
-
-			result.Append(c);
-			first = false;
+			return s;
 		}
 
-		return result.ToString();
+		char[] result = new char[s.Length + spaceCount];
+		WritePascalCaseWithSpaces(s, result);
+		return result;
+	}
+
+	private static int CountPascalCaseSpaces(ReadOnlySpan<char> s)
+	{
+		int spaceCount = 0;
+		for (int i = 1; i < s.Length; i++)
+		{
+			if (char.IsUpper(s[i]))
+			{
+				spaceCount++;
+			}
+		}
+		return spaceCount;
+	}
+
+	private static void WritePascalCaseWithSpaces(ReadOnlySpan<char> source, Span<char> destination)
+	{
+		destination[0] = source[0];
+		int position = 1;
+		for (int i = 1; i < source.Length; i++)
+		{
+			char c = source[i];
+			if (char.IsUpper(c))
+			{
+				destination[position++] = ' ';
+			}
+			destination[position++] = c;
+		}
 	}
 
 
@@ -467,8 +481,9 @@ public static partial class Strings
 		}
 
 		// Use TextInfo for culture-aware title casing
+		// GetCultureInfo returns a cached, read-only culture built with useUserOverride: false, i.e. the same TextInfo rules as new CultureInfo(name, false)
 
-		TextInfo textInfo = new CultureInfo(cultureString, false).TextInfo;
+		TextInfo textInfo = CultureInfo.GetCultureInfo(cultureString).TextInfo;
 
 		if (uppercaseHandling == TitleCaseUppercaseWordHandling.IgnoreUppercase)
 		{
@@ -478,7 +493,7 @@ public static partial class Strings
 		// Split the input by word boundaries
 
 		string[] words = TitleCaseSplitRegex().Split(input);
-		StringBuilder result = new();
+		StringBuilder result = new(input.Length);
 
 		foreach (string word in words)
 		{
@@ -488,8 +503,7 @@ public static partial class Strings
 				continue;
 			}
 
-			bool isAllUppercase = word.Length > 0 && word.StrComp(word.ToUpper()) && !word.StrComp(word.ToLower());
-			if (isAllUppercase)
+			if (IsAllUppercase(word))
 			{
 				switch (uppercaseHandling)
 				{
@@ -529,6 +543,27 @@ public static partial class Strings
 		return result.ToString();
 	}
 
+	// Same as word == word.ToUpper() && word != word.ToLower() (current culture, ordinal equality) without allocating either cased copy
+	private static bool IsAllUppercase(string word)
+	{
+		if (word.Length > 256)
+		{
+			return string.Equals(word, word.ToUpper()) && !string.Equals(word, word.ToLower());
+		}
+
+		CultureInfo culture = CultureInfo.CurrentCulture;
+		Span<char> buffer = stackalloc char[256];
+		Span<char> cased = buffer[..word.Length];
+		word.AsSpan().ToUpper(cased, culture);
+		if (!cased.SequenceEqual(word.AsSpan()))
+		{
+			return false;
+		}
+
+		word.AsSpan().ToLower(cased, culture);
+		return !cased.SequenceEqual(word.AsSpan());
+	}
+
 
 	/// <summary>
 	/// Trims a string removing all extra leading and trailing spaces as well as reducing multiple consecutive spaces to only 1 space
@@ -538,11 +573,64 @@ public static partial class Strings
 	[return: NotNullIfNotNull(nameof(s))]
 	public static string? TrimFull(this string? s)
 	{
-		if (!s.IsNullOrWhiteSpace())
+		if (s.IsNullOrWhiteSpace())
 		{
-			s = MultiSpaceRegex().Replace(s.Trim(), " ");
+			return s?.Trim();
 		}
-		return s?.Trim();
+
+		// Regex \s is char.IsWhiteSpace and string.Trim trims char.IsWhiteSpace, so: trim, then collapse every whitespace run (including a single non-space whitespace char) to one ' '
+		ReadOnlySpan<char> span = s.AsSpan().Trim();
+
+		// Trimmed span never ends in whitespace, so span[i + 1] is always in range when span[i] is whitespace
+		int firstChange = -1;
+		for (int i = 0; i < span.Length; i++)
+		{
+			char c = span[i];
+			if (char.IsWhiteSpace(c) && (c != ' ' || char.IsWhiteSpace(span[i + 1])))
+			{
+				firstChange = i;
+				break;
+			}
+		}
+
+		if (firstChange < 0)
+		{
+			return span.Length == s.Length ? s : span.ToString();
+		}
+
+		char[]? rented = null;
+		Span<char> buffer = span.Length <= 256 ? stackalloc char[256] : (rented = ArrayPool<char>.Shared.Rent(span.Length));
+		try
+		{
+			span[..firstChange].CopyTo(buffer);
+			int position = firstChange;
+			bool inWhiteSpace = false;
+			for (int i = firstChange; i < span.Length; i++)
+			{
+				char c = span[i];
+				if (char.IsWhiteSpace(c))
+				{
+					if (!inWhiteSpace)
+					{
+						buffer[position++] = ' ';
+						inWhiteSpace = true;
+					}
+				}
+				else
+				{
+					buffer[position++] = c;
+					inWhiteSpace = false;
+				}
+			}
+			return buffer[..position].ToString();
+		}
+		finally
+		{
+			if (rented != null)
+			{
+				ArrayPool<char>.Shared.Return(rented);
+			}
+		}
 	}
 
 
@@ -977,7 +1065,7 @@ public static partial class Strings
 				int singleIndex = result.IndexOf(oldValue, StringComparison.InvariantCultureIgnoreCase);
 				if (singleIndex != -1)
 				{
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD2_1
 					result = string.Concat(result.AsSpan(0, singleIndex), newValue.AsSpan(), result.AsSpan(singleIndex + oldValue.Length));
 #else
 					result = string.Concat(result.Substring(0, singleIndex), newValue, result.Substring(singleIndex + oldValue.Length));
@@ -1028,12 +1116,13 @@ public static partial class Strings
 			return true;
 		}
 
+		// MemoryExtensions.Equals with InvariantCultureIgnoreCase is the same comparison as string.Equals, but span Trim avoids allocating trimmed copies
 		if (s1 == null || s2 == null)
 		{
-			return string.Equals(string.Empty, (s1 ?? s2)?.Trim(), StringComparison.InvariantCultureIgnoreCase);
+			return string.Empty.AsSpan().Equals((s1 ?? s2).AsSpan().Trim(), StringComparison.InvariantCultureIgnoreCase);
 		}
 
-		return string.Equals(s1.Trim(), s2.Trim(), StringComparison.InvariantCultureIgnoreCase);
+		return s1.AsSpan().Trim().Equals(s2.AsSpan().Trim(), StringComparison.InvariantCultureIgnoreCase);
 	}
 
 
@@ -1111,7 +1200,7 @@ public static partial class Strings
 	/// <returns><see langword="true"/> if testString contains only letters and numbers and optionally spaces</returns>
 	public static bool IsAlphanumeric(this ReadOnlySpan<char> testString, bool allowSpaces = false)
 	{
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return !testString.IsEmpty && (!allowSpaces ? AlphanumericRegex().IsMatch(testString) : AlphanumericWithSpacesRegex().IsMatch(testString));
 #else
 		return !testString.IsEmpty && testString.ToString().IsAlphanumeric(allowSpaces);
@@ -1139,7 +1228,7 @@ public static partial class Strings
 	/// <returns><see langword="true"/> if testString only contains letters and optionally spaces</returns>
 	public static bool IsAlphaOnly(this ReadOnlySpan<char> testString, bool allowSpaces = false)
 	{
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return !testString.IsEmpty && (!allowSpaces ? AlphaOnlyRegex().IsMatch(testString) : AlphaOnlyWithSpacesRegex().IsMatch(testString));
 #else
 		return !testString.IsEmpty && testString.ToString().IsAlphaOnly(allowSpaces);
@@ -1167,7 +1256,7 @@ public static partial class Strings
 	/// <returns><see langword="true"/> if testString only contains numbers and optionally spaces</returns>
 	public static bool IsNumericOnly(this ReadOnlySpan<char> testString, bool allowSpaces = false)
 	{
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 		return !testString.IsEmpty && (!allowSpaces ? NumericOnlyRegex().IsMatch(testString) : NumericOnlyWithSpacesRegex().IsMatch(testString));
 #else
 		return !testString.IsEmpty && testString.ToString().IsNumericOnly(allowSpaces);
@@ -1246,7 +1335,12 @@ public static partial class Strings
 		return lastIndex != -1 ? s[(lastIndex + 1)..] : s;
 	}
 
-	private static readonly ConcurrentDictionary<(Type, bool), Delegate> trimObjectStringsCache = new();
+	// Per-T static fields replace a (Type, bool) dictionary lookup and avoid allocating a capturing GetOrAdd closure on every call
+	private static class TrimObjectStringsActionCache<T> where T : class
+	{
+		internal static Action<T>? NonRecursive;
+		internal static Action<T>? Recursive;
+	}
 
 
 	/// <summary>
@@ -1263,10 +1357,9 @@ public static partial class Strings
 			return obj;
 		}
 
-		Type type = typeof(T);
-		(Type type, bool recursive) key = (type, recursive);
-
-		Action<T> action = (Action<T>)trimObjectStringsCache.GetOrAdd(key, _ => CreateTrimObjectStringsExpression<T>(recursive).CompileFast());
+		Action<T> action = recursive ?
+			(TrimObjectStringsActionCache<T>.Recursive ??= CreateTrimObjectStringsExpression<T>(true).CompileFast()) :
+			(TrimObjectStringsActionCache<T>.NonRecursive ??= CreateTrimObjectStringsExpression<T>(false).CompileFast());
 		action(obj);
 
 		return obj;
@@ -1490,7 +1583,12 @@ public static partial class Strings
 		return obj;
 	}
 
-	private static readonly ConcurrentDictionary<(Type, bool), Delegate> makeObjectNullNullCache = new();
+	// Per-T static fields replace a (Type, bool) dictionary lookup and avoid allocating a capturing GetOrAdd closure on every call
+	private static class MakeObjectNullNullActionCache<T> where T : class
+	{
+		internal static Action<T>? NonRecursive;
+		internal static Action<T>? Recursive;
+	}
 
 
 	/// <summary>
@@ -1507,10 +1605,9 @@ public static partial class Strings
 			return obj;
 		}
 
-		Type type = typeof(T);
-		(Type type, bool recursive) key = (type, recursive);
-
-		Action<T> action = (Action<T>)makeObjectNullNullCache.GetOrAdd(key, _ => CreateMakeObjectNullNullExpression<T>(recursive).CompileFast());
+		Action<T> action = recursive ?
+			(MakeObjectNullNullActionCache<T>.Recursive ??= CreateMakeObjectNullNullExpression<T>(true).CompileFast()) :
+			(MakeObjectNullNullActionCache<T>.NonRecursive ??= CreateMakeObjectNullNullExpression<T>(false).CompileFast());
 		action(obj);
 
 		return obj;
@@ -1973,6 +2070,54 @@ public static partial class Strings
 	/// <returns>Shortened string representation of the timespan</returns>
 	public static string TimespanToShortForm(this in TimeSpan t)
 	{
+		// TimeSpan.ToString() is the "c" format ([-][d.]hh:mm:ss[.fffffff], max 26 chars), which is also TryFormat's default
+		Span<char> formatted = stackalloc char[32];
+		if (!t.TryFormat(formatted, out int written))
+		{
+			return TimespanToShortFormFallback(t);
+		}
+
+		ReadOnlySpan<char> stringForm = formatted[..written];
+
+		// Milliseconds > 0 implies a trailing ".fffffff"; that 8-char token cannot occur anywhere else, so the original Replace only stripped this suffix
+		if (t.Milliseconds > 0)
+		{
+			stringForm = stringForm[..stringForm.LastIndexOf('.')];
+		}
+
+		int lastDot = stringForm.LastIndexOf('.');
+		if (lastDot >= 0)
+		{
+			stringForm = stringForm[(lastDot + 1)..];
+		}
+
+		if (t.Days > 0)
+		{
+			// A positive Days value never formats with a leading '0', so no leading zero needs to be stripped
+			Span<char> result = stackalloc char[48];
+			t.Days.TryFormat(result, out int dayChars);
+			result[dayChars] = ':';
+			stringForm.CopyTo(result[(dayChars + 1)..]);
+			return result[..(dayChars + 1 + stringForm.Length)].ToString();
+		}
+
+		// Slicing [..3] throws ArgumentOutOfRangeException for short input exactly like the original string slice
+		if (stringForm[..3].SequenceEqual("00:".AsSpan()))
+		{
+			stringForm = stringForm[3..]; //Remove hours if there aren't any
+
+			if (stringForm[..1].SequenceEqual("0".AsSpan()))
+			{
+				stringForm = stringForm[1..]; //Remove leading 0 in minutes
+			}
+		}
+
+		return stringForm.ToString();
+	}
+
+	// Original string-based implementation, only reached if TryFormat unexpectedly needs more than the stack buffer
+	private static string TimespanToShortFormFallback(in TimeSpan t)
+	{
 		string stringForm = t.ToString();
 
 		if (t.Milliseconds > 0)
@@ -2018,7 +2163,31 @@ public static partial class Strings
 	/// <returns>Hash string</returns>
 	public static string GetHash(this string originalString, EHashAlgorithm algorithm)
 	{
-		ReadOnlySpan<byte> bytes = algorithm switch
+#if NET
+		// Encoding.GetBytes(string) throws ArgumentNullException("s") for null, the span overload would silently hash an empty input
+		if (originalString == null)
+		{
+#pragma warning disable CA2208 // Instantiate argument exceptions correctly
+			throw new ArgumentNullException("s");
+#pragma warning restore CA2208 // Instantiate argument exceptions correctly
+		}
+
+		// Larger inputs keep the array overload so pathological sizes fail exactly like the original (341 chars * 3 UTF-8 bytes max fits in 1024)
+		Span<byte> utf8Buffer = stackalloc byte[1024];
+		ReadOnlySpan<byte> data = originalString.Length > 341 ? Encoding.UTF8.GetBytes(originalString) : utf8Buffer[..Encoding.UTF8.GetBytes(originalString, utf8Buffer)];
+
+		Span<byte> hash = stackalloc byte[64];
+		int hashLength = algorithm switch
+		{
+			EHashAlgorithm.SHA1 => System.Security.Cryptography.SHA1.HashData(data, hash),
+			EHashAlgorithm.SHA256 => System.Security.Cryptography.SHA256.HashData(data, hash),
+			EHashAlgorithm.SHA384 => System.Security.Cryptography.SHA384.HashData(data, hash),
+			EHashAlgorithm.MD5 => System.Security.Cryptography.MD5.HashData(data, hash),
+			_ => System.Security.Cryptography.SHA512.HashData(data, hash),
+		};
+		return Convert.ToHexStringLower(hash[..hashLength]);
+#else
+		byte[] bytes = algorithm switch
 		{
 			EHashAlgorithm.SHA1 => Internal.HashCompat.Sha1HashData(Encoding.UTF8.GetBytes(originalString)),
 			EHashAlgorithm.SHA256 => Internal.HashCompat.Sha256HashData(Encoding.UTF8.GetBytes(originalString)),
@@ -2026,13 +2195,22 @@ public static partial class Strings
 			EHashAlgorithm.MD5 => Internal.HashCompat.Md5HashData(Encoding.UTF8.GetBytes(originalString)),
 			_ => Internal.HashCompat.Sha512HashData(Encoding.UTF8.GetBytes(originalString)),
 		};
-		StringBuilder builder = new();
-		for (int i = 0; i < bytes.Length; i++)
+
+		return string.Create(bytes.Length * 2, bytes, static (destination, hash) =>
 		{
-			builder.Append(bytes[i].ToString("x2"));
-		}
-		return builder.ToString();
+			for (int i = 0; i < hash.Length; i++)
+			{
+				byte b = hash[i];
+				destination[i * 2] = LowerHexChars[b >> 4];
+				destination[(i * 2) + 1] = LowerHexChars[b & 0xF];
+			}
+		});
+#endif
 	}
+
+#if !NET
+	private const string LowerHexChars = "0123456789abcdef";
+#endif
 
 
 	/// <summary>
@@ -2047,62 +2225,48 @@ public static partial class Strings
 			return string.Empty;
 		}
 
-		input = input.Trim().Replace("\t", string.Empty);
-
-		int len = input.Length;
-		int index = 0;
-		int i = 0;
-
-		char[] sourceCharArray = input.ToCharArray();
-		bool skip = false;
-		char character;
-
-		for (; i < len; i++)
+		// Every char.IsWhiteSpace char is treated as whitespace. Tabs are dropped without touching the run state, matching a Replace("\t", "") pre-pass.
+		ReadOnlySpan<char> span = input.AsSpan().Trim();
+		char[]? rented = null;
+		Span<char> buffer = span.Length <= 256 ? stackalloc char[256] : (rented = ArrayPool<char>.Shared.Rent(span.Length));
+		try
 		{
-			character = sourceCharArray[i];
-			switch (character)
+			int index = 0;
+			bool skip = false;
+			foreach (char c in span)
 			{
-				case '\u0020':
-				case '\u00A0':
-				case '\u1680':
-				case '\u2000':
-				case '\u2001':
-				case '\u2002':
-				case '\u2003':
-				case '\u2004':
-				case '\u2005':
-				case '\u2006':
-				case '\u2007':
-				case '\u2008':
-				case '\u2009':
-				case '\u200A':
-				case '\u202F':
-				case '\u205F':
-				case '\u3000':
-				case '\u2028':
-				case '\u2029':
-				case '\u0009':
-				case '\u000A':
-				case '\u000B':
-				case '\u000C':
-				case '\u000D':
-				case '\u0085':
+				if (c == '\t')
+				{
+					continue;
+				}
+
+				if (char.IsWhiteSpace(c))
+				{
 					if (skip)
 					{
 						continue;
 					}
 
-					sourceCharArray[index++] = character;
+					buffer[index++] = c;
 					skip = true;
-					continue;
-
-				default:
+				}
+				else
+				{
 					skip = false;
-					sourceCharArray[index++] = character;
-					continue;
+					buffer[index++] = c;
+				}
+			}
+
+			// Only removals happen, so an unchanged length means the content is unchanged
+			return index == input.Length ? input : buffer[..index].ToString();
+		}
+		finally
+		{
+			if (rented != null)
+			{
+				ArrayPool<char>.Shared.Return(rented);
 			}
 		}
-		return new(sourceCharArray, 0, index);
 	}
 
 	private const string DefaultDateFormat = "MM/dd/yyyy";
@@ -2154,8 +2318,29 @@ public static partial class Strings
 			return input;
 		}
 
-		Regex regex = new(regexPattern, regexOptions, matchTimeout ?? TimeSpan.FromSeconds(5));
+		Regex regex = GetOrCreateReplaceInverseRegex(regexPattern, regexOptions, matchTimeout ?? TimeSpan.FromSeconds(5));
 		return regex.ReplaceInverse(input, replacement, matchFirstOnly);
+	}
+
+	private const int MaxCachedReplaceInverseRegexes = 64;
+	private static readonly ConcurrentDictionary<(string Pattern, RegexOptions Options, TimeSpan Timeout, string Culture), Regex> replaceInverseRegexCache = new();
+
+	// Regex instances are immutable and thread-safe. IgnoreCase regexes capture CurrentCulture at construction, so the culture is part of the key
+	// (mirrors Regex's own static-method cache). The cap keeps caller-generated patterns from growing the cache without bound.
+	private static Regex GetOrCreateReplaceInverseRegex(string regexPattern, RegexOptions regexOptions, TimeSpan matchTimeout)
+	{
+		(string, RegexOptions, TimeSpan, string) key = (regexPattern, regexOptions, matchTimeout, CultureInfo.CurrentCulture.Name);
+		if (replaceInverseRegexCache.TryGetValue(key, out Regex? regex))
+		{
+			return regex;
+		}
+
+		regex = new Regex(regexPattern, regexOptions, matchTimeout);
+		if (replaceInverseRegexCache.Count < MaxCachedReplaceInverseRegexes)
+		{
+			replaceInverseRegexCache.TryAdd(key, regex);
+		}
+		return regex;
 	}
 
 
@@ -2179,10 +2364,14 @@ public static partial class Strings
 
 		// Use StringBuilder to build the result
 
-		StringBuilder result = new();
+		StringBuilder result = new(input.Length);
 		int lastMatchEnd = 0;
 
+#if NET
+		foreach (ValueMatch match in regex.EnumerateMatches(input))
+#else
 		foreach (Match match in regex.Matches(input))
+#endif
 		{
 			// Append non-matching parts before the current match
 
@@ -2192,7 +2381,7 @@ public static partial class Strings
 			}
 			// Append the matched value
 
-			result.Append(match.Value);
+			result.Append(input.AsSpan(match.Index, match.Length));
 			lastMatchEnd = match.Index + match.Length;
 
 			if (matchFirstOnly)
@@ -2268,6 +2457,114 @@ public static partial class Strings
 			return input;
 		}
 
+		// Only 'x'/'X' lower-case to 'x', \d is char.IsDigit and casing never creates/removes digits, so the number / extension can be split without lower-casing first
+		string sep = separator ?? string.Empty;
+		ReadOnlySpan<char> source = input.AsSpan();
+		int firstX = source.IndexOfAny('x', 'X');
+		ReadOnlySpan<char> number = firstX < 0 ? source : source[..firstX];
+		ReadOnlySpan<char> extension = ReadOnlySpan<char>.Empty;
+		if (firstX >= 0)
+		{
+			ReadOnlySpan<char> rest = source[(firstX + 1)..];
+			int secondX = rest.IndexOfAny('x', 'X');
+			extension = secondX < 0 ? rest : rest[..secondX];
+		}
+
+		// A '$' or a leading ASCII digit in the separator changes how Regex.Replace parses "$1{separator}$2", so those separators (and inputs too large for the stack buffers) keep the regex path
+		int maxLength = number.Length + (2 * sep.Length) + 4 + (firstX >= 0 ? 1 + extension.Length : 0);
+		if (sep.Contains('$') || (sep.Length > 0 && (uint)(sep[0] - '0') <= 9) || number.Length > 128 || maxLength > 256)
+		{
+			return FormatPhoneNumberWithRegex(input, sep, addParenToAreaCode);
+		}
+
+		Span<char> digitBuffer = stackalloc char[128];
+		int digitCount = 0;
+		foreach (char c in number)
+		{
+			if (char.IsDigit(c))
+			{
+				digitBuffer[digitCount++] = c;
+			}
+		}
+		ReadOnlySpan<char> d = digitBuffer[..digitCount];
+
+		Span<char> output = stackalloc char[256];
+		int position = 0;
+		switch (digitCount)
+		{
+			case 7:
+				AppendPhoneSegment(output, ref position, d[..3]);
+				AppendPhoneSegment(output, ref position, sep.AsSpan());
+				AppendPhoneSegment(output, ref position, d[3..]);
+				break;
+
+			case 10:
+				AppendPhoneAreaCode(output, ref position, d[..3], addParenToAreaCode);
+				AppendPhoneSegment(output, ref position, sep.AsSpan());
+				AppendPhoneSegment(output, ref position, d[3..6]);
+				AppendPhoneSegment(output, ref position, sep.AsSpan());
+				AppendPhoneSegment(output, ref position, d[6..]);
+				break;
+
+			case 11:
+				output[position++] = '+';
+				AppendPhoneSegment(output, ref position, d[..1]);
+				output[position++] = ' ';
+				AppendPhoneAreaCode(output, ref position, d[1..4], addParenToAreaCode);
+				AppendPhoneSegment(output, ref position, sep.AsSpan());
+				AppendPhoneSegment(output, ref position, d[4..7]);
+				AppendPhoneSegment(output, ref position, sep.AsSpan());
+				AppendPhoneSegment(output, ref position, d[7..]);
+				break;
+
+			case 12:
+				output[position++] = '+';
+				AppendPhoneSegment(output, ref position, d[..2]);
+				output[position++] = ' ';
+				AppendPhoneAreaCode(output, ref position, d[2..5], addParenToAreaCode);
+				AppendPhoneSegment(output, ref position, sep.AsSpan());
+				AppendPhoneSegment(output, ref position, d[5..8]);
+				AppendPhoneSegment(output, ref position, sep.AsSpan());
+				AppendPhoneSegment(output, ref position, d[8..]);
+				break;
+
+			default:
+				AppendPhoneSegment(output, ref position, d);
+				break;
+		}
+
+		if (firstX >= 0)
+		{
+			output[position++] = 'x';
+			position += extension.ToLowerInvariant(output[position..]);
+		}
+
+		return output[..position].ToString();
+	}
+
+	private static void AppendPhoneSegment(Span<char> destination, ref int position, ReadOnlySpan<char> value)
+	{
+		value.CopyTo(destination[position..]);
+		position += value.Length;
+	}
+
+	private static void AppendPhoneAreaCode(Span<char> destination, ref int position, ReadOnlySpan<char> areaCode, bool addParen)
+	{
+		if (addParen)
+		{
+			destination[position++] = '(';
+			AppendPhoneSegment(destination, ref position, areaCode);
+			destination[position++] = ')';
+		}
+		else
+		{
+			AppendPhoneSegment(destination, ref position, areaCode);
+		}
+	}
+
+	// Original regex-based implementation, used for separators that Regex.Replace would interpret as part of a substitution and for oversized input
+	private static string FormatPhoneNumberWithRegex(string input, string separator, bool addParenToAreaCode)
+	{
 		string[] phoneParts = input.ToLowerInvariant().Split("x");
 		string? extension = phoneParts.Length > 1 ? phoneParts[1] : null;
 
@@ -2354,7 +2651,7 @@ public static partial class Strings
 		decimal decimalNumberPart = (decimal)number - ToDecimal(wholeNumberPart);
 		long denominator = (long)Math.Pow(10, maxNumberOfDecimalsToConsider);
 		long numerator = (long)(decimalNumberPart * denominator);
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 		GreatestCommonDenominator(ref numerator, ref denominator, out long _);
 #else
 		long gcd = Internal.MathCompat.Gcd(numerator, denominator);
@@ -2381,7 +2678,7 @@ public static partial class Strings
 		decimal decimalNumberPart = number - ToDecimal(wholeNumberPart);
 		long denominator = (long)Math.Pow(10, maxNumberOfDecimalsToConsider);
 		long numerator = (long)(decimalNumberPart * denominator);
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 		GreatestCommonDenominator(ref numerator, ref denominator, out long _);
 #else
 		long gcd = Internal.MathCompat.Gcd(numerator, denominator);
@@ -2413,7 +2710,7 @@ public static partial class Strings
 		double decimalNumberPart = (double)number - ToDouble(wholeNumberPart);
 		long denominator = (long)Math.Pow(10, maxNumberOfDecimalsToConsider);
 		long numerator = (long)(decimalNumberPart * denominator);
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 		GreatestCommonDenominator(ref numerator, ref denominator, out long _);
 #else
 		long gcd = Internal.MathCompat.Gcd(numerator, denominator);
@@ -2440,7 +2737,7 @@ public static partial class Strings
 		double decimalNumberPart = number - ToDouble(wholeNumberPart);
 		long denominator = (long)Math.Pow(10, maxNumberOfDecimalsToConsider);
 		long numerator = (long)(decimalNumberPart * denominator);
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 		GreatestCommonDenominator(ref numerator, ref denominator, out long _);
 #else
 		long gcd = Internal.MathCompat.Gcd(numerator, denominator);
@@ -2514,16 +2811,13 @@ public static partial class Strings
 			return false;
 		}
 
-		bool success = true;
-		try
+		if (!TryParseFractionToDecimal(fractionString, out decimal value))
 		{
-			result = fractionString.FractionToDecimal();
+			return false;
 		}
-		catch (Exception)
-		{
-			success = false;
-		}
-		return success;
+
+		result = value;
+		return true;
 	}
 
 
@@ -2541,16 +2835,67 @@ public static partial class Strings
 			return false;
 		}
 
-		bool success = true;
-		try
+		// FractionToDecimal never returns null for non-null input, so this matches its result without catching its exceptions
+		if (!TryParseFractionToDecimal(fractionString, out decimal value))
 		{
-			result = fractionString.FractionToDecimal() ?? default;
+			return false;
 		}
-		catch (Exception)
+
+		result = value;
+		return true;
+	}
+
+	// Returns false exactly where FractionToDecimal throws (FormatException, or DivideByZeroException for a zero denominator).
+	// int.TryParse(string) is TryParse(span, NumberStyles.Integer, NumberFormatInfo.CurrentInfo), so part parsing is unchanged.
+	private static bool TryParseFractionToDecimal(string fractionString, out decimal value)
+	{
+		if (decimal.TryParse(fractionString, out value))
 		{
-			success = false;
+			return true;
 		}
-		return success;
+
+		value = default;
+		ReadOnlySpan<char> s = fractionString.AsSpan();
+		int firstSeparator = s.IndexOfAny(' ', '/');
+		if (firstSeparator < 0)
+		{
+			return false;
+		}
+
+		ReadOnlySpan<char> first = s[..firstSeparator];
+		ReadOnlySpan<char> remainder = s[(firstSeparator + 1)..];
+		int secondSeparator = remainder.IndexOfAny(' ', '/');
+		ReadOnlySpan<char> second = secondSeparator < 0 ? remainder : remainder[..secondSeparator];
+		ReadOnlySpan<char> third = secondSeparator < 0 ? ReadOnlySpan<char>.Empty : remainder[(secondSeparator + 1)..];
+		if (secondSeparator >= 0 && third.IndexOfAny(' ', '/') >= 0)
+		{
+			return false;
+		}
+
+		if (!int.TryParse(first, NumberStyles.Integer, NumberFormatInfo.CurrentInfo, out int numeratorOrWhole) ||
+			!int.TryParse(second, NumberStyles.Integer, NumberFormatInfo.CurrentInfo, out int denominatorOrNumerator))
+		{
+			return false;
+		}
+
+		if (secondSeparator < 0)
+		{
+			if (denominatorOrNumerator == 0)
+			{
+				return false;
+			}
+
+			value = (decimal)numeratorOrWhole / denominatorOrNumerator;
+			return true;
+		}
+
+		if (!int.TryParse(third, NumberStyles.Integer, NumberFormatInfo.CurrentInfo, out int denominator) || denominator == 0)
+		{
+			return false;
+		}
+
+		value = numeratorOrWhole + ((decimal)denominatorOrNumerator / denominator);
+		return true;
 	}
 
 
@@ -2866,7 +3211,30 @@ public static partial class Strings
 		{
 			return null;
 		}
-		return string.Concat(LettersOnlyRegex().Matches(value.Trim())).Trim();
+
+		ReadOnlySpan<char> source = value.AsSpan().Trim();
+		char[]? rented = null;
+		Span<char> buffer = source.Length <= 256 ? stackalloc char[256] : (rented = ArrayPool<char>.Shared.Rent(source.Length));
+		try
+		{
+			int position = 0;
+			foreach (char c in source)
+			{
+				// [A-Za-z ] without IgnoreCase: ASCII letters only, (c | 0x20) folds 'A'-'Z' onto 'a'-'z' and maps nothing else into that range
+				if (c == ' ' || (uint)((c | 0x20) - 'a') <= 'z' - 'a')
+				{
+					buffer[position++] = c;
+				}
+			}
+			return ((ReadOnlySpan<char>)buffer[..position]).Trim().ToString();
+		}
+		finally
+		{
+			if (rented != null)
+			{
+				ArrayPool<char>.Shared.Return(rented);
+			}
+		}
 	}
 
 
@@ -2884,7 +3252,32 @@ public static partial class Strings
 			return null;
 		}
 
+#if !NETSTANDARD2_1
+		// EnumerateMatches yields allocation-free ValueMatch structs, so the matched digits can be copied straight into one buffer
+		string trimmed = value.Trim();
+		Regex regex = !allowFractions ? NumbersOnlyRegex() : NumbersWithFractionsOnlyRegex();
+		char[]? rented = null;
+		Span<char> buffer = trimmed.Length <= 256 ? stackalloc char[trimmed.Length] : (rented = ArrayPool<char>.Shared.Rent(trimmed.Length));
+		try
+		{
+			int position = 0;
+			foreach (ValueMatch match in regex.EnumerateMatches(trimmed))
+			{
+				trimmed.AsSpan(match.Index, match.Length).CopyTo(buffer[position..]);
+				position += match.Length;
+			}
+			return buffer[..position].Trim().ToString();
+		}
+		finally
+		{
+			if (rented != null)
+			{
+				ArrayPool<char>.Shared.Return(rented);
+			}
+		}
+#else
 		return string.Concat(!allowFractions ? NumbersOnlyRegex().Matches(value.Trim()) : NumbersWithFractionsOnlyRegex().Matches(value.Trim())).Trim();
+#endif
 	}
 
 
@@ -3007,6 +3400,9 @@ public static partial class Strings
 			return 0;
 		}
 
+#if NET
+		return MemoryExtensions.Count(input, charToFind);
+#else
 		int count = 0;
 		foreach (char @char in input)
 		{
@@ -3016,6 +3412,7 @@ public static partial class Strings
 			}
 		}
 		return count;
+#endif
 	}
 
 
@@ -3213,9 +3610,61 @@ public static partial class Strings
 		return input.HasNoLessThanNumberOfChars(charToFind[0], minNumberOfChars);
 	}
 
+	private static readonly char[] LogLineBreakChars = ['\r', '\n'];
+
 	public static string SanitizeForLog(this string input)
 	{
-		return input.Replace(Environment.NewLine, " ").Replace("\n", " ").Replace("\r", " ");
+		// Instance call keeps the NullReferenceException for null input
+		int first = input.IndexOfAny(LogLineBreakChars);
+		if (first < 0)
+		{
+			return input;
+		}
+
+		// The single pass below is only equivalent to chained Replace(Environment.NewLine), Replace("\n"), Replace("\r") for "\r\n" or "\n" newlines
+		string newLine = Environment.NewLine;
+		if (newLine is not "\r\n" and not "\n")
+		{
+			return input.Replace(newLine, " ").Replace("\n", " ").Replace("\r", " ");
+		}
+
+		// Replace("\r\n") is ordinal, leftmost, non-overlapping, so it equals "CR immediately followed by LF -> one space"; every other CR/LF -> one space
+		bool collapseCrLf = newLine.Length == 2;
+		char[]? rented = null;
+		Span<char> buffer = input.Length <= 256 ? stackalloc char[256] : (rented = ArrayPool<char>.Shared.Rent(input.Length));
+		try
+		{
+			input.AsSpan(0, first).CopyTo(buffer);
+			int position = first;
+			for (int i = first; i < input.Length; i++)
+			{
+				char c = input[i];
+				if (c == '\r')
+				{
+					buffer[position++] = ' ';
+					if (collapseCrLf && i + 1 < input.Length && input[i + 1] == '\n')
+					{
+						i++;
+					}
+				}
+				else if (c == '\n')
+				{
+					buffer[position++] = ' ';
+				}
+				else
+				{
+					buffer[position++] = c;
+				}
+			}
+			return buffer[..position].ToString();
+		}
+		finally
+		{
+			if (rented != null)
+			{
+				ArrayPool<char>.Shared.Return(rented);
+			}
+		}
 	}
 
 

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using CommonNetFuncs.Core.CollectionClasses;
 using CommonNetFuncs.Core.Internal;
 
@@ -199,6 +200,28 @@ public abstract class CacheManagerBase<TKey, TValue> : ICacheManagerApi<TKey, TV
 		{
 			readWriteLock.ExitReadLock();
 		}
+	}
+
+	/// <summary>
+	/// Tries to get the value of a record from <see cref="LimitedCache"/> without creating a readonly copy of the cache.
+	/// </summary>
+	/// <param name="key">Key of the record to get from <see cref="LimitedCache"/>.</param>
+	/// <param name="value">The value of the record if found, otherwise the default value of <typeparamref name="TValue"/>.</param>
+	/// <returns><see langword="true"/> if the record was found in <see cref="LimitedCache"/>, otherwise <see langword="false"/>.</returns>
+	public bool TryGetLimitedCacheValue(TKey key, out TValue? value)
+	{
+		return LimitedCache.TryGetValue(key, out value);
+	}
+
+	/// <summary>
+	/// Tries to get the value of a record from <see cref="Cache"/> without creating a readonly copy of the cache.
+	/// </summary>
+	/// <param name="key">Key of the record to get from <see cref="Cache"/>.</param>
+	/// <param name="value">The value of the record if found, otherwise the default value of <typeparamref name="TValue"/>.</param>
+	/// <returns><see langword="true"/> if the record was found in <see cref="Cache"/>, otherwise <see langword="false"/>.</returns>
+	public bool TryGetCacheValue(TKey key, [MaybeNullWhen(false)] out TValue value)
+	{
+		return Cache.TryGetValue(key, out value);
 	}
 
 	/// <summary>

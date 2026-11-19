@@ -408,6 +408,42 @@ public sealed class FingerprintTests
 		duplicates.ShouldBeEmpty();
 	}
 
+	[RetryFact(3)]
+	public void FindDuplicates_MixedAlgorithms_Throws()
+	{
+		List<ImageFingerprint> fingerprints =
+		[
+			new("a.jpg", 0UL, ImageHashAlgorithm.DifferenceHash),
+			new("b.jpg", 0UL, ImageHashAlgorithm.DifferenceHash),
+			new("c.jpg", 0UL, ImageHashAlgorithm.AverageHash),
+		];
+
+		Should.Throw<InvalidOperationException>(() => ImageFingerprinting.FindDuplicates(fingerprints));
+	}
+
+	[RetryFact(3)]
+	public void FindDuplicates_ReturnsOnlyDuplicatePairsWithCompareValues()
+	{
+		// Arrange — a/b differ by 1 bit, a/c by 4 bits, b/c by 5 bits, d is the inverse of a
+		List<ImageFingerprint> fingerprints =
+		[
+			new("a.jpg", 0UL, ImageHashAlgorithm.PerceptualHash),
+			new("b.jpg", 0x1UL, ImageHashAlgorithm.PerceptualHash),
+			new("c.jpg", 0xF0UL, ImageHashAlgorithm.PerceptualHash),
+			new("d.jpg", ulong.MaxValue, ImageHashAlgorithm.PerceptualHash),
+		];
+
+		// Act
+		IReadOnlyList<SimilarityResult> duplicates = ImageFingerprinting.FindDuplicates(fingerprints, duplicateThreshold: 92.0m);
+
+		// Assert — same values as Compare, ordered by descending similarity
+		duplicates.Count.ShouldBe(3);
+		duplicates[0].ShouldBe(ImageFingerprinting.Compare(fingerprints[0], fingerprints[1], 92.0m));
+		duplicates[1].ShouldBe(ImageFingerprinting.Compare(fingerprints[0], fingerprints[2], 92.0m));
+		duplicates[2].ShouldBe(ImageFingerprinting.Compare(fingerprints[1], fingerprints[2], 92.0m));
+		duplicates.ShouldAllBe(x => x.IsDuplicate);
+	}
+
 	// ── FindDuplicatesInDirectory ─────────────────────────────────────────────
 
 	[RetryFact(3)]
@@ -512,6 +548,8 @@ public sealed class FingerprintTests
 	[InlineData(ulong.MaxValue, ulong.MaxValue, 100.0)]
 	[InlineData(0UL, ulong.MaxValue, 0.0)]
 	[InlineData(0x8000_0000_0000_0000UL, 0UL, 100.0 - (1.0 / 64.0 * 100.0))]
+	[InlineData(0x0F0F_0000_0000_00FFUL, 0UL, 75.0)]
+	[InlineData(0xAAAA_AAAA_AAAA_AAAAUL, 0x5555_5555_5555_5555UL, 0.0)]
 	public void HammingSimilarity_KnownValues_AreCorrect(ulong hashA, ulong hashB, double expectedSimilarity)
 	{
 		double similarity = ImageFingerprinting.HammingSimilarity(hashA, hashB);
@@ -547,6 +585,160 @@ public sealed class FingerprintTests
 
 			fp1.Hash.ShouldBe(fp2.Hash, $"Hash mismatch for {algorithm}");
 		}
+	}
+
+	// ── Hashes match the reference implementation (FromBitmap resize + GetPixel + full 2D DCT) ──
+
+	[RetryTheory(3)]
+	[InlineData("test.jpg")]
+	[InlineData("test.png")]
+	[InlineData("test.bmp")]
+	[InlineData("test.gif")]
+	public void FingerprintImage_AllAlgorithms_MatchReferenceImplementation(string fileName)
+	{
+		// Arrange
+		using SKBitmap bitmap = SKBitmap.Decode(GetTestImagePath(fileName));
+
+		// Act & Assert
+		bitmap.FingerprintImage(algorithm: ImageHashAlgorithm.AverageHash).Hash.ShouldBe(ReferenceAverageHash(bitmap));
+		bitmap.FingerprintImage(algorithm: ImageHashAlgorithm.DifferenceHash).Hash.ShouldBe(ReferenceDifferenceHash(bitmap));
+		bitmap.FingerprintImage(algorithm: ImageHashAlgorithm.PerceptualHash).Hash.ShouldBe(ReferencePerceptualHash(bitmap));
+	}
+
+	private static SKBitmap ReferenceResize(SKBitmap source, int width, int height)
+	{
+		using SKImage image = SKImage.FromBitmap(source);
+		return image.ResizeTo(width, height);
+	}
+
+	private static byte ReferenceLuminance(SKColor color) => (byte)(0.299 * color.Red + 0.587 * color.Green + 0.114 * color.Blue);
+
+	private static ulong ReferenceAverageHash(SKBitmap source)
+	{
+		using SKBitmap resized = ReferenceResize(source, 8, 8);
+		byte[] pixels = new byte[64];
+		for (int y = 0; y < 8; y++)
+		{
+			for (int x = 0; x < 8; x++)
+			{
+				pixels[(y * 8) + x] = ReferenceLuminance(resized.GetPixel(x, y));
+			}
+		}
+
+		double mean = pixels.Average(p => (double)p);
+		ulong hash = 0;
+		for (int i = 0; i < 64; i++)
+		{
+			if (pixels[i] >= mean)
+			{
+				hash |= 1UL << i;
+			}
+		}
+		return hash;
+	}
+
+	private static ulong ReferenceDifferenceHash(SKBitmap source)
+	{
+		using SKBitmap resized = ReferenceResize(source, 9, 8);
+		ulong hash = 0;
+		int bit = 0;
+		for (int y = 0; y < 8; y++)
+		{
+			for (int x = 0; x < 8; x++)
+			{
+				if (ReferenceLuminance(resized.GetPixel(x, y)) > ReferenceLuminance(resized.GetPixel(x + 1, y)))
+				{
+					hash |= 1UL << bit;
+				}
+				bit++;
+			}
+		}
+		return hash;
+	}
+
+	private static ulong ReferencePerceptualHash(SKBitmap source)
+	{
+		const int size = 32;
+		using SKBitmap resized = ReferenceResize(source, size, size);
+
+		double[,] luminance = new double[size, size];
+		for (int y = 0; y < size; y++)
+		{
+			for (int x = 0; x < size; x++)
+			{
+				luminance[y, x] = ReferenceLuminance(resized.GetPixel(x, y));
+			}
+		}
+
+		// Full separable DCT-II: rows, then columns
+		double[,] temp = new double[size, size];
+		for (int y = 0; y < size; y++)
+		{
+			double[] row = new double[size];
+			for (int x = 0; x < size; x++)
+			{
+				row[x] = luminance[y, x];
+			}
+
+			double[] dctRow = ReferenceDct1D(row, size);
+			for (int x = 0; x < size; x++)
+			{
+				temp[y, x] = dctRow[x];
+			}
+		}
+
+		double[,] dct = new double[size, size];
+		for (int x = 0; x < size; x++)
+		{
+			double[] col = new double[size];
+			for (int y = 0; y < size; y++)
+			{
+				col[y] = temp[y, x];
+			}
+
+			double[] dctCol = ReferenceDct1D(col, size);
+			for (int y = 0; y < size; y++)
+			{
+				dct[y, x] = dctCol[y];
+			}
+		}
+
+		double[] topLeft = new double[64];
+		int idx = 0;
+		for (int y = 0; y < 8; y++)
+		{
+			for (int x = 0; x < 8; x++)
+			{
+				topLeft[idx++] = dct[y, x];
+			}
+		}
+
+		double[] sorted = topLeft.OrderBy(v => v).ToArray();
+		double median = (sorted[31] + sorted[32]) / 2.0;
+		ulong hash = 0;
+		for (int i = 0; i < 64; i++)
+		{
+			if (topLeft[i] >= median)
+			{
+				hash |= 1UL << i;
+			}
+		}
+		return hash;
+	}
+
+	private static double[] ReferenceDct1D(double[] input, int n)
+	{
+		double[] output = new double[n];
+		for (int k = 0; k < n; k++)
+		{
+			double sum = 0;
+			for (int i = 0; i < n; i++)
+			{
+				sum += input[i] * Math.Cos(Math.PI * k * (2 * i + 1) / (2.0 * n));
+			}
+			output[k] = sum * (k == 0 ? Math.Sqrt(1.0 / n) : Math.Sqrt(2.0 / n));
+		}
+		return output;
 	}
 
 	// ── ImageFingerprint and SimilarityResult record equality ────────────────

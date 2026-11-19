@@ -33,6 +33,25 @@ public sealed class ListDenyCharactersAttributeTests : ValidationTestBase
 	}
 
 	[Fact]
+	public void IsValid_WithCharArrayConstructor_ShouldValidateCorrectly()
+	{
+		// Arrange
+		char[] denyCharacters = ['<', '>', '&', ';', '\'', '"', '%', '$'];
+		ListDenyCharactersAttribute attribute = new(denyCharacters);
+		ValidationContext context = CreateValidationContext("TestProperty");
+
+		// Act
+		ValidationResult? validResult = attribute.GetValidationResult(new List<string> { "safe", "also safe" }, context);
+		ValidationResult? invalidResult = attribute.GetValidationResult(new List<string> { "safe", "cost$" }, context);
+
+		// Assert
+		validResult.ShouldBe(ValidationResult.Success);
+		invalidResult.ShouldNotBeNull();
+		invalidResult.ErrorMessage.ShouldNotBeNull();
+		invalidResult.ErrorMessage.ShouldStartWith("Item at index 1 ");
+	}
+
+	[Fact]
 	public void Constructor_WithNullCharArray_ShouldThrow()
 	{
 		// Act & Assert

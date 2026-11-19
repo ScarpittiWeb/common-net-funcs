@@ -102,6 +102,26 @@ public sealed class Base64Tests : IDisposable
 		Convert.TryFromBase64String(result, buffer, out _).ShouldBeTrue();
 	}
 
+	[RetryTheory(3)]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void ConvertImageFileToBase64_WithMemoryStream_MatchesFileBytes(bool expandableStream)
+	{
+		// Arrange — an expandable stream exposes its buffer (TryGetBuffer) while a stream wrapping an array does not
+		byte[] bytes = File.ReadAllBytes(testImagePath);
+		using MemoryStream ms = expandableStream ? new MemoryStream() : new MemoryStream(bytes);
+		if (expandableStream)
+		{
+			ms.Write(bytes, 0, bytes.Length);
+		}
+
+		// Act
+		string? result = ms.ConvertImageFileToBase64();
+
+		// Assert
+		result.ShouldBe(Convert.ToBase64String(bytes));
+	}
+
 	[RetryFact(3)]
 	public void ConvertImageFileToBase64_WithEmptyMemoryStream_ReturnsNull()
 	{

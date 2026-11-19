@@ -6,9 +6,13 @@ namespace CommonNetFuncs.Web.Common.ValidationAttributes;
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false)]
 public sealed class AllowedNullableValuesAttribute : ValidationAttribute
 {
+	private const int EnumCacheNotCacheable = 2;
+
 	private readonly IEnumerable<object> allowedValues;
 	private readonly bool allowNull;
 	private readonly Type? enumType;
+	private long[]? cachedEnumNumericValues;
+	private int enumNumericCacheState;
 
 	// Original constructors
 	public AllowedNullableValuesAttribute(params object[] allowedValues) : this(true, allowedValues) { }
@@ -64,9 +68,14 @@ public sealed class AllowedNullableValuesAttribute : ValidationAttribute
 			if (value.GetType().IsNumericType())
 			{
 				long numericValue = Convert.ToInt64(value);
-				IEnumerable<long> enumValues = Enum.GetValues(enumType).Cast<object>().Select(Convert.ToInt64);
+				long[]? cachedValues = GetCachedEnumNumericValues(enumType);
 
-				if (enumValues.Contains(numericValue))
+				// Falls back to the exact original (lazy, possibly throwing) evaluation when the enum has a value that does not fit in a long
+				bool isDefined = cachedValues != null
+					? Array.IndexOf(cachedValues, numericValue) >= 0
+					: Enum.GetValues(enumType).Cast<object>().Select(Convert.ToInt64).Contains(numericValue);
+
+				if (isDefined)
 				{
 					return ValidationResult.Success;
 				}
@@ -88,5 +97,33 @@ public sealed class AllowedNullableValuesAttribute : ValidationAttribute
 		// Create error message with the list of allowed values
 		string allowedValuesList = string.Join(", ", allowedValues.Select(v => v?.ToString() ?? "null"));
 		return new ValidationResult($"The field {validationContext.DisplayName} must be one of the following values: {allowedValuesList}");
+	}
+
+	// Benign race: concurrent first callers compute identical arrays; the published array is never mutated.
+	private long[]? GetCachedEnumNumericValues(Type enumTypeToCache)
+	{
+		long[]? values = Volatile.Read(ref cachedEnumNumericValues);
+		if (values != null || Volatile.Read(ref enumNumericCacheState) == EnumCacheNotCacheable)
+		{
+			return values;
+		}
+
+		try
+		{
+			Array rawValues = Enum.GetValues(enumTypeToCache);
+			values = new long[rawValues.Length];
+			for (int i = 0; i < rawValues.Length; i++)
+			{
+				values[i] = Convert.ToInt64(rawValues.GetValue(i));
+			}
+		}
+		catch (Exception)
+		{
+			Volatile.Write(ref enumNumericCacheState, EnumCacheNotCacheable);
+			return null;
+		}
+
+		Volatile.Write(ref cachedEnumNumericValues, values);
+		return values;
 	}
 }

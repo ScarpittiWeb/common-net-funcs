@@ -7,7 +7,6 @@ using NpgsqlTypes;
 
 namespace CommonNetFuncs.Sql.PostgreSql;
 
-#if NET5_0_OR_GREATER
 public static partial class Debug
 {
 	/// <summary>
@@ -154,4 +153,3 @@ public static partial class Debug
 		return elements.Count == 0 ? "'{}'" : $"ARRAY[{string.Join(", ", elements)}]";
 	}
 }
-#endif

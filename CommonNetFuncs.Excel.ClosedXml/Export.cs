@@ -372,7 +372,8 @@ public static class Export
 				int x = 1;
 				int y = 1;
 
-				HashSet<int> skipColumns = [];
+				int columnCount = data.Columns.Count;
+				bool[] skipColumns = new bool[columnCount];
 				List<string> columnNames = [];
 				int colNum = 1;
 
@@ -395,7 +396,7 @@ public static class Export
 					}
 					else
 					{
-						skipColumns.Add(colNum);
+						skipColumns[colNum - 1] = true;
 					}
 					colNum++;
 				}
@@ -406,17 +407,17 @@ public static class Export
 				foreach (DataRow row in data.Rows)
 				{
 					cancellationToken.ThrowIfCancellationRequested();
-					int rawColIndex = 1;
-					foreach (object? value in row.ItemArray)
+					for (int i = 0; i < columnCount; i++)
 					{
-						if (!skipColumns.Contains(rawColIndex))
+						if (skipColumns[i])
 						{
-							IXLCell cell = ws.Cell(y, x);
-							cell.Value = value?.ToString() ?? string.Empty;
-							if (bodyStyle != null) { cell.Style = bodyStyle; }
-							x++;
+							continue;
 						}
-						rawColIndex++;
+
+						IXLCell cell = ws.Cell(y, x);
+						cell.Value = row[i]?.ToString() ?? string.Empty; // row[i]: same default-version read ItemArray performs, without copying the whole row
+						if (bodyStyle != null) { cell.Style = bodyStyle; }
+						x++;
 					}
 					x = 1;
 					y++;

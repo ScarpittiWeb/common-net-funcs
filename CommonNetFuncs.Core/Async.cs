@@ -991,7 +991,7 @@ public static class Async
 		}
 		catch (OperationCanceledException)
 		{
-			// In .NET 10+, Parallel.ForEachAsync throws OperationCanceledException when cancellation is requested.
+			// Parallel.ForEachAsync throws OperationCanceledException when cancellation is requested.
 			// This is expected behavior when the CancellationToken is cancelled, so we silently exit.
 		}
 		return results;
@@ -1047,7 +1047,7 @@ public static class Async
 		}
 		catch (OperationCanceledException)
 		{
-			// In .NET 10+, Parallel.ForEachAsync throws OperationCanceledException when cancellation is requested.
+			// Parallel.ForEachAsync throws OperationCanceledException when cancellation is requested.
 			// This is expected behavior when the CancellationToken is cancelled, so we silently exit.
 		}
 	}

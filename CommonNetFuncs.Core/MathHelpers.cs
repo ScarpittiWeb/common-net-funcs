@@ -113,8 +113,12 @@ public static class MathHelpers
 			return 0;
 		}
 		decimal val = value ?? 0;
+#if !NETSTANDARD2_1
+		return val.Scale;
+#else
 		int[] bits = decimal.GetBits(val);
 		return (bits[3] >> 16) & 0xFF;
+#endif
 	}
 
 	/// <summary>
@@ -148,8 +152,12 @@ public static class MathHelpers
 	/// <returns>The number of decimal places of the given double value</returns>
 	public static int GetPrecision(this decimal value)
 	{
+#if !NETSTANDARD2_1
+		return value.Scale;
+#else
 		int[] bits = decimal.GetBits(value);
 		return (bits[3] >> 16) & 0xFF;
+#endif
 	}
 
 	/// <summary>
@@ -172,7 +180,7 @@ public static class MathHelpers
 		return position == -1 ? 0 : valueString.Length - position - 1;
 	}
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	/// <summary>
 	/// Generates a continuous range of numbers between start and end parameters (inclusive)
 	/// </summary>
@@ -298,7 +306,7 @@ public static class MathHelpers
 		}
 	}
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	/// <summary>
 	/// Calculates the greatest common denominator (GCD) of the specified numerator and denominator, and reduces the numerator and denominator to their lowest terms.
 	/// </summary>
@@ -395,7 +403,7 @@ public static class MathHelpers
 		return Math.Abs(a - b) > (double)tolerance;
 	}
 
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	public static TNumber GetMedian<TNumber>(this IEnumerable<TNumber> numbers) where TNumber : struct, System.Numerics.INumber<TNumber>
 	{
 		if (numbers?.Any() != true)
@@ -420,7 +428,8 @@ public static class MathHelpers
 			throw new ArgumentException(NumbersParameterNullOrEmptyError);
 		}
 
-		int[] sorted = numbers.OrderBy(static x => x).ToArray();
+		int[] sorted = numbers.ToArray();
+		Array.Sort(sorted);
 
 		int mid = sorted.Length / 2;
 		return sorted.Length % 2 != 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
@@ -434,7 +443,9 @@ public static class MathHelpers
 			throw new ArgumentException(NumbersParameterNullOrEmptyError);
 		}
 
-		long[] sorted = numbers.OrderBy(static x => x).ToArray();
+		// ToArray always copies, so the caller's collection is never reordered; equal values are indistinguishable so sort stability is irrelevant
+		long[] sorted = numbers.ToArray();
+		Array.Sort(sorted);
 
 		int mid = sorted.Length / 2;
 		return sorted.Length % 2 != 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;

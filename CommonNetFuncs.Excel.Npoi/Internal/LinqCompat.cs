@@ -1,8 +1,8 @@
-﻿#if !NET6_0_OR_GREATER
+﻿#if NETSTANDARD2_1
 namespace CommonNetFuncs.Excel.Npoi.Internal;
 
 /// <summary>
-/// Shim for <see cref="System.Linq.Enumerable.MinBy{TSource, TKey}(System.Collections.Generic.IEnumerable{TSource}, System.Func{TSource, TKey})"/> (added in .NET 6).
+/// Shim for <see cref="System.Linq.Enumerable.MinBy{TSource, TKey}(System.Collections.Generic.IEnumerable{TSource}, System.Func{TSource, TKey})"/> (not available on netstandard2.1).
 /// </summary>
 internal static class LinqCompat
 {

@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using System.Runtime.CompilerServices;
 using CommonNetFuncs.Core;
 using static CommonNetFuncs.DeepClone.ExpressionTrees;
 
@@ -505,5 +506,144 @@ public sealed class ExpressionTreesTests : IDisposable
 		result.InnerStruct.ClassField.ShouldNotBeSameAs(source.InnerStruct.ClassField);
 		result.InnerStruct.ClassField.Number.ShouldBe(50);
 		result.InnerStruct.ClassField.Text.ShouldBe("nested");
+	}
+
+	public sealed record ChainRecord(int Id, string Name, ChainRecord? Next);
+
+	[Fact]
+	public void DeepClone_WhenInputIsRecordChain_ShouldCloneEveryNode()
+	{
+		// Arrange
+		ChainRecord? source = null;
+		for (int i = 40; i > 0; i--)
+		{
+			source = new ChainRecord(i, $"node{i}", source);
+		}
+
+		// Act
+		ChainRecord result = source!.DeepClone();
+
+		// Assert
+		result.ShouldBe(source);
+		ChainRecord? original = source;
+		ChainRecord? copy = result;
+		int count = 0;
+		while (original != null)
+		{
+			copy.ShouldNotBeNull();
+			copy.ShouldNotBeSameAs(original);
+			copy.Id.ShouldBe(original.Id);
+			copy.Name.ShouldBe(original.Name);
+			original = original.Next;
+			copy = copy.Next;
+			count++;
+		}
+		copy.ShouldBeNull();
+		count.ShouldBe(40);
+	}
+
+	[Theory]
+	[InlineData(0)]
+	[InlineData(3)]
+	public void DeepClone_WhenGraphHasMoreTypesThanCallMemoSlots_ShouldCloneEveryElement(int limitedCacheSize)
+	{
+		// Arrange
+		CacheManager.ClearAllCaches();
+		CacheManager.SetLimitedCacheSize(limitedCacheSize);
+		object[] source =
+		[
+			new TestClass { Number = 1 },
+			new List<int> { 1, 2 },
+			new[] { 3, 4 },
+			new Dictionary<string, int> { ["a"] = 1 },
+			new HashSet<string> { "x" },
+			new ClassWithReadonlyReferenceField(new TestClass { Number = 2 }),
+			new ChainRecord(1, "r", null),
+			new[] { "s" },
+			new Queue<int>(new[] { 5 }),
+			new TestStruct { Number = 3, RefType = new TestClass { Number = 4 } },
+			new TestClass { Number = 5 }
+		];
+
+		for (int pass = 0; pass < 2; pass++)
+		{
+			// Act
+			object[] result = source.DeepClone();
+
+			// Assert
+			result.ShouldNotBeSameAs(source);
+			result.Length.ShouldBe(source.Length);
+			for (int i = 0; i < source.Length; i++)
+			{
+				result[i].ShouldNotBeSameAs(source[i]);
+				result[i].GetType().ShouldBe(source[i].GetType());
+			}
+			((TestClass)result[0]).Number.ShouldBe(1);
+			((List<int>)result[1]).SequenceEqual(new[] { 1, 2 }).ShouldBeTrue();
+			((int[])result[2]).SequenceEqual(new[] { 3, 4 }).ShouldBeTrue();
+			((Dictionary<string, int>)result[3])["a"].ShouldBe(1);
+			((HashSet<string>)result[4]).Contains("x").ShouldBeTrue();
+			ClassWithReadonlyReferenceField readonlyResult = (ClassWithReadonlyReferenceField)result[5];
+			readonlyResult.ReadonlyChild.ShouldNotBeSameAs(((ClassWithReadonlyReferenceField)source[5]).ReadonlyChild);
+			readonlyResult.ReadonlyChild.Number.ShouldBe(2);
+			result[6].ShouldBe(source[6]);
+			((string[])result[7]).SequenceEqual(new[] { "s" }).ShouldBeTrue();
+			((Queue<int>)result[8]).Peek().ShouldBe(5);
+			TestStruct structResult = (TestStruct)result[9];
+			structResult.RefType.ShouldNotBeSameAs(((TestStruct)source[9]).RefType);
+			structResult.RefType!.Number.ShouldBe(4);
+			((TestClass)result[10]).Number.ShouldBe(5);
+		}
+	}
+
+	private sealed class ReentrantComparer(object nestedSource) : EqualityComparer<object>
+	{
+		public object? NestedClone { get; private set; }
+
+		public override bool Equals(object? x, object? y)
+		{
+			return ReferenceEquals(x, y);
+		}
+
+		public override int GetHashCode(object obj)
+		{
+			// Starts a second top-level DeepClone while the outer one is still in progress on this thread
+			NestedClone ??= nestedSource.DeepClone();
+			return RuntimeHelpers.GetHashCode(obj);
+		}
+	}
+
+	[Fact]
+	public void DeepClone_WhenCustomComparerStartsNestedDeepClone_ShouldCloneBothGraphs()
+	{
+		// Arrange
+		TestClass nestedSource = new() { Number = 7, Text = "nested", Child = new TestClass { Number = 8 } };
+		TestClass source = new() { Number = 1, Text = "outer", Numbers = [1, 2], Child = new TestClass { Number = 2, NumberArray = [3] } };
+		ReentrantComparer comparer = new(nestedSource);
+
+		// Act
+		TestClass result = source.DeepClone(new Dictionary<object, object>(comparer));
+		TestClass secondResult = source.DeepClone();
+
+		// Assert
+		TestClass nestedResult = comparer.NestedClone.ShouldBeOfType<TestClass>();
+		nestedResult.ShouldNotBeSameAs(nestedSource);
+		nestedResult.Number.ShouldBe(7);
+		nestedResult.Child.ShouldNotBeNull();
+		nestedResult.Child.ShouldNotBeSameAs(nestedSource.Child);
+		nestedResult.Child.Number.ShouldBe(8);
+
+		foreach (TestClass clone in new[] { result, secondResult })
+		{
+			clone.ShouldNotBeSameAs(source);
+			clone.Text.ShouldBe("outer");
+			clone.Numbers.ShouldNotBeSameAs(source.Numbers);
+			clone.Numbers!.SequenceEqual(new[] { 1, 2 }).ShouldBeTrue();
+			clone.Child.ShouldNotBeNull();
+			clone.Child.ShouldNotBeSameAs(source.Child);
+			clone.Child.Number.ShouldBe(2);
+			clone.Child.NumberArray.ShouldNotBeSameAs(source.Child.NumberArray);
+			clone.Child.NumberArray!.SequenceEqual(new[] { 3 }).ShouldBeTrue();
+		}
 	}
 }
