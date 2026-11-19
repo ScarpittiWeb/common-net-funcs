@@ -23,6 +23,7 @@
 		<PackageReference Include="coverlet.MTP" />
 		<PackageReference Include="Microsoft.AspNetCore.JsonPatch" />
 		<PackageReference Include="Microsoft.AspNetCore.TestHost" />
+		<PackageReference Include="MessagePack.AspNetCoreMvcFormatter" />
 		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
 		<!--<PackageReference Include="Microsoft.AspNetCore.OpenApi" />-->
 		<PackageReference Include="Microsoft.EntityFrameworkCore" />
@@ -41,6 +42,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\CommonNetFuncs.Web.Api\CommonNetFuncs.Web.Api.csproj" />
+		<ProjectReference Include="..\CommonNetFuncs.Web.Requests\CommonNetFuncs.Web.Requests.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
