@@ -340,6 +340,9 @@ ASALocalRun/
 # MSBuild Binary and Structured Log
 *.binlog
 
+# SonarScanner for .NET generated analysis state
+.sonarqube/
+
 # NVidia Nsight GPU debugger configuration file
 *.nvuser
 

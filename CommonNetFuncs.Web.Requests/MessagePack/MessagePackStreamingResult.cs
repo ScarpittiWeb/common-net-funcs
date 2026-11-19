@@ -167,19 +167,6 @@ public class MessagePackStreamingResult<T>(
 			formatter => formatter.GetType().FullName == "MessagePack.AspNetCoreMvcFormatter.MessagePackOutputFormatter");
 	}
 
-	private async Task WriteMessagePackItemAsync(HttpResponse response, T item, CancellationToken cancellationToken)
-	{
-		IServiceProvidersFeature? serviceProviders = httpContext.Features.Get<IServiceProvidersFeature>();
-		if (serviceProviders?.RequestServices is not { } requestServices ||
-			requestServices.GetService(typeof(IOptions<MvcOptions>)) is not IOptions<MvcOptions> mvcOptions)
-		{
-			return null;
-		}
-
-		return mvcOptions.Value.OutputFormatters.FirstOrDefault(
-			formatter => formatter.GetType().FullName == "MessagePack.AspNetCoreMvcFormatter.MessagePackOutputFormatter");
-	}
-
 	private async Task WriteMessagePackItemAsync(HttpResponse response, ArrayBufferWriter<byte> bufferWriter, T item, CancellationToken cancellationToken)
 	{
 		// Serialize each item into the reused buffer
