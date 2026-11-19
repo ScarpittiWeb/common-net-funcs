@@ -31,6 +31,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\CommonNetFuncs.Sql.Common\CommonNetFuncs.Sql.Common.csproj" />
+		<ProjectReference Include="..\CommonNetFuncs.Sql.Odbc\CommonNetFuncs.Sql.Odbc.csproj" />
 		<ProjectReference Include="..\CommonNetFuncs.Sql.SqlServer\CommonNetFuncs.Sql.SqlServer.csproj" />
 		<!-- CommonNetFuncs.Sql.PostgreSql only targets net11.0, so it can't be referenced when testing against the netstandard2.1 builds -->
 		<ProjectReference Include="..\CommonNetFuncs.Sql.PostgreSql\CommonNetFuncs.Sql.PostgreSql.csproj" Condition="'$(UseNetStandardLibs)' != 'true'" />
