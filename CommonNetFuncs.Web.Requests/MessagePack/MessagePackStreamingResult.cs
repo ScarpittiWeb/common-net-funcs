@@ -1,12 +1,12 @@
-﻿using System.Buffers;
-using System.Text.Json;
-using MessagePack;
+﻿using MessagePack;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
+using System.Buffers;
+using System.Text.Json;
 
 namespace CommonNetFuncs.Web.Requests.MessagePack;
 
@@ -157,8 +157,10 @@ public class MessagePackStreamingResult<T>(
 			return null;
 		}
 
-		return mvcOptions.Value.OutputFormatters.FirstOrDefault(
-			formatter => formatter.GetType().FullName == "MessagePack.AspNetCoreMvcFormatter.MessagePackOutputFormatter");
+		return mvcOptions.Value.OutputFormatters.FirstOrDefault(formatter =>
+			formatter is OutputFormatter outputFormatter &&
+			outputFormatter.SupportedMediaTypes.Any(mediaType =>
+				mediaType.Equals("application/x-msgpack", StringComparison.OrdinalIgnoreCase)));
 	}
 
 	private async Task WriteMessagePackItemAsync(HttpResponse response, T item, CancellationToken cancellationToken)
