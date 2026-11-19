@@ -18,7 +18,9 @@ public static class MessagePackStreaming
 	/// </summary>
 	/// <typeparam name="T">Type of items to stream</typeparam>
 	/// <param name="data">The async enumerable data to stream</param>
-	/// <param name="messagePackOptions">Optional MessagePack serializer options</param>
+	/// <param name="messagePackOptions">
+	/// Optional MessagePack serializer options. When omitted, registered MVC MessagePack output formatter options are used when available, otherwise <see cref="MessagePackSerializerOptions.Standard"/> is used.
+	/// </param>
 	/// <param name="jsonOptions">Optional JSON serializer options</param>
 	/// <param name="successStatusCode">Status code to return when data is present (default: 200 OK)</param>
 	/// <param name="emptyStatusCode">Status code to return when no data is present (default: 204 No Content)</param>

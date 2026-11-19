@@ -2,7 +2,10 @@
 using System.Text.Json;
 using MessagePack;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Formatters;
+using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
 
 namespace CommonNetFuncs.Web.Requests.MessagePack;
@@ -14,7 +17,10 @@ namespace CommonNetFuncs.Web.Requests.MessagePack;
 /// </summary>
 /// <typeparam name="T">Type of items to stream</typeparam>
 /// <param name="data">The async enumerable data to stream</param>
-/// <param name="messagePackOptions">Optional MessagePack serializer options</param>
+/// <param name="messagePackOptions">
+/// Optional MessagePack serializer options. When omitted, registered MVC MessagePack output formatter options are used when available;
+/// otherwise <see cref="MessagePackSerializerOptions.Standard"/> is used.
+/// </param>
 /// <param name="jsonOptions">Optional JSON serializer options</param>
 /// <param name="successStatusCode">Status code to return when data is present (default: 200 OK)</param>
 /// <param name="emptyStatusCode">Status code to return when no data is present (default: 204 No Content)</param>
@@ -67,6 +73,9 @@ public class MessagePackStreamingResult<T>(
 		response.StatusCode = successStatusCode;
 
 		bool hasData = false;
+		IOutputFormatter? mvcMessagePackFormatter = format == StreamingFormat.MessagePack && messagePackOptions is null
+			? GetMvcMessagePackFormatter(httpContext)
+			: null;
 
 		try
 		{
@@ -76,7 +85,14 @@ public class MessagePackStreamingResult<T>(
 
 				if (format == StreamingFormat.MessagePack)
 				{
-					await WriteMessagePackItemAsync(response, item, cancellationToken).ConfigureAwait(false);
+					if (mvcMessagePackFormatter is not null)
+					{
+						await WriteMvcMessagePackItemAsync(httpContext, mvcMessagePackFormatter, item).ConfigureAwait(false);
+					}
+					else
+					{
+						await WriteMessagePackItemAsync(response, item, cancellationToken).ConfigureAwait(false);
+					}
 				}
 				else // JSON
 				{
@@ -132,6 +148,19 @@ public class MessagePackStreamingResult<T>(
 		return StreamingFormat.Unsupported;
 	}
 
+	private static IOutputFormatter? GetMvcMessagePackFormatter(HttpContext httpContext)
+	{
+		IServiceProvidersFeature? serviceProviders = httpContext.Features.Get<IServiceProvidersFeature>();
+		if (serviceProviders?.RequestServices is not { } requestServices ||
+			requestServices.GetService(typeof(IOptions<MvcOptions>)) is not IOptions<MvcOptions> mvcOptions)
+		{
+			return null;
+		}
+
+		return mvcOptions.Value.OutputFormatters.FirstOrDefault(
+			formatter => formatter.GetType().FullName == "MessagePack.AspNetCoreMvcFormatter.MessagePackOutputFormatter");
+	}
+
 	private async Task WriteMessagePackItemAsync(HttpResponse response, T item, CancellationToken cancellationToken)
 	{
 		// Serialize each item to a buffer
@@ -141,6 +170,18 @@ public class MessagePackStreamingResult<T>(
 		// Write the serialized bytes to the response stream
 		await response.Body.WriteAsync(bufferWriter.WrittenMemory, cancellationToken).ConfigureAwait(false);
 		await response.Body.FlushAsync(cancellationToken).ConfigureAwait(false);
+	}
+
+	private static async Task WriteMvcMessagePackItemAsync(HttpContext httpContext, IOutputFormatter formatter, T item)
+	{
+		OutputFormatterWriteContext context = new(
+			httpContext,
+			static (stream, encoding) => new StreamWriter(stream, encoding, leaveOpen: true),
+			typeof(T),
+			item);
+
+		await formatter.WriteAsync(context).ConfigureAwait(false);
+		await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted).ConfigureAwait(false);
 	}
 
 	private async Task WriteJsonItemAsync(HttpResponse response, T item, CancellationToken cancellationToken)

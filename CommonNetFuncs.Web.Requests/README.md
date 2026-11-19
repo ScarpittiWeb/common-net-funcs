@@ -21,9 +21,10 @@ This lightweight project contains helper methods for several common functions re
       - [RestHelperOptionsDefaultConfig](#resthelperoptionsdefaultconfig)
       - [Dependency Injection Setup](#dependency-injection-setup)
   - [MessagePack Streaming](#messagepack-streaming)
-    - [Overview](#messagepack-streaming-overview)
+    - [Overview](#overview)
     - [MessagePack Streaming Usage Examples](#messagepack-streaming-usage-examples)
       - [Server-Side Controller](#server-side-controller)
+      - [Minimal API Usage](#minimal-api-usage)
       - [Client-Side Usage](#client-side-usage)
   - [PatchCreator](#patchcreator)
     - [PatchCreator Usage Examples](#patchcreator-usage-examples)
@@ -295,6 +296,7 @@ public class DataController : ControllerBase
     [HttpGet]
     public IActionResult GetStreamingData()
     {
+        // When MessagePack MVC formatters are registered, their configured SerializerOptions are used automatically.
         return this.StreamMessagePack(_dataService.GetDataAsyncEnumerable());
     }
 
@@ -361,6 +363,13 @@ app.Run();
 ```
 
 **Both the controller extension (`this.StreamMessagePack`) and the Minimal API helper (`MessagePackStreaming.Stream`) use the same underlying `MessagePackStreamingResult<T>` implementation, ensuring consistent behavior across both patterns.**
+
+When `messagePackOptions` is omitted, the result uses the options configured on a
+registered MVC `MessagePackOutputFormatter` if one is available. This applies the
+MVC formatter's compression, security, and resolver settings without repeating
+them at each call site. Explicitly supplied options continue to take precedence.
+If no MVC MessagePack formatter is registered, `MessagePackSerializerOptions.Standard`
+is used.
 
 #### Client-Side Usage
 
