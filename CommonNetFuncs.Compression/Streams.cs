@@ -1,6 +1,7 @@
 ﻿using System.Buffers;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 #if NETSTANDARD2_1
 using CommonNetFuncs.Compression.Internal;
 #endif
@@ -21,6 +22,7 @@ public static class Streams
 	//private const int ChunkThreshold = 16 * 1024 * 1024; // 16 MB
 	private const int ChunkSize = 1024 * 1024; // 1 MB
 	private const int MaxCompressionRatio = 1000; // Detect compression bombs
+	private const int MaxArrayLength = 0x7FFFFFC7; // Array.MaxLength (not available on netstandard2.1)
 
 	private const string UnreadableUncompressedStreamErr = "Uncompressed stream does not support reading.";
 
@@ -338,16 +340,66 @@ public static class Streams
 		using MemoryStream compressedStream = new(compressedData);
 		// Estimate initial capacity (compressed data typically expands 2-10x)
 		int estimatedSize = Math.Min((int)(compressedData.Length * 4L), int.MaxValue / 2);
-		using MemoryStream decompressedStream = new(estimatedSize);
+		if (estimatedSize < 0)
+		{
+			// Preserve the ArgumentOutOfRangeException thrown by sizing the output MemoryStream with the overflowed estimate (inputs > 512 MB)
+			using MemoryStream _ = new(estimatedSize);
+		}
 
 		long maxDecompressedSize = compressedData.LongLength * maxCompressionRatio;
 
-		using (Stream decompressionStream = CreateDecompressionStream(compressedStream, compressionType, true))
+		// Decompress straight into a pooled, growable buffer (no staging copy buffer, no MemoryStream growth copies)
+		byte[] buffer = bufferPool.Rent(Math.Max(estimatedSize, ChunkSize));
+		try
 		{
-			decompressionStream.CopyWithLimit(decompressedStream, maxDecompressedSize, cancellationToken);
+			int total = 0;
+			using (Stream decompressionStream = CreateDecompressionStream(compressedStream, compressionType, true))
+			{
+				while (true)
+				{
+					// Always request exactly ChunkSize (like CopyWithLimit) so the read pattern, limit checks and exception ordering are unchanged
+					if (buffer.Length - total < ChunkSize)
+					{
+						buffer = GrowDecompressBuffer(buffer, total);
+					}
+
+					int bytesRead = decompressionStream.Read(buffer, total, ChunkSize);
+					if (bytesRead <= 0)
+					{
+						break;
+					}
+
+					cancellationToken.ThrowIfCancellationRequested();
+
+					total += bytesRead;
+
+					if (total > maxDecompressedSize)
+					{
+						throw new CompressionLimitExceededException($"Operation would exceed maximum size limit of {maxDecompressedSize} bytes");
+					}
+				}
+			}
+
+			return buffer.AsSpan(0, total).ToArray();
+		}
+		finally
+		{
+			bufferPool.Return(buffer);
+		}
+	}
+
+	private static byte[] GrowDecompressBuffer(byte[] buffer, int used)
+	{
+		long required = (long)used + ChunkSize;
+		if (required > MaxArrayLength)
+		{
+			throw new IOException("Stream was too long.");
 		}
 
-		return decompressedStream.ToArray();
+		byte[] next = bufferPool.Rent((int)Math.Min(Math.Max((long)buffer.Length * 2, required), MaxArrayLength));
+		Buffer.BlockCopy(buffer, 0, next, 0, used);
+		bufferPool.Return(buffer);
+		return next;
 	}
 
 	/// <summary>
@@ -629,7 +681,7 @@ public static class Streams
 	/// <returns><see langword="true"/> if byte array contains data that was compressed using the deflate compression algorithm.</returns>
 	public static Task<bool> IsDeflateCompressed(this byte[] data)
 	{
-		return IsDeflateCompressedCore(data.AsMemory());
+		return Task.FromResult(IsDeflateCompressedCore(data.AsMemory()));
 	}
 
 	/// <summary>
@@ -639,34 +691,26 @@ public static class Streams
 	/// <returns><see langword="true"/> if data was compressed using the deflate compression algorithm.</returns>
 	internal static Task<bool> IsDeflateCompressed(this Memory<byte> data)
 	{
-		return IsDeflateCompressedCore(data);
+		return Task.FromResult(IsDeflateCompressedCore(data));
 	}
 
-	private static async Task<bool> IsDeflateCompressedCore(Memory<byte> data)
+	// Everything here completes synchronously over in-memory data, so the callers wrap the result with Task.FromResult instead of using a state machine
+	private static bool IsDeflateCompressedCore(ReadOnlyMemory<byte> data)
 	{
-		byte[]? buffer = null;
 		try
 		{
-			// Create MemoryStream and write data directly to avoid ToArray() allocation
-			await using MemoryStream memoryStream = new(data.Length);
-			await memoryStream.WriteAsync(data).ConfigureAwait(false);
-			memoryStream.Position = 0;
-			await using DeflateStream deflateStream = new(memoryStream, CompressionMode.Decompress);
+			// Wrap the existing array when possible instead of copying the whole input
+			using MemoryStream memoryStream = MemoryMarshal.TryGetArray(data, out ArraySegment<byte> segment)
+				? new MemoryStream(segment.Array!, segment.Offset, segment.Count, writable: false)
+				: new MemoryStream(data.ToArray(), writable: false);
+			using DeflateStream deflateStream = new(memoryStream, CompressionMode.Decompress);
 
-			buffer = bufferPool.Rent(1);
-			int bytesRead = await deflateStream.ReadAsync(buffer.AsMemory(0, 1)).ConfigureAwait(false);
-			return bytesRead > 0;
+			Span<byte> firstByte = stackalloc byte[1];
+			return deflateStream.Read(firstByte) > 0;
 		}
 		catch (Exception)
 		{
 			return false;
-		}
-		finally
-		{
-			if (buffer != null)
-			{
-				bufferPool.Return(buffer);
-			}
 		}
 	}
 

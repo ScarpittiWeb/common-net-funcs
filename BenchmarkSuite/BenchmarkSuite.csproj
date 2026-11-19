@@ -19,7 +19,14 @@
 		<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
 		<PackageReference Include="ZLinq" />
+		<!-- Enables the SkiaSharp / Roslyn source-generator benchmark classes in PerfMiscBenchmarks.cs -->
+		<PackageReference Include="SkiaSharp" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
 	</ItemGroup>
+
+	<PropertyGroup>
+		<DefineConstants>$(DefineConstants);PM_SKIASHARP;PM_ROSLYN</DefineConstants>
+	</PropertyGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\CommonNetFuncs.Core\CommonNetFuncs.Core.csproj" />

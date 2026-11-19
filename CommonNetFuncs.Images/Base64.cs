@@ -65,8 +65,10 @@ public static partial class Base64
 				SKImageInfo bounds = SKBitmap.DecodeBounds(ms);
 				if (bounds.Height > 0 && bounds.Width > 0)
 				{
-					ReadOnlySpan<byte> imageBytes = ms.ToArray();
-					return ToBase64String(imageBytes);
+					// TryGetBuffer exposes exactly the [origin, length) range ToArray would copy
+					return ms.TryGetBuffer(out ArraySegment<byte> segment)
+						? ToBase64String(segment.Array!, segment.Offset, segment.Count)
+						: ToBase64String(ms.ToArray());
 				}
 			}
 		}

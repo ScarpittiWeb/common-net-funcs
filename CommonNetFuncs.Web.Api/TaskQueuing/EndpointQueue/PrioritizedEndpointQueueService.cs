@@ -87,12 +87,13 @@ public class PrioritizedEndpointQueueService : IPrioritizedEndpointQueueService,
 
 	private PrioritizedEndpointQueue GetOrCreateQueue(string endpointKey)
 	{
-		return queues.GetOrAdd(endpointKey, key =>
+		// Static lambda + factory argument avoids allocating a closure and delegate on every lookup
+		return queues.GetOrAdd(endpointKey, static (key, provider) =>
 		{
-			NLog.Logger localLogger = serviceProvider.GetService<NLog.Logger>() ?? NLog.LogManager.GetCurrentClassLogger();
+			NLog.Logger localLogger = provider.GetService<NLog.Logger>() ?? NLog.LogManager.GetCurrentClassLogger();
 			localLogger.Info("Creating new prioritized queue for endpoint: {EndpointKey}", key);
 			return new PrioritizedEndpointQueue(key);
-		});
+		}, serviceProvider);
 	}
 
 	private static TaskPriority GetPriorityLevel(int priority)

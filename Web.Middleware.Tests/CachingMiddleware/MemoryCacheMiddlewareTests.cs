@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Security.Cryptography;
+using System.Text;
 using CommonNetFuncs.Web.Common.CachingSupportClasses;
 using CommonNetFuncs.Web.Middleware.CachingMiddleware;
 using FakeItEasy;
@@ -515,6 +516,45 @@ public sealed class MemoryCacheMiddlewareTests
 		// Assert
 		A.CallTo(() => cache.CreateEntry(A<object>._)).MustHaveHappened();
 		metrics.CacheMisses().ShouldBe(1);
+	}
+
+	[RetryFact(3)]
+	public async Task InvokeAsync_WithPostRequestAndUnsortedQuery_GeneratesSortedCacheKeyWithBodyHash()
+	{
+		// Arrange
+		Dictionary<string, StringValues> queryDict = new()
+		{
+			{ "zeta", "1" },
+			{ options.UseCacheQueryParam, "true" },
+			{ options.EvictionQueryParam, "false" },
+			{ "alpha", "2" },
+			{ "tags", new StringValues(["a", "b"]) }
+		};
+		context.Request.Query = new QueryCollection(queryDict);
+		context.Request.Method = "POST";
+		context.Request.Path = "/api/test";
+		context.Request.Headers.Accept = "application/json";
+
+		const string bodyContent = "{\"test\":\"data\",\"unicode\":\"héllo ✓\"}";
+		context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(bodyContent));
+		context.Response.StatusCode = StatusCodes.Status200OK;
+		context.Response.Body = new MemoryStream();
+
+		A.CallTo(() => next(A<HttpContext>._)).Invokes((HttpContext ctx) =>
+		{
+			byte[] data = Encoding.UTF8.GetBytes("response");
+			ctx.Response.Body.Write(data, 0, data.Length);
+		});
+
+		string expectedKey = $"/api/test?alpha=2&tags=a,b&{options.UseCacheQueryParam}=true&zeta=1|{Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(bodyContent)))}|application/json";
+
+		MemoryCacheMiddleware middleware = new(next, cache, options, metrics, tracker);
+
+		// Act
+		await middleware.InvokeAsync(context);
+
+		// Assert
+		A.CallTo(() => cache.CreateEntry(expectedKey)).MustHaveHappened();
 	}
 
 	[RetryFact(3)]

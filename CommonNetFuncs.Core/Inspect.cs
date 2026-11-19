@@ -85,8 +85,16 @@ public static class Inspect
 		}
 	}
 
+	private sealed class CompareEntry(Func<object, object, IEnumerable<string>, bool> compare, bool hasRecursion)
+	{
+		public Func<object, object, IEnumerable<string>, bool> Compare { get; } = compare;
+
+		// Whether the compiled comparer can call back into IsEqual (and therefore needs cycle tracking)
+		public bool HasRecursion { get; } = hasRecursion;
+	}
+
 	private static readonly AsyncLocal<ComparisonContext?> CurrentContext = new();
-	private static readonly ConcurrentDictionary<(Type Type, bool IgnoreStringCase, bool Recursive), Func<object, object, IEnumerable<string>, bool>> CompareDelegates = [];
+	private static readonly ConcurrentDictionary<(Type Type, bool IgnoreStringCase, bool Recursive), CompareEntry> CompareDelegates = [];
 
 	/// <summary>
 	/// Compare two class objects for value equality
@@ -99,16 +107,50 @@ public static class Inspect
 	/// <returns><see langword="true"/> if the two objects are equal by values, otherwise false</returns>
 	public static bool IsEqual(this object? obj1, object? obj2, IEnumerable<string>? exemptProps = null, bool ignoreStringCase = false, bool recursive = true)
 	{
-		// Initialize context if this is the top-level call
-		bool isTopLevel = CurrentContext.Value == null;
-		if (isTopLevel)
+		// Top-level call
+		if (CurrentContext.Value == null)
 		{
-			CurrentContext.Value = new ComparisonContext();
+			if ((obj1 == null) && (obj2 == null))
+			{
+				return true;
+			}
+
+			if ((obj1 == null) || (obj2 == null))
+			{
+				return false;
+			}
+
+			Type topLevelType = obj1.GetType();
+			if (topLevelType != obj2.GetType())
+			{
+				return false;
+			}
+
+			CompareEntry entry = CompareDelegates.GetOrAdd((topLevelType, ignoreStringCase, recursive), static key => CreateCompareEntry(key.Type, key.IgnoreStringCase, key.Recursive));
+			if (!entry.HasRecursion)
+			{
+				// The compiled comparer can never re-enter IsEqual, so the cycle-tracking context would never be read
+				return entry.Compare(obj1, obj2, exemptProps ?? Array.Empty<string>());
+			}
+
+			ComparisonContext context = new();
+			CurrentContext.Value = context;
+			try
+			{
+				context.TryAddPair(obj1, obj2);
+				return entry.Compare(obj1, obj2, exemptProps ?? Array.Empty<string>());
+			}
+			finally
+			{
+				// Clear context since this was the top-level call
+				CurrentContext.Value?.RemovePair(obj1, obj2);
+				CurrentContext.Value = null;
+			}
 		}
 
+		// Nested (recursive) call
 		try
 		{
-			// Null checks (same as before)
 			if ((obj1 == null) && (obj2 == null))
 			{
 				return true;
@@ -133,10 +175,8 @@ public static class Inspect
 			}
 
 			exemptProps ??= [];
-			Func<object, object, IEnumerable<string>, bool> compareDelegate = CompareDelegates.GetOrAdd((type, ignoreStringCase, recursive),
-				static key => CreateCompareDelegate(key.Type, key.IgnoreStringCase, key.Recursive));
-
-			return compareDelegate(obj1, obj2, exemptProps);
+			CompareEntry entry = CompareDelegates.GetOrAdd((type, ignoreStringCase, recursive), static key => CreateCompareEntry(key.Type, key.IgnoreStringCase, key.Recursive));
+			return entry.Compare(obj1, obj2, exemptProps);
 		}
 		finally
 		{
@@ -145,13 +185,13 @@ public static class Inspect
 			{
 				CurrentContext.Value?.RemovePair(obj1, obj2);
 			}
-
-			// Clear context if this was the top-level call
-			if (isTopLevel)
-			{
-				CurrentContext.Value = null;
-			}
 		}
+	}
+
+	private static CompareEntry CreateCompareEntry(Type type, bool ignoreStringCase, bool recursive)
+	{
+		Func<object, object, IEnumerable<string>, bool> compare = CreateCompareDelegate(type, ignoreStringCase, recursive, out bool hasRecursion);
+		return new CompareEntry(compare, hasRecursion);
 	}
 
 	/// <summary>
@@ -160,9 +200,11 @@ public static class Inspect
 	/// <param name="type">Type of the object to be compared</param>
 	/// <param name="ignoreStringCase">If <see langword="true"/>, will ignore case when comparing string properties for value equality</param>
 	/// <param name="recursive">If <see langword="true"/>, will recursively compare properties of complex types</param>
+	/// <param name="hasRecursion">Set to <see langword="true"/> if the delegate calls back into <see cref="IsEqual"/> for any property</param>
 	/// <returns>A delegate for comparing two objects of the specified type for value equality</returns>
-	private static Func<object, object, IEnumerable<string>, bool> CreateCompareDelegate(Type type, bool ignoreStringCase, bool recursive)
+	private static Func<object, object, IEnumerable<string>, bool> CreateCompareDelegate(Type type, bool ignoreStringCase, bool recursive, out bool hasRecursion)
 	{
+		hasRecursion = false;
 		ParameterExpression obj1Param = Expression.Parameter(typeof(object), "obj1");
 		ParameterExpression obj2Param = Expression.Parameter(typeof(object), "obj2");
 		ParameterExpression exemptPropsParam = Expression.Parameter(typeof(IEnumerable<string>), "exemptProps");
@@ -208,6 +250,7 @@ public static class Inspect
 			{
 				MethodInfo? isEqualMethod = typeof(Inspect).GetMethod(nameof(IsEqual), [typeof(object), typeof(object), typeof(IEnumerable<string>), typeof(bool), typeof(bool)])!;
 				comparison = Expression.Call(isEqualMethod, value1, value2, Expression.Constant(null, typeof(IEnumerable<string>)), Expression.Constant(ignoreStringCase), Expression.Constant(recursive));
+				hasRecursion = true;
 			}
 			else
 			{
@@ -238,7 +281,30 @@ public static class Inspect
 			return "null";
 		}
 
-		HashAlgorithm algorithm = CreateHashAlgorithm(hashAlgorithm);
+#if NET
+		using MemoryStream ms = new();
+		using BinaryWriter writer = new(ms);
+		foreach (PropertyInfo property in GetReadablePropertiesOrderedByNameCached(typeof(T)))
+		{
+			object? value = property.GetValue(obj);
+			if (value != null)
+			{
+				WriteValue(writer, value);
+			}
+		}
+
+		ReadOnlySpan<byte> data = ms.GetBuffer().AsSpan(0, (int)ms.Length);
+		byte[] hash = hashAlgorithm switch
+		{
+			EHashAlgorithm.SHA1 => SHA1.HashData(data),
+			EHashAlgorithm.MD5 => MD5.HashData(data),
+			EHashAlgorithm.SHA256 => SHA256.HashData(data),
+			EHashAlgorithm.SHA384 => SHA384.HashData(data),
+			_ => SHA512.HashData(data)
+		};
+		return Convert.ToHexStringLower(hash);
+#else
+		using HashAlgorithm algorithm = CreateHashAlgorithm(hashAlgorithm);
 		IOrderedEnumerable<PropertyInfo> properties = GetReadablePropertiesOrderedByName(typeof(T));
 
 		using MemoryStream ms = new();
@@ -253,6 +319,7 @@ public static class Inspect
 		}
 
 		return HashCompat.ToHexStringLower(algorithm.ComputeHash(ms.ToArray()));
+#endif
 	}
 
 	/// <summary>
@@ -303,6 +370,16 @@ public static class Inspect
 		return GetOrAddPropertiesFromReflectionCache(type).Where(x => x.CanRead).OrderBy(x => x.Name);
 	}
 
+#if NET
+	private static readonly ConcurrentDictionary<(Type Type, System.Globalization.CultureInfo Culture), PropertyInfo[]> OrderedPropertiesCache = new();
+
+	private static PropertyInfo[] GetReadablePropertiesOrderedByNameCached(Type type)
+	{
+		// OrderBy(Name) uses the current culture's string comparer, so the culture is part of the key to keep the ordering identical
+		return OrderedPropertiesCache.GetOrAdd((type, System.Globalization.CultureInfo.CurrentCulture), static key => GetReadablePropertiesOrderedByName(key.Type).ToArray());
+	}
+#endif
+
 	// Sorts the hashes so the collection's hash doesn't depend on element order.
 	private static void WriteSortedItemHashes(BinaryWriter writer, List<string> itemHashes)
 	{
@@ -347,7 +424,11 @@ public static class Inspect
 				using MemoryStream itemMs = new();
 				using BinaryWriter itemWriter = new(itemMs);
 				WriteValue(itemWriter, item);
+#if NET
+				itemHashes.Add(BitConverter.ToString(MD5.HashData(itemMs.GetBuffer().AsSpan(0, (int)itemMs.Length))));
+#else
 				itemHashes.Add(BitConverter.ToString(HashCompat.Md5HashData(itemMs.ToArray())));
+#endif
 			}
 
 			WriteSortedItemHashes(writer, itemHashes);
@@ -362,7 +443,11 @@ public static class Inspect
 		}
 
 		// Handle complex objects recursively
+#if NET
+		PropertyInfo[] properties = GetReadablePropertiesOrderedByNameCached(type);
+#else
 		IOrderedEnumerable<PropertyInfo> properties = GetReadablePropertiesOrderedByName(type);
+#endif
 
 		writer.Write("{");
 		foreach (PropertyInfo property in properties)

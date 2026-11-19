@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Threading.Channels;
-using CommonNetFuncs.Core;
 using Microsoft.Extensions.Hosting;
 
 namespace CommonNetFuncs.Web.Api.TaskQueuing.ApiQueue;
@@ -12,7 +11,7 @@ public class SequentialTaskProcessor : BackgroundService
 	private readonly ChannelWriter<QueuedTask> writer;
 	private readonly ChannelReader<QueuedTask> reader;
 	private readonly QueueStats stats;
-	private readonly List<TimeSpan> processingTimes = new();
+	private readonly Queue<TimeSpan> processingTimes = new();
 	private readonly Lock statsLock = new();
 	private readonly int processTimeWindow;
 	private bool disposed;
@@ -74,11 +73,11 @@ public class SequentialTaskProcessor : BackgroundService
 				{
 					stats.ProcessedTasks++;
 					stats.LastProcessedAt = DateTime.UtcNow;
-					processingTimes.Add(stopwatch.Elapsed);
+					processingTimes.Enqueue(stopwatch.Elapsed);
 
 					if (processingTimes.Count > processTimeWindow)
 					{
-						processingTimes.RemoveAt(0);
+						processingTimes.Dequeue();
 					}
 				}
 
@@ -111,7 +110,8 @@ public class SequentialTaskProcessor : BackgroundService
 				LastProcessedAt = stats.LastProcessedAt
 			};
 
-			if (processingTimes.AnyFast())
+			// Queue<T> enumerates oldest -> newest, so the average is summed in the same order as before
+			if (processingTimes.Count > 0)
 			{
 				currentStats.AverageProcessingTime = TimeSpan.FromMilliseconds(processingTimes.Average(t => t.TotalMilliseconds));
 			}

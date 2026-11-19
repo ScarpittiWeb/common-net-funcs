@@ -23,6 +23,9 @@ public static class Random
 	private const string NumberToGenerateError = "Number to generate must be greater than 0.";
 	private const string MaxValueError = "Max value must be greater than 0.";
 
+	// Bytes of cryptographic randomness fetched per RandomNumberGenerator call in ShuffleListInPlace (4 bytes are consumed per element)
+	private const int ShuffleRandomBufferSize = 256;
+
 #if !NETSTANDARD2_1
 	// FrozenSet lookups are faster than HashSet once built, ideal for this never-mutated default set
 	internal static readonly FrozenSet<char> DefaultCharSet = new HashSet<char>(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
@@ -588,11 +591,27 @@ public static class Random
 	public static IList<T> ShuffleListInPlace<T>(this IList<T> list, CancellationToken cancellationToken = default)
 	{
 		int n = list.Count;
+		if (n <= 1)
+		{
+			return list;
+		}
+
+		Span<byte> randomBytes = stackalloc byte[ShuffleRandomBufferSize];
+		int offset = ShuffleRandomBufferSize;
 		while (n > 1)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 			n--;
-			int k = GetRandomInt(0, n + 1);
+			if (offset == ShuffleRandomBufferSize)
+			{
+				rng.GetBytes(randomBytes);
+				offset = 0;
+			}
+
+			// Same transform as GetRandomInt(0, n + 1): non-negative int32 modulo the range
+			int result = BitConverter.ToInt32(randomBytes.Slice(offset, 4)) & 0x7FFFFFFF;
+			offset += 4;
+			int k = result % (n + 1);
 			(list[n], list[k]) = (list[k], list[n]);
 		}
 		return list;

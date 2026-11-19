@@ -14,7 +14,40 @@ internal static class Program
 	// dotnet run -c Release -- --job short --filter *BenchmarkClass1*
 	static void Main(string[] args)
 	{
+		// dotnet run -c Release -- --verify : checks that each Perf* "Optimized" variant matches its "Original" on edge-case inputs
+		if (args.Length > 0 && args[0] == "--verify")
+		{
+			RunVerifiers();
+			return;
+		}
+
 		BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, CreateConfig());
+	}
+
+	private static void RunVerifiers()
+	{
+		(string Name, Action Run)[] verifiers =
+		[
+			("Strings", PsVerify.Run),
+			("Core", PcVerify.Run),
+			("Office", PoVerify.Run),
+			("Data", PdVerify.Run),
+			("Web", PwVerify.Run),
+			("Misc", PmVerify.Run),
+		];
+
+		foreach ((string name, Action run) in verifiers)
+		{
+			try
+			{
+				run();
+				Console.WriteLine($"VERIFY {name}: PASS");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"VERIFY {name}: FAIL -> {ex}");
+			}
+		}
 	}
 
 	private static IConfig CreateConfig()

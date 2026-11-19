@@ -2107,6 +2107,42 @@ public sealed class CollectionsTests
 		result.ShouldBe(1);
 	}
 
+	[Fact]
+	public void IndexOf_WithArray_ReturnsFirstMatchingIndex()
+	{
+		// Arrange
+
+		string[] collection = ["test1", "test2", "test3", "test2"];
+
+		// Act
+
+		int found = Collections.IndexOf(collection, "test2");
+		int missing = Collections.IndexOf(collection, "test4");
+
+		// Assert
+
+		found.ShouldBe(1);
+		missing.ShouldBe(-1);
+	}
+
+	[Fact]
+	public void IndexOf_WithNonListEnumerable_ReturnsFirstMatchingIndex()
+	{
+		// Arrange
+
+		IEnumerable<string> collection = Enumerable.Range(1, 4).Select(static x => $"TEST{(x == 4 ? 2 : x)}");
+
+		// Act
+
+		int found = Collections.IndexOf(collection, "test2", StringComparer.OrdinalIgnoreCase);
+		int missing = Collections.IndexOf(collection, "test4", StringComparer.OrdinalIgnoreCase);
+
+		// Assert
+
+		found.ShouldBe(1);
+		missing.ShouldBe(-1);
+	}
+
 	#endregion
 
 	#region IsIn Tests
@@ -2348,6 +2384,38 @@ public sealed class CollectionsTests
 
 		result.Count().ShouldBe(5);
 		result.ShouldBeSubsetOf(["A|1", "A|2", "A|3", "B|1", "B|2", "B|3", "C|1", "C|2", "C|3"]);
+	}
+
+	[Fact]
+	public void GetCombinations_WithMaxCombinationsReachedBeforeLastSource_ReturnsFirstCombinationsInSourceOrder()
+	{
+		// Arrange
+
+		List<List<string>> sources = new() { new List<string> { "A", "B" }, new List<string> { "1", "2", "3" }, new List<string> { "x", "y" } };
+
+		// Act
+
+		HashSet<string> result = sources.GetCombinations(maxCombinations: 5);
+
+		// Assert
+
+		result.ToList().ShouldBe(["A|1", "A|2", "A|3", "B|1", "B|2"]);
+	}
+
+	[Fact]
+	public void GetCombinations_WithNullSeparator_JoinsWithoutSeparatorInSourceOrder()
+	{
+		// Arrange
+
+		List<List<string?>> sources = new() { new List<string?> { "A", "B" }, new List<string?> { "1", null }, new List<string?> { "x" } };
+
+		// Act
+
+		HashSet<string> result = sources.GetCombinations(separator: null!);
+
+		// Assert
+
+		result.ToList().ShouldBe(["A1x", "Ax", "B1x", "Bx"]);
 	}
 
 	[Fact]

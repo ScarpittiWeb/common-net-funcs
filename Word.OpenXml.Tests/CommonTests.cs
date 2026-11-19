@@ -115,6 +115,28 @@ public sealed class ChangeUrlTests : IDisposable
 		hyperlinks.ShouldContain(h => h.Uri.ToString().Contains("github.com"));
 	}
 
+	[RetryFact(3)]
+	public void ChangeUrlsInWordDoc_Dictionary_KeysDifferingOnlyByCase_FirstAddedKeyWins()
+	{
+		// Arrange
+		Dictionary<string, string> urlsToUpdate = new()
+			{
+				{ "http://TestUrl/1", "http://NewUrl/First" },
+				{ "HTTP://TESTURL/1", "http://NewUrl/Second" }
+			};
+
+		// Act
+		bool result = CommonNetFuncs.Word.OpenXml.ChangeUrls.ChangeUrlsInWordDoc(tempFileStream!, urlsToUpdate);
+		tempFileStream!.Position = 0;
+
+		// Assert
+		result.ShouldBeTrue();
+		List<HyperlinkRelationship> hyperlinks = GetHyperlinks(tempFileStream);
+		hyperlinks.ShouldNotContain(h => h.Uri.ToString().Equals("http://TestUrl/1", StringComparison.InvariantCultureIgnoreCase));
+		hyperlinks.ShouldContain(h => h.Uri.ToString().Equals("http://NewUrl/First", StringComparison.InvariantCultureIgnoreCase));
+		hyperlinks.ShouldNotContain(h => h.Uri.ToString().Equals("http://NewUrl/Second", StringComparison.InvariantCultureIgnoreCase));
+	}
+
 	[RetryTheory(3)]
 	[InlineData(@"(TestUrl/)(\d+)", "NewUrl/$2", true)]
 	[InlineData("TestUrl/1", "NewUrl/First", false)]

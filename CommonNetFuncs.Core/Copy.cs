@@ -30,8 +30,8 @@ public static class Copy
 	/// <returns>Function for executing deep copy</returns>
 	private static Func<object, object?, int, int, object?> GetOrAddFunctionFromDeepCopyCache((Type sourceType, Type destType) key)
 	{
-		if (DeepCopyCacheManager.IsUsingLimitedCache() ? DeepCopyCacheManager.GetLimitedCache().TryGetValue(key, out Func<object, object?, int, int, object?>? function) :
-					DeepCopyCacheManager.GetCache().TryGetValue(key, out function))
+		if (DeepCopyCache.IsUsingLimitedCache() ? DeepCopyCache.TryGetLimitedCacheValue(key, out Func<object, object?, int, int, object?>? function) :
+					DeepCopyCache.TryGetCacheValue(key, out function))
 		{
 			return function!;
 		}
@@ -57,8 +57,8 @@ public static class Copy
 	{
 		(Type, Type) key = (typeof(TSource), typeof(TDest));
 		bool isLimitedCache = CopyCacheManager.IsUsingLimitedCache();
-		if (isLimitedCache ? CopyCacheManager.GetLimitedCache().TryGetValue(key, out Dictionary<string, (Delegate Set, Delegate Get)>? functions) :
-					CopyCacheManager.GetCache().TryGetValue(key, out functions))
+		if (isLimitedCache ? CopyCache.TryGetLimitedCacheValue(key, out Dictionary<string, (Delegate Set, Delegate Get)>? functions) :
+					CopyCache.TryGetCacheValue(key, out functions))
 		{
 			return functions!;
 		}
@@ -480,8 +480,8 @@ public static class Copy
 		(Type, Type) key = (typeof(TSource), typeof(TDest));
 		bool isLimitedCache = CopyCacheManager.IsUsingLimitedCache();
 
-		if (isLimitedCache ? CopyCacheTyped.GetLimitedCache().TryGetValue(key, out object? typedCache) :
-			CopyCacheTyped.GetCache().TryGetValue(key, out typedCache))
+		if (isLimitedCache ? CopyCacheTyped.TryGetLimitedCacheValue(key, out object? typedCache) :
+			CopyCacheTyped.TryGetCacheValue(key, out typedCache))
 		{
 			return (Dictionary<string, (Action<TDest, object?> Set, Func<TSource, object?> Get)>)typedCache!;
 		}

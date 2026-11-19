@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Threading.Channels;
-using CommonNetFuncs.Core;
 
 namespace CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
 // Individual Endpoint Queue
@@ -16,7 +15,7 @@ public class EndpointQueue : IDisposable
 	private readonly CancellationTokenSource cancellationTokenSource;
 	private readonly Task processingTask;
 	private readonly QueueStats stats;
-	private readonly List<TimeSpan> processingTimes = new();
+	private readonly Queue<TimeSpan> processingTimes = new();
 	private readonly Lock statsLock = new();
 	private readonly int processTimeWindow;
 
@@ -91,13 +90,12 @@ public class EndpointQueue : IDisposable
 				{
 					stats.ProcessedTasks++;
 					stats.LastProcessedAt = DateTime.UtcNow;
-					processingTimes.Add(stopwatch.Elapsed);
+					processingTimes.Enqueue(stopwatch.Elapsed);
 
-					// Keep only last 100 processing times for average calculation
-
+					// Keep only the last processTimeWindow processing times for average calculation
 					if (processingTimes.Count > processTimeWindow)
 					{
-						processingTimes.RemoveAt(0);
+						processingTimes.Dequeue();
 					}
 				}
 
@@ -130,7 +128,8 @@ public class EndpointQueue : IDisposable
 				LastProcessedAt = stats.LastProcessedAt
 			};
 
-			if (processingTimes.AnyFast())
+			// Queue<T> enumerates oldest -> newest, so the average is summed in the same order as before
+			if (processingTimes.Count > 0)
 			{
 				currentStats.AverageProcessingTime = TimeSpan.FromMilliseconds(processingTimes.Average(t => t.TotalMilliseconds));
 			}

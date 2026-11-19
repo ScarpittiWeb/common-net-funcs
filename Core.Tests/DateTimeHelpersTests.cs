@@ -24,6 +24,21 @@ public sealed class DateTimeHelpersTests
 		DateTimeHelpers.GetBusinessDays(startDate, endDate).ShouldBe(expected);
 	}
 
+	[Theory]
+	[InlineData("2024-05-06T08:00:00", "2024-05-10T17:00:00", null, 5)] // Mon morning - Fri evening, partial days
+	[InlineData("2024-05-06T08:00:00", "2024-05-10T17:00:00", "2024-05-08", 4)] // Partial days with a Wed holiday
+	[InlineData("2024-05-06T08:00:00", "2024-05-20T08:00:00", null, 11)] // Whole-day span with matching non-midnight times
+	public void GetBusinessDays_WithTimeComponents(string start, string end, string? holiday, int expected)
+	{
+		// Arrange
+		DateTime startDate = DateTime.Parse(start, formatProvider);
+		DateTime endDate = DateTime.Parse(end, formatProvider);
+		List<DateTime>? holidays = holiday == null ? null : new List<DateTime> { DateTime.Parse(holiday, formatProvider) };
+
+		// Act & Assert
+		DateTimeHelpers.GetBusinessDays(startDate, endDate, holidays).ShouldBe(expected);
+	}
+
 	[Fact]
 	public void GetBusinessDays_ReturnsZero_WhenStartOrEndIsNull()
 	{

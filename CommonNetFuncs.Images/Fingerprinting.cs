@@ -41,6 +41,13 @@ public record SimilarityResult(
 /// </summary>
 public static class ImageFingerprinting
 {
+	private const int DctSize = 32; // full PerceptualHash DCT grid
+	private const int DctHashSize = 8; // top-left DCT sub-grid used for the PerceptualHash
+
+	// Cosine factors and scales for the DCT coefficients used by PerceptualHash (computed once instead of per Math.Cos call)
+	private static readonly double[][] DctCosTable = BuildDctCosTable();
+	private static readonly double[] DctScale = BuildDctScale();
+
 	// ── Public API ────────────────────────────────────────────────────────────
 
 	/// <summary>Fingerprint a single image file.</summary>
@@ -129,15 +136,25 @@ public static class ImageFingerprinting
 	/// <summary>Find all duplicate pairs in a list of fingerprints.</summary>
 	public static IReadOnlyList<SimilarityResult> FindDuplicates(IReadOnlyList<ImageFingerprint> fingerprints, decimal duplicateThreshold = 90.0m)
 	{
+		// Same pair order, exceptions and similarity values as calling Compare per pair, but only duplicate pairs allocate a result
 		List<SimilarityResult> duplicates = new();
-		for (int i = 0; i < fingerprints.Count; i++)
+		double threshold = (double)duplicateThreshold;
+		int count = fingerprints.Count;
+		for (int i = 0; i < count; i++)
 		{
-			for (int j = i + 1; j < fingerprints.Count; j++)
+			ImageFingerprint a = fingerprints[i];
+			for (int j = i + 1; j < count; j++)
 			{
-				SimilarityResult result = Compare(fingerprints[i], fingerprints[j], duplicateThreshold);
-				if (result.IsDuplicate)
+				ImageFingerprint b = fingerprints[j];
+				if (a.Algorithm != b.Algorithm)
 				{
-					duplicates.Add(result);
+					throw new InvalidOperationException("Cannot compare fingerprints computed with different algorithms.");
+				}
+
+				double similarity = HammingSimilarity(a.Hash, b.Hash);
+				if (similarity >= threshold)
+				{
+					duplicates.Add(new SimilarityResult(a.FilePath, b.FilePath, similarity, true));
 				}
 			}
 		}
@@ -161,19 +178,20 @@ public static class ImageFingerprinting
 	{
 		// Step 1: resize to 8x8 with high-quality downsampling
 		using SKBitmap resizedBitmap = source.ResizeTo(8, 8);
+		SKColor[] colors = resizedBitmap.Pixels; // Row-major, one native call (same SkBitmap::getColor values as GetPixel)
 
 		// Step 2: extract grayscale luminance for all 64 pixels
-		byte[] pixels = new byte[64];
-		for (int y = 0; y < 8; y++)
+		Span<byte> pixels = stackalloc byte[64];
+		int sum = 0;
+		for (int i = 0; i < 64; i++)
 		{
-			for (int x = 0; x < 8; x++)
-			{
-				pixels[y * 8 + x] = Luminance(resizedBitmap.GetPixel(x, y));
-			}
+			byte luminance = Luminance(colors[i]);
+			pixels[i] = luminance;
+			sum += luminance;
 		}
 
-		// Step 3: compute mean luminance
-		double mean = pixels.Average(p => (double)p);
+		// Step 3: compute mean luminance (identical to averaging the exact small integers as doubles)
+		double mean = (double)sum / 64;
 
 		// Step 4: set bit=1 if pixel >= mean, else 0
 		ulong hash = 0;
@@ -197,6 +215,7 @@ public static class ImageFingerprinting
 	{
 		// Step 1: resize to 9 wide x 8 tall (one extra column for diff)
 		using SKBitmap resizedBitmap = source.ResizeTo(9, 8);
+		SKColor[] colors = resizedBitmap.Pixels; // Row-major, one native call (same SkBitmap::getColor values as GetPixel)
 
 		ulong hash = 0;
 		int bit = 0;
@@ -204,10 +223,11 @@ public static class ImageFingerprinting
 		// Step 2: for each row, compare adjacent pixel pairs
 		for (int y = 0; y < 8; y++)
 		{
+			int rowStart = y * 9;
+			byte left = Luminance(colors[rowStart]);
 			for (int x = 0; x < 8; x++)
 			{
-				byte left = Luminance(resizedBitmap.GetPixel(x, y));
-				byte right = Luminance(resizedBitmap.GetPixel(x + 1, y));
+				byte right = Luminance(colors[rowStart + x + 1]);
 
 				// bit = 1 if left pixel is brighter than right
 				if (left > right)
@@ -215,6 +235,7 @@ public static class ImageFingerprinting
 					hash |= 1UL << bit;
 				}
 				bit++;
+				left = right;
 			}
 		}
 
@@ -228,8 +249,8 @@ public static class ImageFingerprinting
 	/// </summary>
 	private static ulong ComputePerceptualHash(SKBitmap source)
 	{
-		const int dctSize = 32; // full DCT grid
-		const int hashSize = 8;  // top-left sub-grid used for hash
+		const int dctSize = DctSize; // full DCT grid
+		const int hashSize = DctHashSize;  // top-left sub-grid used for hash
 
 		// Step 1: resize to 32x32 grayscale
 		using SKBitmap resizedBitmap = source.ResizeTo(dctSize, dctSize);
@@ -244,22 +265,16 @@ public static class ImageFingerprinting
 			}
 		}
 
-		// Step 3: apply 2D DCT
-		double[,] dct = ComputeDct2D(luminanceMatrix, dctSize);
+		// Step 3: apply the 2D DCT (only the coefficients used by the hash are computed)
+		// Step 4: extract top-left 8x8 DCT coefficients
+		Span<double> topLeft = stackalloc double[hashSize * hashSize];
+		ComputeDct2DTopLeft(luminanceMatrix, topLeft);
 
-		// Step 4: extract top-left 8x8 DCT coefficients (skip [0,0] DC component)
-		double[] topLeft = new double[hashSize * hashSize];
-		int idx = 0;
-		for (int y = 0; y < hashSize; y++)
-		{
-			for (int x = 0; x < hashSize; x++)
-			{
-				topLeft[idx++] = dct[y, x];
-			}
-		}
-
-		// Step 5: compute median of the 64 values
-		double[] sorted = topLeft.OrderBy(v => v).ToArray();
+		// Step 5: compute median of the 64 values (ascending sort; ties can only be +0.0/-0.0 or equal values, which cannot change the median
+		// or the >= comparisons)
+		double[] sorted = new double[hashSize * hashSize];
+		topLeft.CopyTo(sorted);
+		Array.Sort(sorted);
 		double median = (sorted[31] + sorted[32]) / 2.0;
 
 		// Step 6: set bit=1 if coefficient >= median
@@ -284,62 +299,75 @@ public static class ImageFingerprinting
 	private static byte Luminance(SKColor color) => (byte)(0.299 * color.Red + 0.587 * color.Green + 0.114 * color.Blue);
 
 	/// <summary>
-	/// Compute 2D Discrete Cosine Transform (DCT-II) on a square matrix.
-	/// Used by PerceptualHash.
+	/// Compute the top-left <see cref="DctHashSize"/> x <see cref="DctHashSize"/> coefficients of the separable 2D Discrete Cosine Transform (DCT-II)
+	/// of a <see cref="DctSize"/> x <see cref="DctSize"/> matrix. Used by PerceptualHash.
 	/// </summary>
-	private static double[,] ComputeDct2D(double[,] input, int size)
+	/// <remarks>
+	/// Every coefficient is accumulated in the same order (i = 0..n-1) with the same cosine factors and scale as the full row/column 1D DCT-II,
+	/// so results are bit-identical to computing the full transform and taking its top-left block.
+	/// </remarks>
+	private static void ComputeDct2DTopLeft(double[,] input, Span<double> topLeft)
 	{
-		// Apply 1D DCT to each row
-		double[,] temp = new double[size, size];
-		for (int y = 0; y < size; y++)
-		{
-			double[] row = new double[size];
-			for (int x = 0; x < size; x++)
-			{
-				row[x] = input[y, x];
-			}
+		const int n = DctSize;
 
-			double[] dctRow = Dct1D(row, size);
-			for (int x = 0; x < size; x++)
+		// Row pass: rowPass[y * DctHashSize + k] == 1D DCT of row y, coefficient k (only k < DctHashSize is needed)
+		Span<double> rowPass = stackalloc double[n * DctHashSize];
+		for (int y = 0; y < n; y++)
+		{
+			for (int k = 0; k < DctHashSize; k++)
 			{
-				temp[y, x] = dctRow[x];
+				double[] cos = DctCosTable[k];
+				double sum = 0;
+				for (int i = 0; i < n; i++)
+				{
+					sum += input[y, i] * cos[i];
+				}
+				rowPass[(y * DctHashSize) + k] = sum * DctScale[k];
 			}
 		}
 
-		// Apply 1D DCT to each column of the row-transformed result
-		double[,] output = new double[size, size];
-		for (int x = 0; x < size; x++)
+		// Column pass: only output rows 0..DctHashSize-1 of columns 0..DctHashSize-1
+		for (int y = 0; y < DctHashSize; y++)
 		{
-			double[] col = new double[size];
-			for (int y = 0; y < size; y++)
+			double[] cos = DctCosTable[y];
+			for (int x = 0; x < DctHashSize; x++)
 			{
-				col[y] = temp[y, x];
-			}
-
-			double[] dctCol = Dct1D(col, size);
-			for (int y = 0; y < size; y++)
-			{
-				output[y, x] = dctCol[y];
+				double sum = 0;
+				for (int i = 0; i < n; i++)
+				{
+					sum += rowPass[(i * DctHashSize) + x] * cos[i];
+				}
+				topLeft[(y * DctHashSize) + x] = sum * DctScale[y];
 			}
 		}
-
-		return output;
 	}
 
-	/// <summary>1D DCT-II transform.</summary>
-	private static double[] Dct1D(double[] input, int n)
+	// Built with the exact same expressions/operand types as the 1D DCT-II so every factor is bit-identical
+	private static double[][] BuildDctCosTable()
 	{
-		double[] output = new double[n];
-		for (int k = 0; k < n; k++)
+		int n = DctSize;
+		double[][] table = new double[DctHashSize][];
+		for (int k = 0; k < DctHashSize; k++)
 		{
-			double sum = 0;
+			double[] row = new double[n];
 			for (int i = 0; i < n; i++)
 			{
-				sum += input[i] * Math.Cos(Math.PI * k * (2 * i + 1) / (2.0 * n));
+				row[i] = Math.Cos(Math.PI * k * (2 * i + 1) / (2.0 * n));
 			}
-			output[k] = sum * (k == 0 ? Math.Sqrt(1.0 / n) : Math.Sqrt(2.0 / n));
+			table[k] = row;
 		}
-		return output;
+		return table;
+	}
+
+	private static double[] BuildDctScale()
+	{
+		int n = DctSize;
+		double[] scale = new double[DctHashSize];
+		for (int k = 0; k < DctHashSize; k++)
+		{
+			scale[k] = k == 0 ? Math.Sqrt(1.0 / n) : Math.Sqrt(2.0 / n);
+		}
+		return scale;
 	}
 
 	/// <summary>
@@ -348,12 +376,18 @@ public static class ImageFingerprinting
 	/// </summary>
 	public static double HammingSimilarity(ulong hashA, ulong hashB)
 	{
-		ulong xor = hashA ^ hashB;
-		int differentBits = 0;
-		while (xor != 0)
-		{
-			differentBits += (int)(xor & 1); xor >>= 1;
-		}
-		return (1.0 - differentBits / 64.0) * 100.0;
+		return (1.0 - PopCount(hashA ^ hashB) / 64.0) * 100.0;
+	}
+
+	private static int PopCount(ulong value)
+	{
+#if NET
+		return System.Numerics.BitOperations.PopCount(value);
+#else
+		value -= (value >> 1) & 0x5555555555555555UL;
+		value = (value & 0x3333333333333333UL) + ((value >> 2) & 0x3333333333333333UL);
+		value = (value + (value >> 4)) & 0x0F0F0F0F0F0F0F0FUL;
+		return (int)((value * 0x0101010101010101UL) >> 56);
+#endif
 	}
 }

@@ -19,6 +19,12 @@ public static class Streams
 		try
 		{
 			await stream.CopyToAsync(ms, bufferSize, cancellationToken).ConfigureAwait(false);
+
+			// The MemoryStream is private to this method, so its buffer can be handed out when it holds exactly the data (pre-sized seekable source at position 0)
+			if (ms.TryGetBuffer(out ArraySegment<byte> segment) && (segment.Offset == 0) && (segment.Count == segment.Array!.Length))
+			{
+				return segment.Array;
+			}
 			return ms.ToArray();
 		}
 		finally

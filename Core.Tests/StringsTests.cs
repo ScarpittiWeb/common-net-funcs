@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using CommonNetFuncs.Core;
 using static Xunit.TestContext;
@@ -216,6 +217,8 @@ public sealed class StringsTests
 	[InlineData("", "")]
 	[InlineData("already trimmed", "already trimmed")]
 	[InlineData("  ", "")]
+	[InlineData("a\tb", "a b")]
+	[InlineData("a \u00A0 b\u3000", "a b")]
 	public void TrimFull_RemovesExcessWhitespace(string? input, string? expected)
 	{
 		// Act
@@ -223,6 +226,19 @@ public sealed class StringsTests
 
 		// Assert
 		result.ShouldBe(expected);
+	}
+
+	[Fact]
+	public void TrimFull_LongInput_CollapsesAllWhitespaceRuns()
+	{
+		// Arrange - longer than the stack buffer so the pooled buffer is used
+		string input = "  " + string.Join(" \t ", Enumerable.Repeat("word", 100)) + "\r\n";
+
+		// Act
+		string result = input.TrimFull();
+
+		// Assert
+		result.ShouldBe(string.Join(" ", Enumerable.Repeat("word", 100)));
 	}
 
 	[Theory]
@@ -733,6 +749,41 @@ public sealed class StringsTests
 	}
 
 	[Fact]
+	public void GetHash_KnownVector_ReturnsLowercaseHex()
+	{
+		// Act
+		string result = "abc".GetHash(EHashAlgorithm.SHA256);
+
+		// Assert
+		result.ShouldBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+	}
+
+	[Theory]
+	[InlineData(341)]
+	[InlineData(342)]
+	[InlineData(1000)]
+	public void GetHash_MultiByteInputAroundBufferLimit_MatchesFramework(int length)
+	{
+		// Arrange
+		string input = new('é', length);
+		string expected = Convert.ToHexStringLower(System.Security.Cryptography.SHA512.HashData(Encoding.UTF8.GetBytes(input)));
+
+		// Act
+		string result = input.GetHash(EHashAlgorithm.SHA512);
+
+		// Assert
+		result.ShouldBe(expected);
+	}
+
+	[Fact]
+	public void GetHash_NullInput_ThrowsArgumentNullException()
+	{
+		// Act & Assert
+		ArgumentNullException exception = Should.Throw<ArgumentNullException>(() => ((string)null!).GetHash(EHashAlgorithm.SHA256));
+		exception.ParamName.ShouldBe("s");
+	}
+
+	[Fact]
 	public void NormalizeWhiteSpace_HandlesVariousWhitespace()
 	{
 		// Arrange
@@ -743,6 +794,32 @@ public sealed class StringsTests
 
 		// Assert
 		result.ShouldBe("Hello World\nTest");
+	}
+
+	[Fact]
+	public void NormalizeWhiteSpace_LongInput_DropsTabsAndKeepsFirstWhitespaceOfRun()
+	{
+		// Arrange - longer than the stack buffer so the pooled buffer is used
+		string input = new string('a', 300) + "\t\n \t b ";
+
+		// Act
+		string result = input.NormalizeWhiteSpace();
+
+		// Assert
+		result.ShouldBe(new string('a', 300) + "\nb");
+	}
+
+	[Fact]
+	public void NormalizeWhiteSpace_AlreadyNormalized_ReturnsSameInstance()
+	{
+		// Arrange
+		const string input = "Hello World";
+
+		// Act
+		string result = input.NormalizeWhiteSpace();
+
+		// Assert
+		result.ShouldBeSameAs(input);
 	}
 
 	[Fact]
@@ -1747,6 +1824,34 @@ public sealed class StringsTests
 		result.ShouldBe("X123X456");
 	}
 
+	[Fact]
+	public void ReplaceInverse_String_RepeatedCalls_RespectOptionsAndCulture()
+	{
+		// Arrange
+		const string input = "ABC123";
+		const string pattern = "[a-z]+";
+
+		// Act & Assert - the same pattern with different options must not reuse a regex built for other options
+		input.ReplaceInverse(pattern, "#").ShouldBe("#");
+		input.ReplaceInverse(pattern, "#", regexOptions: RegexOptions.IgnoreCase).ShouldBe("ABC#");
+		input.ReplaceInverse(pattern, "#").ShouldBe("#");
+
+		// IgnoreCase matching of 'i' / 'I' differs in Turkish cultures, so the current culture must also be honored on repeated calls
+		CultureInfo originalCulture = CultureInfo.CurrentCulture;
+		try
+		{
+			CultureInfo.CurrentCulture = new CultureInfo("en-US");
+			"I".ReplaceInverse("i", "#", regexOptions: RegexOptions.IgnoreCase).ShouldBe("I");
+
+			CultureInfo.CurrentCulture = new CultureInfo("tr-TR");
+			"I".ReplaceInverse("i", "#", regexOptions: RegexOptions.IgnoreCase).ShouldBe("#");
+		}
+		finally
+		{
+			CultureInfo.CurrentCulture = originalCulture;
+		}
+	}
+
 	[Theory]
 	[InlineData(2.5, 3, "2 1/2")]
 	[InlineData(3.25, 2, "3 1/4")]
@@ -1802,6 +1907,12 @@ public sealed class StringsTests
 	[InlineData("2", 2.0, true)]
 	[InlineData(null, null, false)]
 	[InlineData("bad", null, false)]
+	[InlineData("1 1/2", 1.5, true)]
+	[InlineData("-1/2", -0.5, true)]
+	[InlineData("1/0", null, false)]
+	[InlineData("1 1/0", null, false)]
+	[InlineData("2 3/4/5", null, false)]
+	[InlineData("192.168.1.1", null, false)]
 	public void TryFractionToDecimal_Nullable_Works(string? input, double? expected, bool expectedSuccess)
 	{
 		// Act
@@ -1817,6 +1928,9 @@ public sealed class StringsTests
 	[InlineData("2", 2.0, true)]
 	[InlineData(null, 0.0, false)]
 	[InlineData("bad", 0.0, false)]
+	[InlineData("1 1/2", 1.5, true)]
+	[InlineData("1/0", 0.0, false)]
+	[InlineData("192.168.1.1", 0.0, false)]
 	public void TryFractionToDecimal_Value_Works(string? input, double expected, bool expectedSuccess)
 	{
 		// Act
@@ -3459,6 +3573,36 @@ public sealed class StringsTests
 		result.ShouldNotStartWith("00:");
 	}
 
+	[Theory]
+	[InlineData(654_320_000L, "1:05")] // 00:01:05.4320000 -> milliseconds, zero hours and leading minute zero removed
+	[InlineData(500L, "0000500")] // Sub-millisecond ticks are not stripped since Milliseconds is 0
+	[InlineData(-10_000_000L, "-00:00:01")]
+	[InlineData(-937_840_000_000L, "02:03:04")] // -1.02:03:04, negative days are dropped
+	public void TimespanToShortForm_EdgeCases_Works(long ticks, string expected)
+	{
+		// Arrange
+		TimeSpan t = TimeSpan.FromTicks(ticks);
+
+		// Act
+		string result = t.TimespanToShortForm();
+
+		// Assert
+		result.ShouldBe(expected);
+	}
+
+	[Fact]
+	public void TimespanToShortForm_WithDaysAndMilliseconds()
+	{
+		// Arrange
+		TimeSpan t = new(2, 3, 4, 5, 678);
+
+		// Act
+		string result = t.TimespanToShortForm();
+
+		// Assert
+		result.ShouldBe("2:03:04:05");
+	}
+
 	[Fact]
 	public void GetHash_AllAlgorithms()
 	{
@@ -3580,6 +3724,45 @@ public sealed class StringsTests
 	}
 
 	[Theory]
+	[InlineData("5551234567X12x34", "555-123-4567x12")] // Upper-case X splits the extension and only the first extension segment is kept
+	[InlineData("(555) 123-4567 x 890", "555-123-4567x 890")]
+	[InlineData("555.123.4567", "555-123-4567")]
+	public void FormatPhoneNumber_ExtensionAndPunctuation_Works(string input, string expected)
+	{
+		// Act
+		string? result = input.FormatPhoneNumber();
+
+		// Assert
+		result.ShouldBe(expected);
+	}
+
+	[Fact]
+	public void FormatPhoneNumber_DollarSeparator_UsesRegexSubstitutionSemantics()
+	{
+		// Arrange - "$1$$2" is the substitution pattern, where "$$" is a literal '$' followed by a literal '2'
+		const string input = "1234567";
+
+		// Act
+		string? result = input.FormatPhoneNumber("$");
+
+		// Assert
+		result.ShouldBe("123$2");
+	}
+
+	[Fact]
+	public void FormatPhoneNumber_VeryLongInput_Works()
+	{
+		// Arrange - exceeds the stack buffer so the regex-based path is used
+		string input = new string(' ', 200) + "1234567890 ";
+
+		// Act
+		string? result = input.FormatPhoneNumber(".", true);
+
+		// Assert
+		result.ShouldBe("(123).456.7890");
+	}
+
+	[Theory]
 	[InlineData("abcd", true, "ab cd")]
 	[InlineData("ab\ncd", true, "ab  cd")]
 	[InlineData("ab\rcd", true, "ab  cd")]
@@ -3601,6 +3784,32 @@ public sealed class StringsTests
 
 		// Assert
 		result.ShouldBe(expected);
+	}
+
+	[Fact]
+	public void SanitizeForLog_NoLineBreaks_ReturnsSameInstance()
+	{
+		// Arrange
+		const string input = "User 'bob' logged in";
+
+		// Act
+		string result = input.SanitizeForLog();
+
+		// Assert
+		result.ShouldBeSameAs(input);
+	}
+
+	[Fact]
+	public void SanitizeForLog_LongInput_ReplacesEveryLineFeed()
+	{
+		// Arrange - longer than the stack buffer so the pooled buffer is used
+		string input = string.Concat(Enumerable.Repeat("ab\n", 150));
+
+		// Act
+		string result = input.SanitizeForLog();
+
+		// Assert
+		result.ShouldBe(string.Concat(Enumerable.Repeat("ab ", 150)));
 	}
 
 	[Fact]

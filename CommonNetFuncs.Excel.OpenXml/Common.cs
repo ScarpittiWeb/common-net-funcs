@@ -2122,10 +2122,29 @@ public static partial class Common
 				CellReference startCell = new(startCellReference ?? "A1");
 				CellReference endCell = (endCellReference != null) ? new(endCellReference) : sheetData.GetLastPopulatedCell();
 
+				// Rows/cells are resolved through forward-only lazy indexes (each element visited and parsed at most once) instead of a full rescan per cell
+				LazyRowLookup rows = new(sheetData);
+
 				// Add columns to DataTable
+				LazyParsedCellLookup? headerCells = null;
+				bool headerResolved = false;
 				for (uint col = startCell.ColumnIndex; col <= endCell.ColumnIndex; col++)
 				{
-					string columnName = hasHeaders ? sheetData.GetCellValue(startCell.RowIndex, col, sharedStringIndex) : $"Column{col - startCell.ColumnIndex}";
+					string columnName;
+					if (hasHeaders)
+					{
+						// Resolved on first use so any exception surfaces at the same point as the per-cell GetCellValue lookup
+						if (!headerResolved)
+						{
+							headerCells = LazyParsedCellLookup.ForRow(rows.Find(startCell.RowIndex), startCell.RowIndex);
+							headerResolved = true;
+						}
+						columnName = headerCells?.Find(col)?.GetCellValue(sharedStringIndex) ?? string.Empty;
+					}
+					else
+					{
+						columnName = $"Column{col - startCell.ColumnIndex}";
+					}
 					dataTable.Columns.Add(columnName);
 				}
 
@@ -2135,10 +2154,18 @@ public static partial class Common
 				{
 					DataRow dataRow = dataTable.NewRow();
 					bool rowHasData = false;
+					LazyParsedCellLookup? cells = null;
+					bool rowResolved = false;
 
 					for (uint col = startCell.ColumnIndex; col <= endCell.ColumnIndex; col++)
 					{
-						string cellValue = sheetData.GetCellValue(row, col, sharedStringIndex);
+						if (!rowResolved)
+						{
+							cells = LazyParsedCellLookup.ForRow(rows.Find(row), row);
+							rowResolved = true;
+						}
+
+						string cellValue = cells?.Find(col)?.GetCellValue(sharedStringIndex) ?? string.Empty;
 						dataRow[(int)(col - startCell.ColumnIndex)] = cellValue;
 						if (!string.IsNullOrWhiteSpace(cellValue))
 						{
@@ -2412,13 +2439,23 @@ public static partial class Common
 			SharedStringTablePart? sharedStringPart = workbookPart.GetPartsOfType<SharedStringTablePart>().FirstOrDefault();
 			IReadOnlyDictionary<int, string>? sharedStringIndex = sharedStringPart?.BuildSharedStringIndex();
 
-			// Get headers
-			for (uint col = startCell.ColumnIndex; col <= endCell.ColumnIndex; col++)
+			// Read-only document, so cells are resolved through indexed lookups instead of GetCellFromCoordinates (which rescans and inserts missing rows/cells)
+			TableCellResolver? resolver = (worksheet != null) ? new TableCellResolver(worksheet) : null;
+			uint firstCol = startCell.ColumnIndex;
+			string[] colLetters = new string[(endCell.ColumnIndex >= firstCol) ? (endCell.ColumnIndex - firstCol + 1) : 0];
+			for (int i = 0; i < colLetters.Length; i++)
 			{
-				Cell? headerCell = worksheet?.GetCellFromCoordinates((int)col, (int)startCell.RowIndex);
-				if (headerCell != null)
+				colLetters[i] = CellReference.NumberToColumnName(firstCol + (uint)i);
+			}
+
+			// Get headers
+			string headerRowText = startCell.RowIndex.ToString(CultureInfo.InvariantCulture);
+			for (uint col = firstCol; col <= endCell.ColumnIndex; col++)
+			{
+				if ((resolver != null) && resolver.TryResolve(startCell.RowIndex, col, colLetters[col - firstCol] + headerRowText, out Cell? headerCell))
 				{
-					dataTable.Columns.Add(headerCell.GetStringValue(sharedStringIndex) ?? $"Column{col - startCell.ColumnIndex + 1}");
+					// A missing cell would have been created empty, whose GetStringValue is ""
+					dataTable.Columns.Add(((headerCell != null) ? headerCell.GetStringValue(sharedStringIndex) : string.Empty) ?? $"Column{col - firstCol + 1}");
 				}
 			}
 
@@ -2427,12 +2464,12 @@ public static partial class Common
 			{
 				cancellationToken.ThrowIfCancellationRequested();
 				DataRow dataRow = dataTable.NewRow();
-				for (uint col = startCell.ColumnIndex; col <= endCell.ColumnIndex; col++)
+				string rowText = row.ToString(CultureInfo.InvariantCulture);
+				for (uint col = firstCol; col <= endCell.ColumnIndex; col++)
 				{
-					Cell? cell = worksheet?.GetCellFromCoordinates((int)col, (int)row);
-					if (cell != null)
+					if ((resolver != null) && resolver.TryResolve(row, col, colLetters[col - firstCol] + rowText, out Cell? cell))
 					{
-						dataRow[((int)col) - ((int)startCell.ColumnIndex)] = cell.GetStringValue(sharedStringIndex);
+						dataRow[((int)col) - ((int)firstCol)] = (cell != null) ? cell.GetStringValue(sharedStringIndex) : string.Empty;
 					}
 				}
 				dataTable.Rows.Add(dataRow);
@@ -3527,21 +3564,27 @@ public static partial class Common
 		return Expression.Lambda<Action<object, object?>>(assign, objParam, valueParam).CompileFast();
 	}
 
-	private static void SetExcelPropertyValue<T>(T obj, PropertyInfo property, string value)
+	// Index = columnIndex - startColumn; every mapped column is >= startColumn because cells left of it are skipped when the map is built
+	private static ExcelColumnBinder?[] CreateColumnBinders(Dictionary<uint, PropertyInfo> columnPropertyMap, uint startColumn)
 	{
-		Type targetType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-		try
+		uint maxColumn = 0;
+		foreach (uint key in columnPropertyMap.Keys)
 		{
-			object? result = ConvertExcelCellValue(value, targetType);
-			if (result != null || Nullable.GetUnderlyingType(property.PropertyType) != null)
+			if (key > maxColumn)
 			{
-				ExcelSetterCache.GetOrAdd(property, BuildSetter)(obj!, result);
+				maxColumn = key;
 			}
 		}
-		catch
+
+		ExcelColumnBinder?[] binders = new ExcelColumnBinder?[(maxColumn >= startColumn) ? (maxColumn - startColumn + 1) : 0];
+		foreach (KeyValuePair<uint, PropertyInfo> kvp in columnPropertyMap)
 		{
-			// Non-convertible values are silently skipped; the property retains its default value
+			if (kvp.Key >= startColumn)
+			{
+				binders[kvp.Key - startColumn] = new ExcelColumnBinder(kvp.Value);
+			}
 		}
+		return binders;
 	}
 
 	private static object? ConvertExcelCellValue(string value, Type targetType)
@@ -3604,6 +3647,7 @@ public static partial class Common
 		ExcelTypeInfo typeInfo = ExcelTypeInfoCache.GetOrAdd(typeof(T), static t => new ExcelTypeInfo(t));
 
 		Dictionary<uint, PropertyInfo> columnPropertyMap = [];
+		ExcelColumnBinder?[]? binders = null; // Built from columnPropertyMap once it is final (first data row)
 		bool headerRowProcessed = !hasHeaders;
 		bool positionalMappingBuilt = false;
 
@@ -3665,6 +3709,7 @@ public static partial class Common
 
 			T item = new();
 			bool rowHasData = false;
+			binders ??= CreateColumnBinders(columnPropertyMap, startCell.ColumnIndex);
 
 			foreach (Cell cell in row.Elements<Cell>())
 			{
@@ -3684,7 +3729,9 @@ public static partial class Common
 					break;
 				}
 
-				if (!columnPropertyMap.TryGetValue(cellRef.ColumnIndex, out PropertyInfo? prop))
+				uint binderIndex = cellRef.ColumnIndex - startCell.ColumnIndex;
+				ExcelColumnBinder? binder = (binderIndex < (uint)binders.Length) ? binders[binderIndex] : null;
+				if (binder == null)
 				{
 					continue;
 				}
@@ -3693,7 +3740,7 @@ public static partial class Common
 				if (!string.IsNullOrWhiteSpace(cellValue))
 				{
 					rowHasData = true;
-					SetExcelPropertyValue(item, prop, cellValue);
+					binder.Set(item!, cellValue);
 				}
 			}
 
@@ -3773,9 +3820,73 @@ public static partial class Common
 
 		public CellReference(string reference)
 		{
+			if (TryParseAscii(reference, out uint col, out uint row))
+			{
+				columnIndex = col;
+				rowIndex = row;
+				return;
+			}
+
+			// Anything outside the fast path ('$', ranges, whitespace, non-ASCII, out-of-range values, null) keeps the original regex behavior and exceptions
 			Match match = CellRefRegex().Match(reference.ToUpperInvariant());
 			ColumnIndex = ColumnNameToNumber(match.Groups[1].Value);
 			RowIndex = uint.Parse(match.Groups[2].Value);
+		}
+
+		/// <summary>Accepts only ^[A-Za-z]{1,3}[0-9]{1,7}$ with in-range values, for which the regex path yields the same column/row.</summary>
+		private static bool TryParseAscii(string? reference, out uint column, out uint row)
+		{
+			column = 0;
+			row = 0;
+			if (reference == null)
+			{
+				return false;
+			}
+
+			int length = reference.Length;
+			int letters = 0;
+			while ((letters < length) && IsAsciiLetter(reference[letters]))
+			{
+				letters++;
+			}
+
+			int digits = length - letters;
+			if ((letters is 0 or > 3) || (digits is 0 or > 7))
+			{
+				return false;
+			}
+
+			uint col = 0;
+			for (int i = 0; i < letters; i++)
+			{
+				col = (col * 26) + (uint)((reference[i] | 0x20) - 'a' + 1);
+			}
+
+			uint r = 0;
+			for (int i = letters; i < length; i++)
+			{
+				char ch = reference[i];
+				if ((ch < '0') || (ch > '9'))
+				{
+					return false;
+				}
+				r = (r * 10) + (uint)(ch - '0');
+			}
+
+			// Out-of-range values go through the regex path so the identical ArgumentOutOfRangeException is thrown
+			if ((col is < 1 or > 16384) || (r is < 1 or > 1048576))
+			{
+				return false;
+			}
+
+			column = col;
+			row = r;
+			return true;
+		}
+
+		private static bool IsAsciiLetter(char c)
+		{
+			return (uint)((c | 0x20) - 'a') <= ('z' - 'a');
 		}
 
 		public CellReference(uint col, uint row)

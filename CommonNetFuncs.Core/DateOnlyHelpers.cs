@@ -19,17 +19,20 @@ public static class DateOnlyHelpers
 			return 0;
 		}
 
-		DateOnly sDate = (DateOnly)startDate;
-		DateOnly eDate = (DateOnly)endDate;
+		DateOnly sDate = startDate.Value;
+		DateOnly eDate = endDate.Value;
+		DayOfWeek startDayOfWeek = sDate.DayOfWeek;
+		DayOfWeek endDayOfWeek = eDate.DayOfWeek;
 
-		decimal calcBusinessDays = 1 + ((((eDate.DayNumber - sDate.DayNumber) * 5m) - ((sDate.DayOfWeek - eDate.DayOfWeek) * 2m)) / 7m);
+		// endDow - startDow == days (mod 7), so 5 * days - 2 * (startDow - endDow) is always a multiple of 7 and the integer division is exact
+		int calcBusinessDays = 1 + ((((eDate.DayNumber - sDate.DayNumber) * 5) - ((startDayOfWeek - endDayOfWeek) * 2)) / 7);
 
-		if (eDate.DayOfWeek == DayOfWeek.Saturday)
+		if (endDayOfWeek == DayOfWeek.Saturday)
 		{
 			calcBusinessDays--;
 		}
 
-		if (sDate.DayOfWeek == DayOfWeek.Sunday)
+		if (startDayOfWeek == DayOfWeek.Sunday)
 		{
 			calcBusinessDays--;
 		}
@@ -49,7 +52,7 @@ public static class DateOnlyHelpers
 			calcBusinessDays -= exceptionDays;
 		}
 
-		return (int)calcBusinessDays;
+		return calcBusinessDays;
 	}
 
 	/// <summary>

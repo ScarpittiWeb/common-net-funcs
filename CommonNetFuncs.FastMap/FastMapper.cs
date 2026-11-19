@@ -373,6 +373,11 @@ public static class FastMapper
 			return Expression.New(dictCtor, source);
 		}
 
+		if (sourceType.IsGenericType && sourceType.GetGenericTypeDefinition() == typeof(Dictionary<,>) && destType.IsGenericType && destType.GetGenericTypeDefinition() == typeof(Dictionary<,>))
+		{
+			return CreateDictionaryToDictionaryMappingExpression(source, sourceType, destType, sourceKeyType, sourceValueType, destKeyType, destValueType);
+		}
+
 		// Need to map values - generate inline loop
 		List<ParameterExpression> variables = [];
 		List<Expression> bodyExpressions = [];
@@ -425,6 +430,53 @@ public static class FastMapper
 		bodyExpressions.Add(destDict);
 
 		return Expression.Block(variables, bodyExpressions);
+	}
+
+	/// <summary>
+	/// Dictionary&lt;K,V1&gt; -> Dictionary&lt;K,V2&gt; value mapping using the struct enumerator (no boxing / interface dispatch) and a destination presized to the source count.
+	/// </summary>
+	private static BlockExpression CreateDictionaryToDictionaryMappingExpression(Expression source, Type sourceType, Type destType, Type sourceKeyType, Type sourceValueType, Type destKeyType, Type destValueType)
+	{
+		ParameterExpression sourceDict = Expression.Variable(sourceType, "sourceDict");
+		ParameterExpression destDict = Expression.Variable(destType, "destDict");
+
+		MethodInfo getEnumeratorMethod = sourceType.GetMethod("GetEnumerator", Type.EmptyTypes)!;
+		Type enumeratorType = getEnumeratorMethod.ReturnType;
+		ParameterExpression enumerator = Expression.Variable(enumeratorType, "enumerator");
+
+		Type kvpType = typeof(KeyValuePair<,>).MakeGenericType(sourceKeyType, sourceValueType);
+		ParameterExpression kvpVar = Expression.Variable(kvpType, "kvp");
+		MemberExpression keyAccess = Expression.Property(kvpVar, "Key");
+		MemberExpression valueAccess = Expression.Property(kvpVar, "Value");
+
+		Expression mappedValue = CreateMappingExpression(valueAccess, sourceValueType, destValueType);
+
+		// Add null check for reference type values
+		if (!sourceValueType.IsValueType)
+		{
+			mappedValue = Expression.Condition(
+				Expression.Equal(valueAccess, Expression.Constant(null, sourceValueType)),
+				Expression.Default(destValueType),
+				mappedValue);
+		}
+
+		MethodInfo addMethod = destType.GetMethod("Add", [destKeyType, destValueType])!;
+		ConstructorInfo capacityCtor = destType.GetConstructor([typeof(int)])!;
+
+		LabelTarget loopBreak = Expression.Label("break");
+		BlockExpression loopBody = Expression.Block(
+			Expression.IfThen(Expression.Not(Expression.Call(enumerator, enumeratorType.GetMethod("MoveNext", Type.EmptyTypes)!)), Expression.Break(loopBreak)),
+			Expression.Assign(kvpVar, Expression.Property(enumerator, enumeratorType.GetProperty("Current")!)),
+			Expression.Call(destDict, addMethod, keyAccess, mappedValue));
+
+		// Source is assigned to a local so it is evaluated only once (Count + GetEnumerator)
+		return Expression.Block(
+			new[] { sourceDict, destDict, enumerator, kvpVar },
+			Expression.Assign(sourceDict, source),
+			Expression.Assign(destDict, Expression.New(capacityCtor, Expression.Property(sourceDict, "Count"))),
+			Expression.Assign(enumerator, Expression.Call(sourceDict, getEnumeratorMethod)),
+			Expression.Loop(loopBody, loopBreak),
+			destDict);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]

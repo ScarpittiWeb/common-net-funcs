@@ -64,6 +64,24 @@ public sealed class StreamsTests
 	}
 
 	[Fact]
+	public async Task ReadStreamAsync_ReadsRemainingBytes_WhenSeekableStreamIsNotAtStart()
+	{
+		// Arrange
+
+		byte[] data = GetRandomBytes(1024);
+		await using MemoryStream stream = new(data);
+		stream.Position = 100;
+
+		// Act
+
+		byte[] result = await stream.ReadStreamAsync(cancellationToken: Current.CancellationToken);
+
+		// Assert
+
+		result.ShouldBe(data.Skip(100).ToArray());
+	}
+
+	[Fact]
 	public async Task ReadStreamAsync_HandlesNonSeekableStream()
 	{
 		// Arrange

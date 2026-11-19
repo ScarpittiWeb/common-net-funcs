@@ -27,6 +27,28 @@ public class UriHelpersTests
 		result.ShouldBe(expected);
 	}
 
+	[Fact]
+	public void ListToQueryParameters_WithTypedValues_ShouldMatchCurrentCultureToString()
+	{
+		// Arrange
+		double[] doubles = [1.5, -2.25, 1e21];
+		decimal[] decimals = [1234.5m, -0.01m];
+		long[] longs = [long.MinValue, 42];
+		bool[] bools = [true, false];
+		char[] chars = ['a', '%'];
+		Guid[] guids = [Guid.Parse("0f8fad5b-d9cb-469f-a165-70867728950e")];
+		int?[] nullableInts = [1, null, 3];
+
+		// Act & Assert - every typed path must produce the same text as the boxed ToString() call
+		doubles.ListToQueryParameters("d").ShouldBe(string.Join('&', doubles.Select(x => $"d={x.ToString()}")));
+		decimals.ListToQueryParameters("m").ShouldBe(string.Join('&', decimals.Select(x => $"m={x.ToString()}")));
+		longs.ListToQueryParameters("l").ShouldBe(string.Join('&', longs.Select(x => $"l={x.ToString()}")));
+		bools.ListToQueryParameters("b").ShouldBe("b=True&b=False");
+		chars.ListToQueryParameters("c").ShouldBe("c=a&c=%");
+		guids.ListToQueryParameters("g").ShouldBe("g=0f8fad5b-d9cb-469f-a165-70867728950e");
+		nullableInts.ListToQueryParameters("n").ShouldBe("n=1&n=&n=3");
+	}
+
 	[Theory]
 	[InlineData(null, "")]
 	[InlineData(new int[0], "")]

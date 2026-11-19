@@ -77,6 +77,32 @@ public sealed class ReferenceEqualityComparerTests
 	}
 
 	[Fact]
+	public void GetHashCode_WhenTypeOverridesGetHashCode_ShouldUseIdentityHashWithoutCallingOverride()
+	{
+		// Arrange
+		ThrowingHashCode obj = new();
+
+		// Act
+		int result = comparer.GetHashCode(obj);
+
+		// Assert
+		result.ShouldBe(System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj));
+	}
+
+	private sealed class ThrowingHashCode
+	{
+		public override bool Equals(object? obj)
+		{
+			return true;
+		}
+
+		public override int GetHashCode()
+		{
+			throw new InvalidOperationException("Overridden GetHashCode should not be called");
+		}
+	}
+
+	[Fact]
 	public void GetHashCode_WhenCalledMultipleTimes_ShouldReturnSameValue()
 	{
 		// Arrange

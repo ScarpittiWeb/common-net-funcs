@@ -614,6 +614,64 @@ public sealed class FastMapperTests
 	}
 
 	[Theory]
+	[InlineData(0)]
+	[InlineData(1)]
+	[InlineData(25)]
+	public void FasterMap_WithDictionaryOfMappedValues_MapsEntriesAndNullValues(int entries)
+	{
+		// Arrange
+		Dictionary<string, SimpleSource> source = [];
+		for (int i = 0; i < entries; i++)
+		{
+			source["k" + i] = i % 5 == 4 ? null! : new SimpleSource { StringProp = "s" + i, IntProp = i, DateProp = new DateTime(2026, 1, 1).AddDays(i) };
+		}
+
+		// Act
+		Dictionary<string, SimpleDestination> result = source.FastMap<Dictionary<string, SimpleSource>, Dictionary<string, SimpleDestination>>();
+
+		// Assert
+		result.ShouldNotBeNull();
+		result.Count.ShouldBe(entries);
+		foreach ((string key, SimpleSource value) in source)
+		{
+			result.ContainsKey(key).ShouldBeTrue();
+			if (value == null)
+			{
+				result[key].ShouldBeNull();
+			}
+			else
+			{
+				result[key].StringProp.ShouldBe(value.StringProp);
+				result[key].IntProp.ShouldBe(value.IntProp);
+				result[key].DateProp.ShouldBe(value.DateProp);
+			}
+		}
+	}
+
+	[Fact]
+	public void FasterMap_WithNonDictionarySourceShape_MapsValues()
+	{
+		// Arrange
+		SortedDictionary<string, SimpleSource> source = new()
+		{
+			["b"] = new() { StringProp = "B", IntProp = 2 },
+			["a"] = null!,
+			["c"] = new() { StringProp = "C", IntProp = 3 }
+		};
+
+		// Act
+		Dictionary<string, SimpleDestination> result = source.FastMap<SortedDictionary<string, SimpleSource>, Dictionary<string, SimpleDestination>>();
+
+		// Assert
+		result.Count.ShouldBe(3);
+		result["a"].ShouldBeNull();
+		result["b"].StringProp.ShouldBe("B");
+		result["b"].IntProp.ShouldBe(2);
+		result["c"].StringProp.ShouldBe("C");
+		result["c"].IntProp.ShouldBe(3);
+	}
+
+	[Theory]
 	[InlineData(null)]
 	[InlineData("")]
 	[InlineData("NonEmpty")]

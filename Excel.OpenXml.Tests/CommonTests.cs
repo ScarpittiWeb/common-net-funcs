@@ -251,6 +251,36 @@ public sealed class CommonTests : IDisposable
 	}
 
 	[RetryTheory(3)]
+	[InlineData("a1", 1u, 1u)]
+	[InlineData("ab12", 28u, 12u)]
+	[InlineData("XFD1048576", 16384u, 1048576u)]
+	[InlineData("xfd1048576", 16384u, 1048576u)]
+	[InlineData("$B3", 2u, 3u)] // Regex fallback
+	[InlineData("C4:D5", 3u, 4u)] // Regex fallback takes the first match
+	public void CellReference_ShouldParseFastPathAndFallbackInputs(string reference, uint expectedColumn, uint expectedRow)
+	{
+		// Act
+		CellReference cellRef = new(reference);
+
+		// Assert
+		cellRef.ColumnIndex.ShouldBe(expectedColumn);
+		cellRef.RowIndex.ShouldBe(expectedRow);
+	}
+
+	[RetryTheory(3)]
+	[InlineData("XFE1")] // Column 16385
+	[InlineData("A0")]
+	[InlineData("A1048577")]
+	[InlineData("A12345678")] // More than 7 digits
+	[InlineData("AAAA1")] // More than 3 letters
+	[InlineData("$B$3")]
+	public void CellReference_WithOutOfRangeOrUnparsableReference_ShouldThrow(string reference)
+	{
+		// Act & Assert
+		Should.Throw<ArgumentOutOfRangeException>(() => new CellReference(reference));
+	}
+
+	[RetryTheory(3)]
 	[InlineData(1u, "A")]
 	[InlineData(26u, "Z")]
 	[InlineData(27u, "AA")]
@@ -2032,6 +2062,38 @@ public sealed class CommonTests : IDisposable
 
 		// Assert
 		result.Rows.Count.ShouldBe(1); // Should stop at empty row 3
+	}
+
+	[RetryFact(3)]
+	public void ReadExcelFileToDataTable_WithMissingCells_ShouldReturnEmptyStringsForMissingCells()
+	{
+		// Arrange
+		using MemoryStream memoryStream = new();
+		using SpreadsheetDocument document = SpreadsheetDocument.Create(memoryStream, SpreadsheetDocumentType.Workbook);
+		document.CreateNewSheet("Test Sheet");
+		Worksheet worksheet = document.GetWorksheetByName("Test Sheet")!;
+		worksheet.InsertCellValue(1, 1, new CellValue("A"), CellValues.String);
+		worksheet.InsertCellValue(2, 1, new CellValue("B"), CellValues.String);
+		worksheet.InsertCellValue(3, 1, new CellValue("C"), CellValues.String);
+		worksheet.InsertCellValue(1, 2, new CellValue("a2"), CellValues.String); // B2 missing
+		worksheet.InsertCellValue(3, 2, new CellValue("c2"), CellValues.String);
+		worksheet.InsertCellValue(2, 3, new CellValue("b3"), CellValues.String); // A3 and C3 missing
+		document.Save();
+		memoryStream.Flush();
+		memoryStream.Position = 0;
+
+		// Act
+		DataTable result = memoryStream.ReadExcelFileToDataTable(true);
+
+		// Assert
+		result.Columns.Count.ShouldBe(3);
+		result.Rows.Count.ShouldBe(2);
+		result.Rows[0]["A"].ShouldBe("a2");
+		result.Rows[0]["B"].ShouldBe(string.Empty);
+		result.Rows[0]["C"].ShouldBe("c2");
+		result.Rows[1]["A"].ShouldBe(string.Empty);
+		result.Rows[1]["B"].ShouldBe("b3");
+		result.Rows[1]["C"].ShouldBe(string.Empty);
 	}
 
 	[RetryFact(3)]
@@ -3825,6 +3887,65 @@ public sealed class CommonTests : IDisposable
 		dataTable.Rows[0]["Age"].ShouldBe("30");
 		dataTable.Rows[1]["Name"].ShouldBe("Jane");
 		dataTable.Rows[1]["City"].ShouldBe("Seattle");
+	}
+
+	[RetryFact(3)]
+	public void ReadExcelTableToDataTable_WithMissingCellsAndRows_ShouldReturnEmptyStrings()
+	{
+		// Arrange
+		using MemoryStream memoryStream = new();
+		using (SpreadsheetDocument document = SpreadsheetDocument.Create(memoryStream, SpreadsheetDocumentType.Workbook))
+		{
+			uint sheetId = document.CreateNewSheet("Sheet1");
+			Worksheet worksheet = document.GetWorksheetById(sheetId)!;
+
+			worksheet.InsertCellValue(1, 1, new CellValue("Name"), CellValues.String);
+			worksheet.InsertCellValue(2, 1, new CellValue("Age"), CellValues.String);
+			worksheet.InsertCellValue(3, 1, new CellValue("City"), CellValues.String);
+
+			// Row 2 is missing B2, row 3 is missing entirely
+			worksheet.InsertCellValue(1, 2, new CellValue("John"), CellValues.String);
+			worksheet.InsertCellValue(3, 2, new CellValue("Boston"), CellValues.String);
+
+			worksheet.InsertCellValue(1, 4, new CellValue("Jane"), CellValues.String);
+			worksheet.InsertCellValue(2, 4, new CellValue("25"), CellValues.String);
+			worksheet.InsertCellValue(3, 4, new CellValue("Seattle"), CellValues.String);
+
+			Sheet? sheet = document.GetSheetByName("Sheet1");
+			WorksheetPart worksheetPart = (WorksheetPart)document.WorkbookPart!.GetPartById(sheet!.Id!);
+			TableDefinitionPart tableDefinitionPart = worksheetPart.AddNewPart<TableDefinitionPart>();
+			Table table = new() { Id = 1, Name = "SparseTable", DisplayName = "SparseTable", Reference = "A1:C4", TotalsRowShown = false };
+			TableColumns tableColumns = new() { Count = 3 };
+			tableColumns.AppendChild(new TableColumn { Id = 1, Name = "Name" });
+			tableColumns.AppendChild(new TableColumn { Id = 2, Name = "Age" });
+			tableColumns.AppendChild(new TableColumn { Id = 3, Name = "City" });
+			table.AppendChild(tableColumns);
+			table.AppendChild(new AutoFilter { Reference = "A1:C4" });
+			tableDefinitionPart.Table = table;
+
+			TableParts tableParts = new() { Count = 1 };
+			tableParts.AppendChild(new TablePart { Id = worksheetPart.GetIdOfPart(tableDefinitionPart) });
+			worksheet.AppendChild(tableParts);
+			document.Save();
+		}
+
+		memoryStream.Position = 0;
+
+		// Act
+		DataTable dataTable = memoryStream.ReadExcelTableToDataTable("SparseTable");
+
+		// Assert
+		dataTable.Columns.Count.ShouldBe(3);
+		dataTable.Rows.Count.ShouldBe(3);
+		dataTable.Rows[0]["Name"].ShouldBe("John");
+		dataTable.Rows[0]["Age"].ShouldBe(string.Empty);
+		dataTable.Rows[0]["City"].ShouldBe("Boston");
+		dataTable.Rows[1]["Name"].ShouldBe(string.Empty);
+		dataTable.Rows[1]["Age"].ShouldBe(string.Empty);
+		dataTable.Rows[1]["City"].ShouldBe(string.Empty);
+		dataTable.Rows[2]["Name"].ShouldBe("Jane");
+		dataTable.Rows[2]["Age"].ShouldBe("25");
+		dataTable.Rows[2]["City"].ShouldBe("Seattle");
 	}
 
 	[RetryFact(3)]

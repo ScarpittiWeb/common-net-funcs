@@ -33,6 +33,32 @@ public sealed class DenyCharactersAttributeTests : ValidationTestBase
 		attribute.DenyCharacters.ShouldBe("<>\"'/");
 	}
 
+	[Theory]
+	[InlineData("safe value", true)]
+	[InlineData("semi;colon", false)]
+	[InlineData("percent%", false)]
+	[InlineData("tag<", false)]
+	public void IsValid_WithCharArrayConstructor_ShouldValidateCorrectly(string value, bool shouldBeValid)
+	{
+		// Arrange
+		char[] denyCharacters = ['<', '>', '&', ';', '\'', '"', '%', '$'];
+		DenyCharactersAttribute attribute = new(denyCharacters);
+
+		// Act
+		ValidationResult? result = attribute.GetValidationResult(value, CreateValidationContext("TestProperty"));
+
+		// Assert
+		if (shouldBeValid)
+		{
+			result.ShouldBe(ValidationResult.Success);
+		}
+		else
+		{
+			result.ShouldNotBeNull();
+			result.MemberNames.ShouldContain("TestProperty");
+		}
+	}
+
 	[Fact]
 	public void Constructor_WithNullCharArray_ShouldThrow()
 	{
