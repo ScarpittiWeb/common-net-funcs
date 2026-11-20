@@ -10,14 +10,16 @@ Supported stream/byte algorithms are Brotli, GZip, Deflate, and ZLib. `ECompress
 
 ## Contents
 
-- [Installation](#installation)
-- [Stream and byte-array API](#stream-and-byte-array-api)
-  - [Explicit bounded copying](#explicit-bounded-copying)
-- [Detection](#detection)
-  - [`ConcatenatedStream`](#concatenatedstream)
-  - [Limit exception](#limit-exception)
-- [File and ZIP API](#file-and-zip-api)
-- [License](#license)
+- [CommonNetFuncs.Compression](#commonnetfuncscompression)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [Stream and byte-array API](#stream-and-byte-array-api)
+    - [Explicit bounded copying](#explicit-bounded-copying)
+  - [Detection](#detection)
+    - [`ConcatenatedStream`](#concatenatedstream)
+    - [Limit exception](#limit-exception)
+  - [File and ZIP API](#file-and-zip-api)
+  - [License](#license)
 
 ## Installation
 

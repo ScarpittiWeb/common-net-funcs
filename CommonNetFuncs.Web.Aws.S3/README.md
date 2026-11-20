@@ -8,18 +8,20 @@ Helpers for Amazon S3 upload, multipart upload, download, deletion, existence ch
 
 ## Contents
 
-- [Target frameworks](#target-frameworks)
-- [Installation](#installation)
-- [Configure and inject the client](#configure-and-inject-the-client)
-- [Public API](#public-api)
-- [Complete operation examples](#complete-operation-examples)
-- [Upload behavior](#upload-behavior)
-  - [Stream and file-path overloads](#stream-and-file-path-overloads)
-  - [Multipart details](#multipart-details)
-- [Download behavior](#download-behavior)
-- [Delete, existence, listing, URLs, and validation](#delete-existence-listing-urls-and-validation)
-- [Cancellation and errors](#cancellation-and-errors)
-- [License](#license)
+- [CommonNetFuncs.Web.Aws.S3](#commonnetfuncswebawss3)
+  - [Contents](#contents)
+  - [Target frameworks](#target-frameworks)
+  - [Installation](#installation)
+  - [Configure and inject the client](#configure-and-inject-the-client)
+  - [Public API](#public-api)
+  - [Complete operation examples](#complete-operation-examples)
+  - [Upload behavior](#upload-behavior)
+    - [Stream and file-path overloads](#stream-and-file-path-overloads)
+    - [Multipart details](#multipart-details)
+  - [Download behavior](#download-behavior)
+  - [Delete, existence, listing, URLs, and validation](#delete-existence-listing-urls-and-validation)
+  - [Cancellation and errors](#cancellation-and-errors)
+  - [License](#license)
 
 ---
 

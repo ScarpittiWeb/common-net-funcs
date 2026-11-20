@@ -10,14 +10,16 @@ and `netstandard2.1`; install a ClosedXML, NPOI, or Open XML backend for I/O.
 
 ## Contents
 
-- [`EStyle`](#estyle)
-- [`EFont`](#efont)
-- [`ETableStyle`](#etablestyle)
-- [`EFontName`](#efontname)
-- [`EIndexedExcelColors`](#eindexedexcelcolors)
-- [Backend compatibility](#backend-compatibility)
-- [Installation](#installation)
-- [License](#license)
+- [CommonNetFuncs.Excel.Common](#commonnetfuncsexcelcommon)
+  - [Contents](#contents)
+  - [`EStyle`](#estyle)
+  - [`EFont`](#efont)
+  - [`ETableStyle`](#etablestyle)
+  - [`EFontName`](#efontname)
+  - [`EIndexedExcelColors`](#eindexedexcelcolors)
+  - [Backend compatibility](#backend-compatibility)
+  - [Installation](#installation)
+  - [License](#license)
 
 Import the namespace:
 
@@ -200,7 +202,7 @@ short customIndex = (short)EIndexedExcelColors.Grey80Percent;
 ```
 
 | Member | Value | Member | Value |
-|---|---:|---|---:|
+| --- | ---: | --- | ---: |
 | `Black` | 8 | `White` | 9 |
 | `Red` | 10 | `BrightGreen` | 11 |
 | `Blue` | 12 | `Yellow` | 13 |
@@ -224,7 +226,7 @@ short customIndex = (short)EIndexedExcelColors.Grey80Percent;
 | `SeaGreen` | 57 | `DarkGreen` | 58 |
 | `OliveGreen` | 59 | `Brown` | 60 |
 | `Plum` | 61 | `Indigo` | 62 |
-| `Grey80Percent` | 63 |  |  |
+| `Grey80Percent` | 63 | | |
 
 These are primarily useful where a backend accepts legacy indexed palette
 numbers. Modern OOXML colors are often represented as RGB/theme colors instead.

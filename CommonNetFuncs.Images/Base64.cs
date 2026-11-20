@@ -1,9 +1,9 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Text.RegularExpressions;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
 using SkiaSharp;
-using static System.Convert;
+using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 using static CommonNetFuncs.Core.ExceptionLocation;
+using static System.Convert;
 
 namespace CommonNetFuncs.Images;
 

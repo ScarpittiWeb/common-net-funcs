@@ -1,9 +1,11 @@
-﻿using System.Collections.Concurrent;
-using System.Diagnostics;
-using AutoFixture;
+﻿using AutoFixture;
 using AutoFixture.AutoFakeItEasy;
 using CommonNetFuncs.Ffmpeg;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Reflection;
 using xRetry.v3;
+using FfmpegHelpers = CommonNetFuncs.Ffmpeg.Helpers;
 
 namespace Ffmpeg.Tests;
 
@@ -759,4 +761,140 @@ public sealed class HelpersTests : IDisposable
 
 		return args;
 	}
+}
+
+public sealed class FfmpegHelpersBehaviorTests() : ConversionTaskTestsBase("HelpersTests_Behavior")
+{
+
+
+
+
+
+
+
+
+
+	private static T InvokePrivate<T>(Type type, string methodName, params object?[] arguments)
+	{
+		MethodInfo method = type.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static)!;
+		return (T)method.Invoke(null, arguments)!;
+	}
+
+	private static DataReceivedEventArgs CreateDataReceivedEventArgs(string? data)
+	{
+		DataReceivedEventArgs args = (DataReceivedEventArgs)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(DataReceivedEventArgs));
+		typeof(DataReceivedEventArgs)
+			.GetField("_data", BindingFlags.NonPublic | BindingFlags.Instance)!
+			.SetValue(args, data);
+		return args;
+	}
+
+	[Fact]
+	public void ParseKeyFrameProbe_SkipsInvalidValuesAndPreservesNumericValues()
+	{
+		List<decimal> parsed = InvokePrivate<List<decimal>>(
+			typeof(FfmpegHelpers),
+			"ParseKeyFrameProbe",
+			$"2.5{Environment.NewLine}invalid{Environment.NewLine}1.25");
+
+		parsed.ShouldBe([2.5m, 1.25m]);
+	}
+
+	[Fact]
+	public void GetAverageFramesToNextKeyFrame_NoUsableIntervals_ReturnsMinusOne()
+	{
+		decimal result = InvokePrivate<decimal>(
+			typeof(FfmpegHelpers),
+			"GetAverageFramesToNextKeyFrame",
+			new List<decimal> { 4m },
+			30m);
+
+		result.ShouldBe(-1m);
+	}
+
+	[Fact]
+	public void LogFfmpegOutput_InvalidFpsDoesNotCreateDictionaryEntry()
+	{
+		ConcurrentDictionary<int, decimal> fps = new();
+		DateTime lastOutput = DateTime.UtcNow.AddMinutes(-1);
+		DateTime lastSummary = DateTime.UtcNow.AddMinutes(-1);
+		bool conversionFailed = false;
+		bool sizeFailure = false;
+		DataReceivedEventArgs args = CreateDataReceivedEventArgs(
+			"frame=1 fps=invalid size=1kB time=00:00:01.00 bitrate=1kbits/s speed=0.0x");
+
+		args.LogFfmpegOutput(
+			ref lastOutput,
+			ref lastSummary,
+			ref conversionFailed,
+			ref sizeFailure,
+			new FileInfo(testVideoPath),
+			TimeSpan.FromSeconds(2),
+			9,
+			false,
+			null,
+			null,
+			null,
+			fps,
+			null);
+
+		fps.ShouldBeEmpty();
+		conversionFailed.ShouldBeFalse();
+	}
+
+	[Theory]
+	[InlineData("N/A")]
+	[InlineData("raw-value")]
+	public void LogFfmpegOutput_UnparseableTime_UsesRawTimeWithoutFailing(string rawTime)
+	{
+		ConcurrentDictionary<int, decimal> fps = new();
+		DateTime lastOutput = DateTime.UtcNow.AddMinutes(-1);
+		DateTime lastSummary = DateTime.UtcNow.AddMinutes(-1);
+		bool conversionFailed = false;
+		bool sizeFailure = false;
+		DataReceivedEventArgs args = CreateDataReceivedEventArgs(
+			$"frame=1 fps=1.0 size=1kB time={rawTime} bitrate=1kbits/s speed=1.0x");
+
+		args.LogFfmpegOutput(
+			ref lastOutput,
+			ref lastSummary,
+			ref conversionFailed,
+			ref sizeFailure,
+			new FileInfo(testVideoPath),
+			TimeSpan.FromSeconds(2),
+			10,
+			false,
+			"task",
+			"details",
+			new ConcurrentBag<string> { "FileName=x,SizeDif=1536" },
+			fps,
+			null);
+
+		conversionFailed.ShouldBeFalse();
+		fps[10].ShouldBe(1m);
+	}
+
+	[Fact]
+	public void NetStandardFileSizeCompat_WhenPresent_FormatsBoundaryValues()
+	{
+		Assembly assembly = typeof(FfmpegHelpers).Assembly;
+		Type? compatibilityType = assembly.GetType("CommonNetFuncs.Ffmpeg.Internal.FileSizeCompatExtensions");
+
+		// The compatibility helper is intentionally absent from native builds.
+		if (compatibilityType == null)
+		{
+			typeof(FfmpegHelpers).Assembly.GetName().Name.ShouldBe("CommonNetFuncs.Ffmpeg");
+			return;
+		}
+
+		MethodInfo method = compatibilityType.GetMethod(
+			"GetFileSizeFromBytesWithUnits",
+			BindingFlags.Public | BindingFlags.Static,
+			[typeof(long), typeof(int)])!;
+
+		((string)method.Invoke(null, [0L, 1])!).ShouldBe("0 B");
+		((string)method.Invoke(null, [-1536L, 1])!).ShouldBe("-1.5 KiB");
+		((string)method.Invoke(null, [1536L, -2])!).ShouldBe("2 KiB");
+	}
+
 }

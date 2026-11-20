@@ -1,11 +1,13 @@
-﻿using System.Security.Cryptography;
-using System.Text;
-using CommonNetFuncs.Web.Common.CachingSupportClasses;
+﻿using CommonNetFuncs.Web.Common.CachingSupportClasses;
 using CommonNetFuncs.Web.Middleware.CachingMiddleware;
 using FakeItEasy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Primitives;
+using System.Collections.Immutable;
+using System.Security.Cryptography;
+using System.Text;
 using xRetry.v3;
 using static CommonNetFuncs.Compression.Streams;
 using static Xunit.TestContext;
@@ -1366,4 +1368,527 @@ public sealed class MemoryCacheMiddlewareTests
 		// Assert
 		A.CallTo(() => cache.CreateEntry(A<object>._)).MustHaveHappened();
 	}
+}
+
+public sealed class MemoryCacheMiddlewareBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static DefaultHttpContext CreateContext(string path, string useCacheQueryParam)
+	{
+		DefaultHttpContext context = new();
+		context.Request.Path = path;
+		context.Request.Query = new QueryCollection(new Dictionary<string, StringValues>
+		{
+			[useCacheQueryParam] = "true",
+		});
+		return context;
+	}
+
+	[Fact]
+	public async Task InvokeAsync_CacheMiss_CopiesAndCachesExactResponseState()
+	{
+		// Arrange
+		ServiceCollection services = new();
+		services.AddLogging();
+		services.MemoryValueCaching();
+		await using ServiceProvider provider = services.BuildServiceProvider();
+
+		IMemoryCache cache = provider.GetRequiredService<IMemoryCache>();
+		CacheMetrics metrics = provider.GetRequiredService<CacheMetrics>();
+		CacheTracker tracker = provider.GetRequiredService<CacheTracker>();
+		CacheOptions options = new()
+		{
+			UseCompression = false,
+			HeadersToCache = ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, "Content-Type", "Content-Language"),
+		};
+		const string expectedKey = "/widgets?useCache=true|application/json";
+		DefaultHttpContext context = CreateContext("/widgets", options.UseCacheQueryParam);
+		context.Request.Headers.Accept = "application/json";
+		context.Request.Headers[options.CacheTagHeader] = "catalog, featured";
+		await using MemoryStream originalBody = new();
+		context.Response.Body = originalBody;
+		byte[] expectedBody = Encoding.UTF8.GetBytes("response-body");
+		int nextCalls = 0;
+
+		RequestDelegate next = async invocationContext =>
+		{
+			nextCalls++;
+			invocationContext.Response.StatusCode = StatusCodes.Status200OK;
+			invocationContext.Response.ContentType = "application/custom";
+			invocationContext.Response.Headers.ContentLanguage = "en";
+			invocationContext.Response.Headers.CacheControl = "must-not-be-cached";
+			await invocationContext.Response.Body.WriteAsync(expectedBody);
+		};
+		MemoryCacheMiddleware middleware = new(next, cache, options, metrics, tracker);
+
+		// Act
+		await middleware.InvokeAsync(context);
+
+		// Assert
+		nextCalls.ShouldBe(1);
+		context.Response.Body.ShouldBe(originalBody);
+		originalBody.ToArray().ShouldBe(expectedBody);
+		context.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
+		cache.TryGetValue(expectedKey, out CacheEntry? entry).ShouldBeTrue();
+		entry.ShouldNotBeNull();
+		entry.Data.ShouldBe(expectedBody);
+		entry.CompressionType.ShouldBe((short)0);
+		entry.Headers.Count.ShouldBe(2);
+		entry.Headers["Content-Type"].ShouldBe("application/custom");
+		entry.Headers["Content-Language"].ShouldBe("en");
+		entry.Headers.ShouldNotContainKey("Cache-Control");
+		tracker.CacheTags["catalog"].ShouldContain(expectedKey);
+		tracker.CacheTags["featured"].ShouldContain(expectedKey);
+		metrics.CacheTags["catalog"].ShouldContain(expectedKey);
+		metrics.CacheMisses().ShouldBe(1);
+		metrics.CurrentCacheEntryCount().ShouldBe(1);
+		metrics.CurrentCacheSize().ShouldBe(expectedBody.Length);
+	}
+
+	[Fact]
+	public async Task InvokeAsync_CacheHitWithoutMetrics_RestoresExactBodyAndHeadersWithoutCallingNext()
+	{
+		// Arrange
+		CacheOptions options = new() { UseCompression = false };
+		using MemoryCache cache = new(new MemoryCacheOptions());
+		CacheTracker tracker = new();
+		const string expectedKey = "/widgets?useCache=true|application/json";
+		CacheEntry cached = new()
+		{
+			Data = Encoding.UTF8.GetBytes("cached-body"),
+			Headers = new Dictionary<string, string>
+			{
+				["Content-Type"] = "application/json",
+				["Vary"] = "Accept",
+			},
+		};
+		cache.Set(expectedKey, cached);
+
+		DefaultHttpContext context = CreateContext("/widgets", options.UseCacheQueryParam);
+		context.Request.Headers.Accept = "application/json";
+		context.Response.Headers.ContentType = "application/original";
+		await using MemoryStream responseBody = new();
+		context.Response.Body = responseBody;
+		int nextCalls = 0;
+		MemoryCacheMiddleware middleware = new(_ =>
+		{
+			nextCalls++;
+			return Task.CompletedTask;
+		}, cache, options, null, tracker);
+
+		// Act
+		await middleware.InvokeAsync(context);
+
+		// Assert
+		nextCalls.ShouldBe(0);
+		Encoding.UTF8.GetString(responseBody.ToArray()).ShouldBe("cached-body");
+		context.Response.Headers.ContentType.ToString().ShouldBe("application/original");
+		context.Response.Headers.Vary.ToString().ShouldBe("Accept");
+	}
+
+	[Fact]
+	public async Task InvokeAsync_CacheMissWithoutMetricsEvictsTrackedEntryThenCachesExactKey()
+	{
+		// Arrange
+		CacheOptions options = new() { UseCompression = false, MaxCacheSizeInBytes = 100 };
+		using MemoryCache cache = new(new MemoryCacheOptions { SizeLimit = 100 });
+		CacheTracker tracker = new();
+		const string oldKey = "old";
+		tracker.TrackEntry(oldKey, 8);
+		cache.Set(oldKey, new CacheEntry { Data = new byte[8] }, new MemoryCacheEntryOptions().SetSize(8));
+
+		const string expectedKey = "/new?useCache=true|";
+		DefaultHttpContext context = CreateContext("/new", options.UseCacheQueryParam);
+		context.Request.Headers[options.CacheTagHeader] = "fresh";
+		await using MemoryStream originalBody = new();
+		context.Response.Body = originalBody;
+		MemoryCacheMiddleware middleware = new(async invocationContext =>
+		{
+			invocationContext.Response.StatusCode = StatusCodes.Status200OK;
+			await invocationContext.Response.Body.WriteAsync("fresh"u8.ToArray());
+		}, cache, options, null, tracker);
+
+		// Act
+		await middleware.InvokeAsync(context);
+
+		// Assert
+		originalBody.ToArray().ShouldBe("fresh"u8.ToArray());
+		cache.TryGetValue(oldKey, out _).ShouldBeFalse();
+		tracker.GetEntries().ShouldNotContain(entry => entry.Key == oldKey);
+		cache.TryGetValue(expectedKey, out CacheEntry? fresh).ShouldBeTrue();
+		fresh.ShouldNotBeNull();
+		fresh.Data.ShouldBe("fresh"u8.ToArray());
+		tracker.CacheTags["fresh"].ShouldContain(expectedKey);
+	}
+
+	[Fact]
+	public async Task InvokeAsync_OversizedResponseWithoutMetrics_CopiesBodyWithoutCaching()
+	{
+		// Arrange
+		CacheOptions options = new() { UseCompression = false, MaxCacheSizeInBytes = 3 };
+		using MemoryCache cache = new(new MemoryCacheOptions { SizeLimit = 3 });
+		CacheTracker tracker = new();
+		DefaultHttpContext context = CreateContext("/large", options.UseCacheQueryParam);
+		await using MemoryStream originalBody = new();
+		context.Response.Body = originalBody;
+		MemoryCacheMiddleware middleware = new(async invocationContext =>
+		{
+			invocationContext.Response.StatusCode = StatusCodes.Status200OK;
+			await invocationContext.Response.Body.WriteAsync("four"u8.ToArray());
+		}, cache, options, null, tracker);
+
+		// Act
+		await middleware.InvokeAsync(context);
+
+		// Assert
+		originalBody.ToArray().ShouldBe("four"u8.ToArray());
+		cache.TryGetValue("/large?useCache=true|", out _).ShouldBeFalse();
+	}
+
+	[Fact]
+	public async Task InvokeAsync_ManualTagEviction_UpdatesExactMetricsAndTagState()
+	{
+		// Arrange
+		CacheOptions options = new() { SuppressLogs = false };
+		using MemoryCache cache = new(new MemoryCacheOptions());
+		CacheMetrics metrics = new();
+		CacheTracker tracker = new();
+		const string tag = "catalog";
+		string[] keys = ["/one", "/two"];
+		byte[][] values = [Encoding.UTF8.GetBytes("one"), Encoding.UTF8.GetBytes("two")];
+		for (int i = 0; i < keys.Length; i++)
+		{
+			cache.Set(keys[i], new CacheEntry { Data = values[i], Tags = [tag] });
+			metrics.AddToSize(values[i].Length);
+			metrics.IncrementCacheEntryCount();
+		}
+		tracker.CacheTags[tag] = [.. keys];
+		metrics.CacheTags[tag] = [.. keys];
+
+		DefaultHttpContext context = new();
+		context.Request.Query = new QueryCollection(new Dictionary<string, StringValues>
+		{
+			[options.EvictionQueryParam] = "true",
+			[options.EvictTagQueryParam] = tag,
+		});
+		int nextCalls = 0;
+		MemoryCacheMiddleware middleware = new(_ =>
+		{
+			nextCalls++;
+			return Task.CompletedTask;
+		}, cache, options, metrics, tracker);
+
+		// Act
+		await middleware.InvokeAsync(context);
+
+		// Assert
+		nextCalls.ShouldBe(1);
+		foreach (string key in keys)
+		{
+			cache.TryGetValue(key, out _).ShouldBeFalse();
+		}
+		tracker.CacheTags.ShouldNotContainKey(tag);
+		metrics.CacheTags.ShouldNotContainKey(tag);
+		metrics.CurrentCacheSize().ShouldBe(0);
+		metrics.CurrentCacheEntryCount().ShouldBe(0);
+		metrics.EvictedDueToRemoved().ShouldBe(2);
+	}
+
+	[Fact]
+	public async Task InvokeAsync_TagEvictionWithoutMetrics_RemovesNullCachedValue()
+	{
+		// Arrange
+		CacheOptions options = new() { SuppressLogs = false };
+		using MemoryCache cache = new(new MemoryCacheOptions());
+		CacheTracker tracker = new();
+		const string key = "null-value";
+		const string tag = "null-tag";
+		cache.Set<object?>(key, null);
+		tracker.CacheTags[tag] = [key];
+		DefaultHttpContext context = new();
+		context.Request.Query = new QueryCollection(new Dictionary<string, StringValues>
+		{
+			[options.EvictionQueryParam] = "true",
+			[options.EvictTagQueryParam] = tag,
+		});
+		MemoryCacheMiddleware middleware = new(_ => Task.CompletedTask, cache, options, null, tracker);
+
+		// Act
+		await middleware.InvokeAsync(context);
+
+		// Assert
+		cache.TryGetValue(key, out _).ShouldBeFalse();
+		tracker.CacheTags.ShouldNotContainKey(tag);
+	}
+
+	[Fact]
+	public async Task InvokeAsync_SingleKeyEvictionWithoutMetrics_RemovesNullCachedValue()
+	{
+		// Arrange
+		CacheOptions options = new() { SuppressLogs = false };
+		using MemoryCache cache = new(new MemoryCacheOptions());
+		const string key = "/null|";
+		cache.Set<object?>(key, null);
+		DefaultHttpContext context = new();
+		context.Request.Path = "/null";
+		context.Request.Query = new QueryCollection(new Dictionary<string, StringValues>
+		{
+			[options.EvictionQueryParam] = "true",
+		});
+		MemoryCacheMiddleware middleware = new(_ => Task.CompletedTask, cache, options, null, new CacheTracker());
+
+		// Act
+		await middleware.InvokeAsync(context);
+
+		// Assert
+		cache.TryGetValue(key, out _).ShouldBeFalse();
+	}
+
+	[Fact]
+	public async Task InvokeAsync_SingleKeyEviction_UpdatesExactMetricsAndRemovesEveryAssociatedTag()
+	{
+		// Arrange
+		CacheOptions options = new() { SuppressLogs = false };
+		using MemoryCache cache = new(new MemoryCacheOptions());
+		CacheMetrics metrics = new();
+		CacheTracker tracker = new();
+		const string key = "/single|text/plain";
+		byte[] cachedData = Encoding.UTF8.GetBytes("cached");
+		CacheEntry entry = new() { Data = cachedData, Tags = ["primary", "shared"] };
+		cache.Set(key, entry);
+		metrics.AddToSize(cachedData.Length);
+		metrics.IncrementCacheEntryCount();
+		foreach (string tag in entry.Tags)
+		{
+			tracker.CacheTags[tag] = [key];
+			metrics.CacheTags[tag] = [key];
+		}
+
+		DefaultHttpContext context = new();
+		context.Request.Path = "/single";
+		context.Request.Headers.Accept = "text/plain";
+		context.Request.Query = new QueryCollection(new Dictionary<string, StringValues>
+		{
+			[options.EvictionQueryParam] = "true",
+		});
+		int nextCalls = 0;
+		MemoryCacheMiddleware middleware = new(_ =>
+		{
+			nextCalls++;
+			return Task.CompletedTask;
+		}, cache, options, metrics, tracker);
+
+		// Act
+		await middleware.InvokeAsync(context);
+
+		// Assert
+		nextCalls.ShouldBe(1);
+		cache.TryGetValue(key, out _).ShouldBeFalse();
+		tracker.CacheTags.ShouldBeEmpty();
+		metrics.CacheTags.ShouldBeEmpty();
+		metrics.CurrentCacheSize().ShouldBe(0);
+		metrics.CurrentCacheEntryCount().ShouldBe(0);
+		metrics.EvictedDueToRemoved().ShouldBe(1);
+	}
+
+	[Fact]
+	public async Task InvokeAsync_TagEvictionWithNullTracker_SkipsEvictionAndContinuesPipeline()
+	{
+		// Arrange
+		CacheOptions options = new() { SuppressLogs = true };
+		using MemoryCache cache = new(new MemoryCacheOptions());
+		DefaultHttpContext context = new();
+		context.Request.Query = new QueryCollection(new Dictionary<string, StringValues>
+		{
+			[options.EvictionQueryParam] = "true",
+			[options.EvictTagQueryParam] = "missing",
+		});
+		int nextCalls = 0;
+		MemoryCacheMiddleware middleware = new(_ =>
+		{
+			nextCalls++;
+			return Task.CompletedTask;
+		}, cache, options, null, null!);
+
+		// Act
+		await middleware.InvokeAsync(context);
+
+		// Assert
+		nextCalls.ShouldBe(1);
+	}
+
+	[Fact]
+	public async Task InvokeAsync_TwoEntriesWithSameTag_RegistersBothKeysInTrackerAndMetrics()
+	{
+		// Arrange
+		CacheOptions options = new() { UseCompression = false };
+		using MemoryCache cache = new(new MemoryCacheOptions());
+		CacheMetrics metrics = new();
+		CacheTracker tracker = new();
+		MemoryCacheMiddleware middleware = new(invocationContext =>
+		{
+			invocationContext.Response.StatusCode = StatusCodes.Status200OK;
+			return invocationContext.Response.WriteAsync(invocationContext.Request.Path.Value ?? string.Empty);
+		}, cache, options, metrics, tracker);
+
+		foreach (string path in new[] { "/first", "/second" })
+		{
+			DefaultHttpContext context = CreateContext(path, options.UseCacheQueryParam);
+			context.Request.Headers[options.CacheTagHeader] = "shared";
+			context.Response.Body = new MemoryStream();
+			await middleware.InvokeAsync(context);
+		}
+
+		// Assert
+		string[] expectedKeys = ["/first?useCache=true|", "/second?useCache=true|"];
+		tracker.CacheTags["shared"].ShouldBe(expectedKeys, ignoreOrder: true);
+		metrics.CacheTags["shared"].ShouldBe(expectedKeys, ignoreOrder: true);
+		metrics.CurrentCacheEntryCount().ShouldBe(2);
+	}
+
+	[Fact]
+	public async Task InvokeAsync_CacheMissWithPendingNext_RestoresBodyAfterAsynchronousCompletion()
+	{
+		// Arrange
+		CacheOptions options = new() { UseCompression = false };
+		using MemoryCache cache = new(new MemoryCacheOptions());
+		CacheMetrics metrics = new();
+		CacheTracker tracker = new();
+		DefaultHttpContext context = CreateContext("/pending", options.UseCacheQueryParam);
+		await using MemoryStream originalBody = new();
+		context.Response.Body = originalBody;
+		TaskCompletionSource gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+		MemoryCacheMiddleware middleware = new(async invocationContext =>
+		{
+			await gate.Task;
+			invocationContext.Response.StatusCode = StatusCodes.Status200OK;
+			await invocationContext.Response.Body.WriteAsync("done"u8.ToArray());
+		}, cache, options, metrics, tracker);
+
+		// Act
+		Task invocation = middleware.InvokeAsync(context);
+		invocation.IsCompleted.ShouldBeFalse();
+		gate.SetResult();
+		await invocation;
+
+		// Assert
+		context.Response.Body.ShouldBeSameAs(originalBody);
+		originalBody.ToArray().ShouldBe("done"u8.ToArray());
+		metrics.CurrentCacheEntryCount().ShouldBe(1);
+	}
+
+	[Fact]
+	public async Task InvokeAsync_CacheMissWithAsynchronousNextFailure_RestoresBodyAndPropagatesFailure()
+	{
+		// Arrange
+		CacheOptions options = new() { UseCompression = false };
+		using MemoryCache cache = new(new MemoryCacheOptions());
+		DefaultHttpContext context = CreateContext("/async-failure", options.UseCacheQueryParam);
+		await using MemoryStream originalBody = new();
+		context.Response.Body = originalBody;
+		InvalidOperationException failure = new("asynchronous downstream failure");
+		TaskCompletionSource gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+		MemoryCacheMiddleware middleware = new(async _ =>
+		{
+			await gate.Task;
+			throw failure;
+		}, cache, options, new CacheMetrics(), new CacheTracker());
+
+		// Act
+		Task invocation = middleware.InvokeAsync(context);
+		invocation.IsCompleted.ShouldBeFalse();
+		gate.SetResult();
+		InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() => invocation);
+
+		// Assert
+		thrown.ShouldBeSameAs(failure);
+		context.Response.Body.ShouldBeSameAs(originalBody);
+	}
+
+	[Fact]
+	public async Task InvokeAsync_CacheMissWithNextFailure_RestoresOriginalResponseStream()
+	{
+		// Arrange
+		CacheOptions options = new() { UseCompression = false };
+		using MemoryCache cache = new(new MemoryCacheOptions());
+		CacheMetrics metrics = new();
+		CacheTracker tracker = new();
+		DefaultHttpContext context = CreateContext("/failure", options.UseCacheQueryParam);
+		await using MemoryStream originalBody = new();
+		context.Response.Body = originalBody;
+		InvalidOperationException failure = new("downstream failure");
+		MemoryCacheMiddleware middleware = new(_ => throw failure, cache, options, metrics, tracker);
+
+		// Act
+		InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() => middleware.InvokeAsync(context));
+
+		// Assert
+		thrown.ShouldBeSameAs(failure);
+		context.Response.Body.ShouldBeSameAs(originalBody);
+		metrics.CacheMisses().ShouldBe(1);
+		metrics.CurrentCacheEntryCount().ShouldBe(0);
+	}
+
+	[Fact]
+	public async Task InvokeAsync_CapacityPressure_EvictsExactEntryAndCachesNewResponse()
+	{
+		// Arrange
+		CacheOptions options = new()
+		{
+			UseCompression = false,
+			MaxCacheSizeInBytes = 10,
+			SuppressLogs = false,
+		};
+		using MemoryCache cache = new(new MemoryCacheOptions { SizeLimit = 10 });
+		CacheMetrics metrics = new();
+		CacheTracker tracker = new();
+		const string oldKey = "old";
+		byte[] oldData = new byte[8];
+		CacheEntry oldEntry = new() { Data = oldData, Tags = ["old-tag"] };
+		cache.Set(oldKey, oldEntry, new MemoryCacheEntryOptions().SetSize(oldData.Length));
+		tracker.TrackEntry(oldKey, oldData.Length);
+		tracker.CacheTags["old-tag"] = [oldKey];
+		metrics.CacheTags["old-tag"] = [oldKey];
+		metrics.AddToSize(oldData.Length);
+		metrics.IncrementCacheEntryCount();
+
+		DefaultHttpContext context = CreateContext("/new", options.UseCacheQueryParam);
+		await using MemoryStream originalBody = new();
+		context.Response.Body = originalBody;
+		MemoryCacheMiddleware middleware = new(async invocationContext =>
+		{
+			invocationContext.Response.StatusCode = StatusCodes.Status200OK;
+			await invocationContext.Response.Body.WriteAsync("123456"u8.ToArray());
+		}, cache, options, metrics, tracker);
+
+		// Act
+		await middleware.InvokeAsync(context);
+
+		// Assert
+		cache.TryGetValue(oldKey, out _).ShouldBeFalse();
+		tracker.GetEntries().ShouldNotContain(pair => pair.Key == oldKey);
+		tracker.CacheTags.ShouldNotContainKey("old-tag");
+		metrics.CacheTags.ShouldNotContainKey("old-tag");
+		metrics.EvictedDueToCapacity().ShouldBe(1);
+		metrics.CurrentCacheSize().ShouldBe(6);
+		metrics.CurrentCacheEntryCount().ShouldBe(1);
+		cache.TryGetValue("/new?useCache=true|", out CacheEntry? newEntry).ShouldBeTrue();
+		newEntry!.Data.ShouldBe("123456"u8.ToArray());
+		originalBody.ToArray().ShouldBe("123456"u8.ToArray());
+	}
+
 }

@@ -1,8 +1,8 @@
-﻿using System.Collections.Concurrent;
+﻿using CommonNetFuncs.Core;
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
-using CommonNetFuncs.Core;
 
 namespace CommonNetFuncs.DeepClone;
 

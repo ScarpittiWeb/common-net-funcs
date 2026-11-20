@@ -1,6 +1,8 @@
 ﻿using CommonNetFuncs.SubsetModelBinder;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
+using System.Reflection;
 using static Xunit.TestContext;
 
 namespace SubsetModelBinder.Generator.Tests;
@@ -1015,8 +1017,8 @@ using System;
 	{
 		// Arrange - this tests the branch where attributeSymbol.ContainingType.Name != "SubsetOfAttribute"
 		const string source = @"
-			using CommonNetFuncs.SubsetModelBinder;
-			using System;
+using CommonNetFuncs.SubsetModelBinder;
+using System;
 
 			namespace TestNamespace
 			{
@@ -1861,8 +1863,8 @@ using CommonNetFuncs.SubsetModelBinder;
 	{
 		// Arrange - test with attributes in separate attribute lists
 		const string source = @"
-			using CommonNetFuncs.SubsetModelBinder;
-			using System;
+using CommonNetFuncs.SubsetModelBinder;
+using System;
 
 			namespace TestNamespace
 			{
@@ -1983,8 +1985,8 @@ using System;
 	{
 		// Arrange
 		const string source = @"
-			using CommonNetFuncs.SubsetModelBinder;
-			using System.Collections.Generic;
+using CommonNetFuncs.SubsetModelBinder;
+using System.Collections.Generic;
 
 			namespace TestNamespace
 			{
@@ -2153,4 +2155,343 @@ using CommonNetFuncs.SubsetModelBinder;
 			new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
 			new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 	}
+}
+
+public sealed class SubsetValidatorGeneratorBehaviorTests
+{
+	private static readonly Type DiagnosticInfoType = GetGeneratorType("DiagnosticInfo");
+	private static readonly Type EquatableArrayDiagnosticType = GetGeneratorType("EquatableArray`1").MakeGenericType(DiagnosticInfoType);
+	private static readonly Type SubsetModelType = GetGeneratorType("SubsetModel");
+
+	private const string DefaultAttributeSource = """
+		namespace CommonNetFuncs.SubsetModelBinder
+		{
+			[System.AttributeUsage(System.AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+			public sealed class SubsetOfAttribute : System.Attribute
+			{
+				public SubsetOfAttribute(System.Type sourceType, bool isMvcApp = false, bool allowInheritedProperties = true, bool ignoreType = false) { }
+			}
+		}
+		""";
+
+
+
+
+
+
+
+
+
+	private static GeneratorDriverRunResult Run(string modelSource, string? attributeSource = null)
+	{
+		MetadataReference[] references = [MetadataReference.CreateFromFile(typeof(object).Assembly.Location)];
+		SyntaxTree[] syntaxTrees =
+		[
+			CSharpSyntaxTree.ParseText(modelSource, path: "Model.cs", cancellationToken: Current.CancellationToken),
+			CSharpSyntaxTree.ParseText(attributeSource ?? DefaultAttributeSource, path: "Attribute.cs", cancellationToken: Current.CancellationToken)
+		];
+		CSharpCompilation compilation = CSharpCompilation.Create(
+			"GeneratorCoverage",
+			syntaxTrees,
+			references,
+			new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+		GeneratorDriver driver = CSharpGeneratorDriver.Create(new SubsetValidatorGenerator());
+		driver = driver.RunGenerators(compilation, Current.CancellationToken);
+		return driver.GetRunResult();
+	}
+
+	private static Type GetGeneratorType(string name)
+		=> typeof(SubsetValidatorGenerator).Assembly.GetType($"CommonNetFuncs.SubsetModelBinder.{name}", throwOnError: true)!;
+
+	private static object Create(Type type, params object?[] arguments)
+		=> Activator.CreateInstance(type, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, arguments, null)!;
+
+	private static object CreateArray(object? item)
+		=> Create(EquatableArrayDiagnosticType, CreateDiagnosticArray(item));
+
+	private static Array CreateDiagnosticArray(params object?[] items)
+	{
+		Array array = Array.CreateInstance(DiagnosticInfoType, items.Length);
+		for (int i = 0; i < items.Length; i++)
+		{
+			array.SetValue(items[i], i);
+		}
+		return array;
+	}
+
+	private static bool InvokeTypedEquals(object target, object other)
+		=> (bool)target.GetType().GetMethod("Equals", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, binder: null, types: [target.GetType()], modifiers: null)!.Invoke(target, [other])!;
+
+	private static bool InvokeEquals(object target, object? other)
+		=> (bool)target.GetType().GetMethod("Equals", BindingFlags.Instance | BindingFlags.Public, binder: null, types: [typeof(object)], modifiers: null)!.Invoke(target, [other])!;
+
+	private static int InvokeGetHashCode(object target)
+		=> (int)target.GetType().GetMethod("GetHashCode")!.Invoke(target, null)!;
+
+	[Theory]
+	[InlineData(false, "System.ComponentModel.DataAnnotations", "MetadataType")]
+	[InlineData(true, "Microsoft.AspNetCore.Mvc", "ModelMetadataType")]
+	public void Generator_EmitsExactMetadataSource_ForAttributeMode(bool isMvcApp, string attributeNamespace, string attributeName)
+	{
+		const string modelSource = """
+			using CommonNetFuncs.SubsetModelBinder;
+
+			namespace Samples.Models
+			{
+				public sealed class Person
+				{
+					public string Name { get; set; }
+				}
+
+				[SubsetOf(typeof(Person), IS_MVC_APP)]
+				public partial class PersonSubset
+				{
+					public string Name { get; set; }
+				}
+			}
+			""";
+
+		GeneratorDriverRunResult result = Run(modelSource.Replace("IS_MVC_APP", isMvcApp ? "true" : "false"));
+		GeneratedSourceResult generated = result.Results.Single().GeneratedSources.Single();
+
+		string expected = string.Join(Environment.NewLine, [
+			"#nullable enable",
+			"using System;",
+			$"using {attributeNamespace};",
+			"namespace Samples.Models",
+			"{",
+			$"    [{attributeName}(typeof(Person))]",
+			"    public partial class PersonSubset",
+			"    {",
+			"    }",
+			"}",
+			""
+		]);
+
+		generated.HintName.ShouldBe("PersonSubset_Attributes.g.cs");
+		generated.SourceText.ToString().ShouldBe(expected);
+		result.Diagnostics.ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void Generator_ReportsExactDiagnostics_WithLocations_ForPropertyFailures()
+	{
+		const string source = """
+			using CommonNetFuncs.SubsetModelBinder;
+
+			namespace Samples
+			{
+				public class BasePerson
+				{
+					public string BaseName { get; set; }
+				}
+
+				public class Person : BasePerson
+				{
+					public string Name { get; set; }
+				}
+
+				[SubsetOf(typeof(Person), allowInheritedProperties: false)]
+				public partial class PersonSubset
+				{
+					public int Name { get; set; }
+					public string Missing { get; set; }
+					public string BaseName { get; set; }
+				}
+			}
+			""";
+
+		Diagnostic[] diagnostics = Run(source).Diagnostics.OrderBy(d => d.Location.GetLineSpan().StartLinePosition.Line).ToArray();
+
+		diagnostics.Select(d => d.Id).ShouldBe(["SG0001", "SG0002", "SG0002"]);
+		diagnostics[0].Descriptor.Title.ToString().ShouldBe("Property type mismatch");
+		diagnostics[0].GetMessage().ShouldBe("Property 'Name' has a different type than in the original class 'Person'. Expected: String, Found: Int32");
+		diagnostics[0].Severity.ShouldBe(DiagnosticSeverity.Error);
+		diagnostics[0].Location.GetLineSpan().StartLinePosition.Line.ShouldBe(17);
+		diagnostics[1].GetMessage().ShouldBe("Property 'Missing' is not present in the parent class 'Person'");
+		diagnostics[2].GetMessage().ShouldBe("Property 'BaseName' is not present in the parent class 'Person'");
+	}
+
+	[Fact]
+	public void Generator_ReportsPartialDiagnostic_AndStillEmitsExactPartialSource()
+	{
+		const string source = """
+			using CommonNetFuncs.SubsetModelBinder;
+
+			namespace Samples
+			{
+				public class Person { }
+
+				[SubsetOf(typeof(Person))]
+				public class PersonSubset { }
+			}
+			""";
+
+		GeneratorDriverRunResult result = Run(source);
+		Diagnostic diagnostic = result.Diagnostics.ShouldHaveSingleItem();
+
+		diagnostic.Id.ShouldBe("SG0003");
+		diagnostic.Descriptor.Title.ToString().ShouldBe("Class must be partial");
+		diagnostic.GetMessage().ShouldBe("The class 'PersonSubset' decorated with SubsetOf attribute must be marked as partial");
+		diagnostic.Location.GetLineSpan().StartLinePosition.Line.ShouldBe(7);
+		result.GeneratedTrees.ShouldHaveSingleItem().ToString().ShouldContain("public partial class PersonSubset");
+	}
+
+	[Theory]
+	[InlineData("System.Type sourceType", "typeof(Person)", "MetadataType", true)]
+	[InlineData("System.Type sourceType, bool isMvcApp = false", "typeof(Person), true", "ModelMetadataType", true)]
+	[InlineData("System.Type sourceType, bool isMvcApp = false, bool allowInheritedProperties = true", "typeof(Person), false, false", "MetadataType", true)]
+	[InlineData("System.Type sourceType, bool isMvcApp = false, bool allowInheritedProperties = true, bool ignoreType = false", "typeof(Person), false, true, true", "MetadataType", false)]
+	public void Generator_HandlesEverySupportedAttributeConstructorShape(
+		string constructorParameters,
+		string constructorArguments,
+		string expectedAttribute,
+		bool inheritedPropertyDiagnostic)
+	{
+		string attributeSource = $$"""
+			namespace CommonNetFuncs.SubsetModelBinder
+			{
+				[System.AttributeUsage(System.AttributeTargets.Class)]
+				public sealed class SubsetOfAttribute({{constructorParameters}}) : System.Attribute
+				{
+				}
+			}
+			""";
+		string modelSource = $$"""
+			using CommonNetFuncs.SubsetModelBinder;
+
+			namespace Samples
+			{
+				public class BasePerson { public string Id { get; set; } }
+				public class Person : BasePerson { public string Name { get; set; } }
+
+				[SubsetOf({{constructorArguments}})]
+				public partial class PersonSubset
+				{
+					public int Name { get; set; }
+					public string Id { get; set; }
+				}
+			}
+			""";
+
+		GeneratorDriverRunResult result = Run(modelSource, attributeSource);
+		string generated = result.GeneratedTrees.ShouldHaveSingleItem().ToString();
+
+		generated.ShouldContain($"[{expectedAttribute}(typeof(Person))]");
+		result.Diagnostics.Any(d => d.Id == "SG0002").ShouldBe(inheritedPropertyDiagnostic);
+	}
+
+	[Theory]
+	[InlineData("[SubsetOf(null)]")]
+	[InlineData("[SubsetOf()]")]
+	public void Generator_WithUnresolvableSourceType_EmitsOnlyExistingPartialDiagnostic(string attribute)
+	{
+		string source = $$"""
+			using CommonNetFuncs.SubsetModelBinder;
+
+			namespace Samples
+			{
+				{{attribute}}
+				public class PersonSubset
+				{
+					public string Name { get; set; }
+				}
+			}
+			""";
+
+		GeneratorDriverRunResult result = Run(source);
+
+		result.GeneratedTrees.ShouldBeEmpty();
+		Diagnostic diagnostic = result.Diagnostics.ShouldHaveSingleItem();
+		diagnostic.Id.ShouldBe("SG0003");
+	}
+
+	[Fact]
+	public void InternalModels_EqualityAndHashing_DistinguishAllFields()
+	{
+		Location location = Location.Create(CSharpSyntaxTree.ParseText("class C {}", cancellationToken: Current.CancellationToken), new TextSpan(6, 1));
+		Location otherLocation = Location.Create(CSharpSyntaxTree.ParseText("class D {}", cancellationToken: Current.CancellationToken), new TextSpan(6, 1));
+		object diagnostic = Create(DiagnosticInfoType, "SG0001", "Title", "Message", location);
+		object equalDiagnostic = Create(DiagnosticInfoType, "SG0001", "Title", "Message", location);
+		object differentId = Create(DiagnosticInfoType, "SG0002", "Title", "Message", location);
+		object differentTitle = Create(DiagnosticInfoType, "SG0001", "Other", "Message", location);
+		object differentMessage = Create(DiagnosticInfoType, "SG0001", "Title", "Other", location);
+		object differentLocation = Create(DiagnosticInfoType, "SG0001", "Title", "Message", otherLocation);
+		object nullLocation = Create(DiagnosticInfoType, "SG0001", "Title", "Message", null);
+
+		InvokeEquals(diagnostic, null).ShouldBeFalse();
+		InvokeEquals(diagnostic, "not-a-diagnostic").ShouldBeFalse();
+		InvokeTypedEquals(diagnostic, diagnostic).ShouldBeTrue();
+		InvokeTypedEquals(diagnostic, equalDiagnostic).ShouldBeTrue();
+		InvokeTypedEquals(diagnostic, differentId).ShouldBeFalse();
+		InvokeTypedEquals(diagnostic, differentTitle).ShouldBeFalse();
+		InvokeTypedEquals(diagnostic, differentMessage).ShouldBeFalse();
+		InvokeTypedEquals(diagnostic, differentLocation).ShouldBeFalse();
+		InvokeGetHashCode(diagnostic).ShouldBe(InvokeGetHashCode(equalDiagnostic));
+		InvokeGetHashCode(nullLocation).ShouldNotBe(InvokeGetHashCode(diagnostic));
+
+		object diagnostics = CreateArray(diagnostic);
+		object equalDiagnostics = CreateArray(equalDiagnostic);
+		object differentDiagnostics = CreateArray(differentId);
+		object model = Create(SubsetModelType, "Samples", "PersonSubset", "Person", false, diagnostics);
+		object equalModel = Create(SubsetModelType, "Samples", "PersonSubset", "Person", false, equalDiagnostics);
+
+		InvokeEquals(model, null).ShouldBeFalse();
+		InvokeEquals(model, "not-a-model").ShouldBeFalse();
+		InvokeTypedEquals(model, model).ShouldBeTrue();
+		InvokeTypedEquals(model, equalModel).ShouldBeTrue();
+		InvokeTypedEquals(model, Create(SubsetModelType, null, "PersonSubset", "Person", false, diagnostics)).ShouldBeFalse();
+		InvokeTypedEquals(model, Create(SubsetModelType, "Samples", null, "Person", false, diagnostics)).ShouldBeFalse();
+		InvokeTypedEquals(model, Create(SubsetModelType, "Samples", "PersonSubset", null, false, diagnostics)).ShouldBeFalse();
+		InvokeTypedEquals(model, Create(SubsetModelType, "Samples", "PersonSubset", "Person", true, diagnostics)).ShouldBeFalse();
+		InvokeTypedEquals(model, Create(SubsetModelType, "Samples", "PersonSubset", "Person", false, differentDiagnostics)).ShouldBeFalse();
+		InvokeGetHashCode(model).ShouldBe(InvokeGetHashCode(equalModel));
+		InvokeGetHashCode(Create(SubsetModelType, null, null, null, true, differentDiagnostics))
+			.ShouldNotBe(InvokeGetHashCode(model));
+	}
+
+	[Fact]
+	public void InternalEquatableArrays_CompareElementsAndSupportDefaultAndNullElements()
+	{
+		object first = Create(DiagnosticInfoType, "SG0001", "Title", "Message", null);
+		object equalFirst = Create(DiagnosticInfoType, "SG0001", "Title", "Message", null);
+		object second = Create(DiagnosticInfoType, "SG0002", "Title", "Message", null);
+		Array one = CreateDiagnosticArray(first);
+		Array oneEqual = CreateDiagnosticArray(equalFirst);
+		Array oneDifferent = CreateDiagnosticArray(second);
+		object array = Create(EquatableArrayDiagnosticType, one);
+		object equalArray = Create(EquatableArrayDiagnosticType, oneEqual);
+
+		InvokeTypedEquals(array, equalArray).ShouldBeTrue();
+		InvokeTypedEquals(array, Create(EquatableArrayDiagnosticType, CreateDiagnosticArray())).ShouldBeFalse();
+		InvokeTypedEquals(array, Create(EquatableArrayDiagnosticType, oneDifferent)).ShouldBeFalse();
+		InvokeEquals(array, null).ShouldBeFalse();
+		InvokeEquals(array, "not-an-array").ShouldBeFalse();
+		InvokeEquals(array, equalArray).ShouldBeTrue();
+		InvokeGetHashCode(array).ShouldBe(InvokeGetHashCode(equalArray));
+
+		object defaultArray = Activator.CreateInstance(EquatableArrayDiagnosticType)!;
+		object emptyFromNullItems = Create(EquatableArrayDiagnosticType, new object?[] { null });
+		InvokeTypedEquals(defaultArray, Create(EquatableArrayDiagnosticType, CreateDiagnosticArray())).ShouldBeTrue();
+		InvokeTypedEquals(defaultArray, emptyFromNullItems).ShouldBeTrue();
+		InvokeTypedEquals(emptyFromNullItems, defaultArray).ShouldBeTrue();
+		InvokeTypedEquals(defaultArray, array).ShouldBeFalse();
+		InvokeGetHashCode(defaultArray).ShouldBe(0);
+
+		Array arrayWithNull = CreateDiagnosticArray(new object?[] { null });
+		InvokeGetHashCode(Create(EquatableArrayDiagnosticType, arrayWithNull)).ShouldBe(0);
+		InvokeTypedEquals(Create(EquatableArrayDiagnosticType, arrayWithNull), Create(EquatableArrayDiagnosticType, arrayWithNull)).ShouldBeTrue();
+	}
+
+	[Fact]
+	public void HashCombiner_IsDeterministic_AndDoesNotOverflow()
+	{
+		Type hashCombiner = GetGeneratorType("HashCombiner");
+		MethodInfo combine = hashCombiner.GetMethod("Combine", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!;
+
+		((int)combine.Invoke(null, [int.MaxValue, 17])!).ShouldBe(unchecked((int.MaxValue * -1521134295) + 17));
+		((int)combine.Invoke(null, [0, 0])!).ShouldBe(0);
+	}
+
 }

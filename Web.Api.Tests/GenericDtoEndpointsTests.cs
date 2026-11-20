@@ -1,13 +1,18 @@
-﻿using System.ComponentModel.DataAnnotations;
-using AutoFixture;
+﻿using AutoFixture;
 using AutoFixture.AutoFakeItEasy;
 using CommonNetFuncs.EFCore;
 using CommonNetFuncs.Web.Api;
 using FakeItEasy;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OpenApi;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.Extensions.Logging;
+using System.ComponentModel.DataAnnotations;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests;
@@ -1674,4 +1679,72 @@ public sealed class GenericDtoEndpointsTests
 
 
 	#endregion
+}
+
+public sealed class GenericDtoValidationBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+	private static async Task<WebApplication> CreateApp(Action<WebApplication> configure)
+	{
+		WebApplicationBuilder builder = WebApplication.CreateBuilder();
+		builder.Logging.ClearProviders();
+		builder.WebHost.UseTestServer();
+		WebApplication app = builder.Build();
+		configure(app);
+		await app.StartAsync();
+		return app;
+	}
+
+	private static OpenApiDocumentTransformerContext CreateOpenApiContext() => new()
+	{
+		DocumentName = "coverage",
+		DescriptionGroups = [],
+		ApplicationServices = null!
+	};
+
+	private sealed class CoverageController : ControllerBase;
+
+	[Fact]
+	public async Task GenericDto_UpdateValidationFailure_ReturnsExactBadRequestProblem()
+	{
+		GenericDtoEndpoints endpoint = new();
+		GenericDtoEndpointsTests.TestEntity entity = new()
+		{
+			Id = 7,
+			Name = "original",
+			Description = "unchanged"
+		};
+		GenericDtoEndpointsTests.TestInDto input = new()
+		{
+			Id = 7,
+			Name = null!,
+			Description = "replacement"
+		};
+		CommonNetFuncs.EFCore.IBaseDbContextActions<GenericDtoEndpointsTests.TestEntity, GenericDtoEndpointsTests.TestDbContext> actions =
+			A.Fake<CommonNetFuncs.EFCore.IBaseDbContextActions<GenericDtoEndpointsTests.TestEntity, GenericDtoEndpointsTests.TestDbContext>>();
+		A.CallTo(() => actions.GetByKey(A<object>.Ignored, null, default)).Returns(entity);
+
+		ActionResult<GenericDtoEndpointsTests.TestOutDto> result =
+			await endpoint.Update<GenericDtoEndpointsTests.TestEntity, GenericDtoEndpointsTests.TestDbContext, GenericDtoEndpointsTests.TestInDto, GenericDtoEndpointsTests.TestOutDto>(7, input, actions);
+
+		ObjectResult objectResult = result.Result.ShouldBeOfType<ObjectResult>();
+		objectResult.StatusCode.ShouldBe(StatusCodes.Status400BadRequest);
+		ValidationProblemDetails problem = objectResult.Value.ShouldBeOfType<ValidationProblemDetails>();
+		problem.Title.ShouldBeNull();
+		problem.Errors.ShouldBeEmpty();
+		A.CallTo(() => actions.Update(A<GenericDtoEndpointsTests.TestEntity>.Ignored)).MustNotHaveHappened();
+		entity.Name.ShouldBe("original");
+	}
+
 }

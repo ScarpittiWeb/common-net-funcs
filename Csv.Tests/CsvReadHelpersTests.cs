@@ -1,8 +1,8 @@
-﻿using System.Data;
-using System.Globalization;
-using AutoFixture;
+﻿using AutoFixture;
 using CommonNetFuncs.Csv;
 using CsvHelper;
+using System.Data;
+using System.Globalization;
 using static Xunit.TestContext;
 
 namespace Csv.Tests;
@@ -517,4 +517,111 @@ public sealed partial class CsvReadHelpersTests
 
 		return writer.ToString();
 	}
+}
+
+public sealed partial class CsvReadBehaviorTests
+{
+	[CsvRecord]
+	internal sealed partial record CoverageRecord(string Name, int Count);
+
+
+
+
+
+
+
+
+	private static async Task<string> ReadToEndAsync(MemoryStream stream)
+	{
+		stream.Position = 0;
+		using StreamReader reader = new(stream, leaveOpen: true);
+		return await reader.ReadToEndAsync(Current.CancellationToken);
+	}
+
+	private static MemoryStream CsvStream(string csv) =>
+		new(System.Text.Encoding.UTF8.GetBytes(csv));
+
+	private sealed class NullStringDataColumn : DataColumn
+	{
+		public override string ToString() => null!;
+	}
+
+	private sealed class NullStringValue
+	{
+		public override string ToString() => null!;
+	}
+
+	private sealed class ControlledWriteMemoryStream : MemoryStream
+	{
+		private readonly TaskCompletionSource flushStarted =
+			new(TaskCreationOptions.RunContinuationsAsynchronously);
+		private readonly TaskCompletionSource continueFlush =
+			new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+		public Task WaitUntilFlushStartsAsync(CancellationToken cancellationToken) =>
+			flushStarted.Task.WaitAsync(cancellationToken);
+
+		public void ReleaseFlush() => continueFlush.TrySetResult();
+
+		public override async Task FlushAsync(CancellationToken cancellationToken)
+		{
+			flushStarted.TrySetResult();
+			await continueFlush.Task.WaitAsync(cancellationToken);
+			await base.FlushAsync(cancellationToken);
+		}
+	}
+
+	private sealed class ThrowOnSecondFlushMemoryStream : MemoryStream
+	{
+		public int FlushAttempts { get; private set; }
+
+		public override Task FlushAsync(CancellationToken cancellationToken)
+		{
+			FlushAttempts++;
+			if (FlushAttempts == 2)
+			{
+				throw new IOException("Cleanup flush failed.");
+			}
+
+			return base.FlushAsync(cancellationToken);
+		}
+	}
+
+	[Fact]
+	public async Task ReadCsvAsync_WithCancelledFileOperation_ShouldThrowOperationCancelledException()
+	{
+		string filePath = Path.GetTempFileName();
+		await File.WriteAllTextAsync(
+			filePath,
+			$"Name,Count{Environment.NewLine}Alice,1{Environment.NewLine}",
+			Current.CancellationToken);
+		using CancellationTokenSource cancellation = new();
+		cancellation.Cancel();
+
+		try
+		{
+			await Should.ThrowAsync<OperationCanceledException>(
+				() => CsvReadHelpers.ReadCsvAsync<CoverageRecord>(
+					filePath,
+					cancellationToken: cancellation.Token));
+		}
+		finally
+		{
+			File.Delete(filePath);
+		}
+	}
+
+	[Fact]
+	public async Task ReadCsvAsync_WithCancelledStreamOperation_ShouldThrowOperationCancelledException()
+	{
+		using MemoryStream stream = CsvStream("Name,Count\nAlice,1\n");
+		using CancellationTokenSource cancellation = new();
+		cancellation.Cancel();
+
+		await Should.ThrowAsync<OperationCanceledException>(
+			() => CsvReadHelpers.ReadCsvAsync<CoverageRecord>(
+				stream,
+				cancellationToken: cancellation.Token));
+	}
+
 }

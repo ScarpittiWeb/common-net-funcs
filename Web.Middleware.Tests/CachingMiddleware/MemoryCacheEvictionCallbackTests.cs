@@ -1,10 +1,11 @@
-﻿using System.Text;
-using CommonNetFuncs.Web.Common.CachingSupportClasses;
+﻿using CommonNetFuncs.Web.Common.CachingSupportClasses;
 using CommonNetFuncs.Web.Middleware.CachingMiddleware;
 using FakeItEasy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
+using System.Reflection;
+using System.Text;
 using xRetry.v3;
 using static Xunit.TestContext;
 
@@ -232,4 +233,119 @@ public sealed class MemoryCacheEvictionCallbackTests
 			}
 		}
 	}
+}
+
+public sealed class MemoryCacheEvictionCallbackBehaviorTests
+{
+
+
+
+
+
+	private static MemoryCacheMiddleware CreateMiddleware(CacheMetrics? metrics, CacheTracker tracker, CacheOptions? options = null)
+	{
+		return new MemoryCacheMiddleware(
+			_ => Task.CompletedTask,
+			new MemoryCache(new MemoryCacheOptions()),
+			options ?? new CacheOptions { SuppressLogs = true },
+			metrics,
+			tracker);
+	}
+
+	private static void InvokeHandleEviction(MemoryCacheMiddleware middleware, object key, object? value)
+	{
+		GetPrivateMethod("HandleEviction").Invoke(middleware, [key, value, EvictionReason.Removed, null]);
+	}
+
+	private static void InvokeAppendSortedQuery(StringBuilder builder, IQueryCollection query, string evictionQueryParam)
+	{
+		GetPrivateMethod("AppendSortedQuery").Invoke(null, [builder, query, evictionQueryParam]);
+	}
+
+	private static SemaphoreSlim GetCacheLock(MemoryCacheMiddleware middleware)
+	{
+		FieldInfo field = typeof(MemoryCacheMiddleware).GetField("cacheLock", BindingFlags.Instance | BindingFlags.NonPublic)
+			?? throw new InvalidOperationException("cacheLock field was not found.");
+		return (SemaphoreSlim)field.GetValue(middleware)!;
+	}
+
+	private static MethodInfo GetPrivateMethod(string name)
+	{
+		return typeof(MemoryCacheMiddleware).GetMethod(name, BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic)
+			?? throw new InvalidOperationException($"{name} method was not found.");
+	}
+
+	private sealed class NullStringObject
+	{
+		public override string? ToString()
+		{
+			return null;
+		}
+	}
+
+	[Fact]
+	public void HandleEviction_NonCacheValue_LeavesMetricsAndTagsUnchanged()
+	{
+		// Arrange
+		CacheMetrics metrics = new();
+		CacheTracker tracker = new();
+		tracker.CacheTags["tag"] = ["key"];
+		metrics.CacheTags["tag"] = ["key"];
+		metrics.AddToSize(4);
+		metrics.IncrementCacheEntryCount();
+		using MemoryCacheMiddleware middleware = CreateMiddleware(metrics, tracker);
+
+		// Act
+		InvokeHandleEviction(middleware, "key", "not-a-cache-entry");
+
+		// Assert
+		metrics.CurrentCacheSize().ShouldBe(4);
+		metrics.CurrentCacheEntryCount().ShouldBe(1);
+		metrics.EvictedDueToRemoved().ShouldBe(0);
+		tracker.CacheTags["tag"].ShouldContain("key");
+	}
+
+	[Fact]
+	public void HandleEviction_CacheEntryWithNullStringKey_RemovesLastTagWithoutMetrics()
+	{
+		// Arrange
+		CacheTracker tracker = new();
+		tracker.CacheTags["tag"] = [string.Empty];
+		CacheEntry entry = new()
+		{
+			Data = Encoding.UTF8.GetBytes("data"),
+			Tags = ["tag"],
+		};
+		using MemoryCacheMiddleware middleware = CreateMiddleware(null, tracker);
+
+		// Act
+		InvokeHandleEviction(middleware, new NullStringObject(), entry);
+
+		// Assert
+		tracker.CacheTags.ShouldNotContainKey("tag");
+	}
+
+	[Fact]
+	public void HandleEviction_CacheEntryWithoutTracker_UpdatesMetricsButPreservesTrackerIndependentState()
+	{
+		// Arrange
+		CacheMetrics metrics = new();
+		metrics.AddToSize(4);
+		metrics.IncrementCacheEntryCount();
+		CacheEntry entry = new()
+		{
+			Data = new byte[4],
+			Tags = ["tag"],
+		};
+		using MemoryCacheMiddleware middleware = CreateMiddleware(metrics, null!);
+
+		// Act
+		InvokeHandleEviction(middleware, "key", entry);
+
+		// Assert
+		metrics.CurrentCacheSize().ShouldBe(0);
+		metrics.CurrentCacheEntryCount().ShouldBe(0);
+		metrics.EvictedDueToRemoved().ShouldBe(1);
+	}
+
 }

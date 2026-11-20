@@ -1,7 +1,7 @@
-﻿using System.Data;
+﻿using Microsoft.Data.SqlClient;
+using System.Data;
 using System.Data.Common;
 using System.Text;
-using Microsoft.Data.SqlClient;
 
 namespace CommonNetFuncs.Sql.SqlServer;
 

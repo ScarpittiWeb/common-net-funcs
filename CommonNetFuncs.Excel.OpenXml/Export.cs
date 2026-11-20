@@ -1,12 +1,12 @@
-﻿using System.Data;
-using System.Globalization;
-using System.IO.Packaging;
-using System.Reflection;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
 using CommonNetFuncs.Excel.Common;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using System.Data;
+using System.Globalization;
+using System.IO.Packaging;
+using System.Reflection;
 using static CommonNetFuncs.Core.ExceptionLocation;
 using static CommonNetFuncs.Core.ReflectionCaches;
 using static CommonNetFuncs.Excel.OpenXml.Common;
@@ -330,10 +330,6 @@ public static class Export
 						}
 
 						object value = row[i]; // Same default-version read ItemArray performs, without copying the whole row
-						if (value == null)
-						{
-							continue;
-						}
 						string text = value.ToString() ?? string.Empty;
 						AppendSharedStringCell(dataRow, colLetters[i] + y, text, bodyStyleId, sharedStringCache, sharedStringTable, ref ssCount, colWidths, i);
 					}

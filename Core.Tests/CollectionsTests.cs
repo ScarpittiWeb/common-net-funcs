@@ -1,10 +1,11 @@
-﻿using System.Collections.Concurrent;
-using System.Data;
-using System.Linq.Expressions;
-using AutoFixture;
+﻿using AutoFixture;
 using CommonNetFuncs.Core;
 using CommonNetFuncs.Core.CollectionClasses;
 using FastExpressionCompiler;
+using System.Collections.Concurrent;
+using System.ComponentModel.DataAnnotations;
+using System.Data;
+using System.Linq.Expressions;
 using static Xunit.TestContext;
 
 namespace Core.Tests;
@@ -4295,4 +4296,390 @@ public sealed class CollectionsTests
 
 
 	#endregion
+}
+
+public sealed class CollectionsBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	public sealed class GapPartialRecord
+	{
+		public int Id { get; set; }
+
+		public string? Name { get; set; }
+	}
+
+	public sealed class GapDataRow
+	{
+		public bool Enabled { get; set; }
+
+		public DateOnly DateValue { get; set; }
+
+		public DateOnly ParsedDate { get; set; }
+	}
+
+	public sealed class GapNullableDataRow
+	{
+		public bool? EnabledNullable { get; set; }
+	}
+
+	public sealed class GapDateTimeRow
+	{
+		public DateTime DateTimeValue { get; set; }
+
+		public DateTime TextDateTime { get; set; }
+	}
+
+	public sealed class GapAggregateRow
+	{
+		public string? Group { get; set; }
+
+		public string? Value { get; set; }
+	}
+
+	public sealed class GapWriteOnlyProperty
+	{
+		public int Readable { get; set; }
+
+		public string WriteOnly
+		{
+			set { }
+		}
+	}
+
+	[Fact]
+	public void AddRange_NullDictionaryInput_LeavesDestinationUnchanged()
+	{
+		Dictionary<string, int?> destination = new() { ["keep"] = 1 };
+
+		destination.AddRange((IDictionary<string, int?>?)null, false, cancellationToken: Current.CancellationToken);
+
+		destination.ShouldBe(new Dictionary<string, int?> { ["keep"] = 1 });
+	}
+
+	[Theory]
+	[InlineData("", false, 0)]
+	[InlineData("", true, 1)]
+	[InlineData(" ", true, 1)]
+	[InlineData(null, true, 0)]
+	public void SingleToList_StringControlsWhetherEmptyValuesAreRetained(string? value, bool allowEmpty, int expectedCount)
+	{
+		List<string> result = value.SingleToList(allowEmpty);
+
+		result.Count.ShouldBe(expectedCount);
+		if (expectedCount == 1)
+		{
+			result[0].ShouldBe(value);
+		}
+	}
+
+	[Fact]
+	public void SingleToList_StringNullAndTextCoverBothReturnBranches()
+	{
+		"text".SingleToList(true).ShouldHaveSingleItem().ShouldBe("text");
+		((string?)null).SingleToList(true).ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void GetObjectByPartial_ReturnsNullWhenNoSearchableValuesExist()
+	{
+		GapPartialRecord[] rows = [new() { Id = 1, Name = "one" }];
+
+		rows.AsQueryable().GetObjectByPartial(new GapPartialRecord(), true, cancellationToken: Current.CancellationToken).ShouldBeNull();
+		rows.AsQueryable().GetObjectByPartial(new GapPartialRecord { Name = "one" }, true, cancellationToken: Current.CancellationToken).ShouldBeSameAs(rows[0]);
+	}
+
+	[Fact]
+	public void DataTableConversions_EmptyTablesStayEmptyAcrossAllModes()
+	{
+		DataTable table = new();
+
+		table.ToList<GapDataRow>(cancellationToken: Current.CancellationToken).ShouldBeEmpty();
+		table.ToListParallel<GapDataRow>(cancellationToken: Current.CancellationToken).ShouldBeEmpty();
+		table.ToEnumerableParallel<GapDataRow>(cancellationToken: Current.CancellationToken).ShouldBeEmpty();
+		table.ToEnumerableStreaming<GapDataRow>(cancellationToken: Current.CancellationToken).ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void DataTableConversions_MapShortsDatesDbNullAndDateParsingFailures()
+	{
+		DataTable table = new();
+		table.Columns.Add("Enabled", typeof(short));
+		table.Columns.Add("DateValue", typeof(DateTime));
+		table.Columns.Add("ParsedDate", typeof(string));
+		table.Rows.Add((short)1, new DateTime(2024, 5, 6), "2024-05-07");
+		table.Rows.Add((short)0, DBNull.Value, DBNull.Value);
+
+		GapDataRow[] rows = table.ToList<GapDataRow>(convertShortToBool: true, cancellationToken: Current.CancellationToken).ToArray();
+
+		rows[0].Enabled.ShouldBeTrue();
+		rows[0].DateValue.ShouldBe(new DateOnly(2024, 5, 6));
+		rows[0].ParsedDate.ShouldBe(new DateOnly(2024, 5, 7));
+		rows[1].Enabled.ShouldBeFalse();
+		rows[1].DateValue.ShouldBe(default);
+		rows[1].ParsedDate.ShouldBe(default);
+
+		DataTable invalidDateOnly = new();
+		invalidDateOnly.Columns.Add("ParsedDate", typeof(string));
+		invalidDateOnly.Rows.Add("not-a-date");
+		Should.Throw<InvalidCastException>(() => invalidDateOnly.ToList<GapDataRow>());
+	}
+
+	[Fact]
+	public void DataTableConversions_MapShortToNullableBool()
+	{
+		DataTable table = new();
+		table.Columns.Add("EnabledNullable", typeof(short));
+		table.Rows.Add((short)1);
+
+		table.ToList<GapNullableDataRow>(convertShortToBool: true, cancellationToken: Current.CancellationToken).Single().EnabledNullable.ShouldBe(true);
+	}
+
+	[Fact]
+	public void DataTableConversions_ConvertDateOnlyToDateTimeAndRejectInvalidText()
+	{
+		DataTable table = new();
+		table.Columns.Add("DateTimeValue", typeof(DateOnly));
+		table.Columns.Add("TextDateTime", typeof(string));
+		table.Rows.Add(new DateOnly(2024, 8, 9), "2024-08-10");
+
+		GapDateTimeRow row = table.ToList<GapDateTimeRow>(cancellationToken: Current.CancellationToken).Single();
+
+		row.DateTimeValue.ShouldBe(new DateTime(2024, 8, 9));
+		row.TextDateTime.ShouldBe(new DateTime(2024, 8, 10));
+
+		DataTable invalid = new();
+		invalid.Columns.Add("TextDateTime", typeof(string));
+		invalid.Rows.Add("not-a-date");
+		Should.Throw<InvalidCastException>(() => invalid.ToList<GapDateTimeRow>());
+	}
+
+	[Fact]
+	public void ToDataTable_RemovesStaleColumnsAndHonorsParallelOptions()
+	{
+		DataTable existing = new();
+		existing.Columns.Add("Stale", typeof(string));
+		GapPartialRecord[] values = [new() { Id = 7, Name = "seven" }];
+
+		DataTable serial = values.ToDataTable(existing, cancellationToken: Current.CancellationToken)!;
+		serial.Columns.Contains("Stale").ShouldBeFalse();
+		serial.Rows[0]["Id"].ShouldBe(7);
+
+		DataTable parallel = values.ToDataTable(useParallel: true, approximateCount: 10, degreeOfParallelism: 1, cancellationToken: Current.CancellationToken)!;
+		parallel.Rows.Count.ShouldBe(1);
+		parallel.Rows[0]["Name"].ShouldBe("seven");
+	}
+
+	[Fact]
+	public void ToDataTable_ReadOnlyPropertiesAreExcluded()
+	{
+		DataTable table = new[] { new GapWriteOnlyProperty { Readable = 17 } }.ToDataTable(cancellationToken: Current.CancellationToken)!;
+
+		table.Columns.Contains("WriteOnly").ShouldBeFalse();
+		table.Columns.Contains("Readable").ShouldBeTrue();
+		table.Rows[0]["Readable"].ShouldBe(17);
+	}
+
+	[Fact]
+	public void StringAggProps_ParallelModeAndInvalidPropertiesFailPredictably()
+	{
+		GapAggregateRow[] rows =
+		[
+			new() { Group = "A", Value = "one" },
+			new() { Group = "A", Value = "one" },
+			new() { Group = "A", Value = "two" }
+		];
+
+		GapAggregateRow aggregate = rows.StringAggProps(new HashSet<string> { "Value" }, ",", false, true).Single();
+		aggregate.Value.ShouldBeOneOf("one,one,two", "one,two,one", "two,one,one");
+
+		Should.Throw<ArgumentException>(() => rows.StringAggProps(new HashSet<string> { "Missing" }, parallel: true).ToList());
+	}
+
+	[Fact]
+	public void IndexOf_NullCollection_PreservesFailureAndMissesAllIndexedPaths()
+	{
+		IEnumerable<int>? values = null;
+
+		Should.Throw<ArgumentNullException>(() => values!.IndexOf(1));
+
+		new[] { 1, 2 }.IndexOf(9).ShouldBe(-1);
+		new List<int> { 1, 2 }.IndexOf(9).ShouldBe(-1);
+	}
+
+	[Fact]
+	public void GetCombinations_LimitedResultBreaksOnceLimitReached()
+	{
+		IEnumerable<IEnumerable<string?>> sources = new[]
+		{
+			new string?[] { "A", "B" },
+			new string?[] { "1", "2" },
+			new string?[] { "x", "y" }
+		};
+
+		List<string> combinations = sources.GetCombinations(3)
+			.Select(combination => string.Join("|", combination))
+			.ToList();
+
+		combinations.ShouldBe(["A|1", "A|2", "B|1"]);
+	}
+
+	[Fact]
+	public void CombineExpressions_HandlesParametersUnrelatedToTheReplacementTarget()
+	{
+		Expression<Func<int, bool>> first = value => Enumerable.Range(0, 2).Any(n => n == value);
+		Expression<Func<int, bool>> second = value => value >= 0;
+
+		Expression<Func<int, bool>> combined = Collections.CombineExpressions([first, second])!;
+
+		combined.Compile()(1).ShouldBeTrue();
+		combined.Compile()(4).ShouldBeFalse();
+	}
+
+	[Fact]
+	public void GetDuplicatesWithCount_TracksAThirdOccurrence()
+	{
+		Dictionary<int, int> result = new[] { 4, 4, 4, 4 }.GetDuplicatesWithCount(includeUniqueInCount: true);
+
+		result.ShouldHaveSingleItem();
+		result.ShouldContainKeyAndValue(4, 4);
+	}
+
+}
+
+public sealed class CollectionsSystemBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static DataTable CreateOneRowTable()
+	{
+		DataTable table = new();
+		table.Columns.Add("Value", typeof(int));
+		table.Rows.Add(9);
+		return table;
+	}
+
+	[GapNullTypeId]
+	private sealed class GapNullTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNullTypeIdAttribute : Attribute
+	{
+		public override object TypeId => null!;
+	}
+
+	[GapNamelessTypeId]
+	private sealed class GapNamelessTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNamelessTypeIdAttribute : Attribute
+	{
+		public override object TypeId { get; } = new object();
+	}
+
+	private sealed class GapNestedEquality
+	{
+		public GapNestedValue? Child { get; set; }
+	}
+
+	private sealed class GapNestedValue
+	{
+		public int Value { get; set; }
+	}
+
+	private sealed class GapHashHolder
+	{
+		public List<GapNestedValue?> Values { get; set; } = [];
+	}
+
+	private sealed class GapNonSeekableReadStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public bool AllowRead { get; set; } = true;
+
+		public override bool CanRead => AllowRead;
+
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonWritableTargetStream : MemoryStream
+	{
+		public override bool CanWrite => false;
+	}
+
+	private sealed class GapUnseekableSourceStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonSeekableWriteStream : MemoryStream
+	{
+		public override bool CanSeek => false;
+
+		public byte[] Data => ToArray();
+	}
+
+	private sealed class GapValidated
+	{
+		[Required]
+		public string? Required { get; set; }
+
+		[Range(1, 10)]
+		public int Count { get; set; }
+
+		public string? Optional { get; set; }
+	}
+
+	[Fact]
+	public void FixedLruDictionary_GetOrAddMovesOldAndRetainsNewestEntry()
+	{
+		FixedLruDictionary<int, string> dictionary = new(2);
+		dictionary.Add(1, "one");
+		dictionary.Add(2, "two");
+
+		dictionary.GetOrAdd(1, _ => "new").ShouldBe("one");
+		dictionary.GetOrAdd(3, _ => "three").ShouldBe("three");
+
+		dictionary.ContainsKey(2).ShouldBeFalse();
+		dictionary.Keys.ShouldBe(new[] { 1, 3 }, ignoreOrder: true);
+		dictionary.GetOrAdd(3, _ => "replacement").ShouldBe("three");
+	}
+
 }

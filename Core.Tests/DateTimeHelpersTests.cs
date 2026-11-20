@@ -1,5 +1,7 @@
-﻿using System.Globalization;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
+using System.ComponentModel.DataAnnotations;
+using System.Data;
+using System.Globalization;
 
 namespace Core.Tests;
 
@@ -193,4 +195,137 @@ public sealed class DateTimeHelpersTests
 		// Act & Assert
 		value.IsValidOaDate().ShouldBe(expected);
 	}
+}
+
+public sealed class DateTimeHelpersBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static DataTable CreateOneRowTable()
+	{
+		DataTable table = new();
+		table.Columns.Add("Value", typeof(int));
+		table.Rows.Add(9);
+		return table;
+	}
+
+	[GapNullTypeId]
+	private sealed class GapNullTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNullTypeIdAttribute : Attribute
+	{
+		public override object TypeId => null!;
+	}
+
+	[GapNamelessTypeId]
+	private sealed class GapNamelessTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNamelessTypeIdAttribute : Attribute
+	{
+		public override object TypeId { get; } = new object();
+	}
+
+	private sealed class GapNestedEquality
+	{
+		public GapNestedValue? Child { get; set; }
+	}
+
+	private sealed class GapNestedValue
+	{
+		public int Value { get; set; }
+	}
+
+	private sealed class GapHashHolder
+	{
+		public List<GapNestedValue?> Values { get; set; } = [];
+	}
+
+	private sealed class GapNonSeekableReadStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public bool AllowRead { get; set; } = true;
+
+		public override bool CanRead => AllowRead;
+
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonWritableTargetStream : MemoryStream
+	{
+		public override bool CanWrite => false;
+	}
+
+	private sealed class GapUnseekableSourceStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonSeekableWriteStream : MemoryStream
+	{
+		public override bool CanSeek => false;
+
+		public byte[] Data => ToArray();
+	}
+
+	private sealed class GapValidated
+	{
+		[Required]
+		public string? Required { get; set; }
+
+		[Range(1, 10)]
+		public int Count { get; set; }
+
+		public string? Optional { get; set; }
+	}
+
+	[Fact]
+	public void GetBusinessDays_PartialDayPathsCoverWeekendsAndExceptionDates()
+	{
+		DateTime saturday = new(2024, 6, 1, 8, 0, 0);
+		DateTime sunday = new(2024, 6, 2, 18, 0, 0);
+
+		DateTimeHelpers.GetBusinessDays(saturday, sunday, [new DateTime(2024, 6, 3)]).ShouldBe(0);
+		DateTimeHelpers.GetBusinessDays(
+			new DateTime(2024, 6, 3, 8, 0, 0),
+			new DateTime(2024, 6, 7, 18, 0, 0),
+			[new DateTime(2024, 6, 4)]).ShouldBe(4);
+		DateTimeHelpers.GetBusinessDays(
+			new DateTime(2024, 6, 2, 8, 0, 0),
+			new DateTime(2024, 6, 8, 18, 0, 0)).ShouldBe(5);
+	}
+
+	[Fact]
+	public void IsValidOaDate_RejectsValuesOutsideBothBoundaries()
+	{
+		((double?)657434.99999999).IsValidOaDate().ShouldBeFalse();
+		((double?)657435d).IsValidOaDate().ShouldBeTrue();
+		2958466d.IsValidOaDate().ShouldBeFalse();
+	}
+
 }

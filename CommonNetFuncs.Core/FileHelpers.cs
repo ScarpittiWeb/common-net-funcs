@@ -1,9 +1,9 @@
-﻿using System.Buffers;
+﻿using CommonNetFuncs.Core.Internal;
+using System.Buffers;
 using System.IO.Pipelines;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using CommonNetFuncs.Core.Internal;
 
 namespace CommonNetFuncs.Core;
 

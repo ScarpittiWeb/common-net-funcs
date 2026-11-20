@@ -1,5 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
-using CommonNetFuncs.Web.Common.ValidationAttributes;
+﻿using CommonNetFuncs.Web.Common.ValidationAttributes;
+using System.ComponentModel.DataAnnotations;
 
 namespace Web.Common.Tests.ValidationAttributes;
 
@@ -543,4 +543,35 @@ public sealed class ListRangeAttributeTests : ValidationTestBase
 		// Assert
 		result.ShouldBe(ValidationResult.Success);
 	}
+}
+
+public sealed class ListRangeAttributeBehaviorTests : ValidationTestBase
+{
+
+
+
+
+	[Fact]
+	public void ListRange_ReusedAttribute_KeepsSuccessfulValidationAfterConversionSetup()
+	{
+		ListRangeAttribute attribute = new(1, 3);
+		List<int> values = [1, 2, 3];
+
+		attribute.GetValidationResult(values, CreateValidationContext("Values"))
+			.ShouldBe(ValidationResult.Success);
+		attribute.GetValidationResult(values, CreateValidationContext("Values"))
+			.ShouldBe(ValidationResult.Success);
+	}
+
+	[Fact]
+	public void ListRange_NullOperandType_ThrowsDuringConversionSetup()
+	{
+		ListRangeAttribute attribute = new(null!, "1", "3");
+
+		InvalidOperationException exception = Should.Throw<InvalidOperationException>(
+			() => attribute.GetValidationResult(new List<int> { 2 }, DummyValidationContext));
+
+		exception.Message.ShouldBe("Must set operand type");
+	}
+
 }

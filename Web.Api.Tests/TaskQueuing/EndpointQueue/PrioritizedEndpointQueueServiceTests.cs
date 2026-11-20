@@ -840,3 +840,43 @@ public sealed class PrioritizedEndpointQueueServiceTests
 		allStats.Count.ShouldBe(Enum.GetValues<TaskPriority>().Length);
 	}
 }
+
+public sealed class PrioritizedEndpointQueueServiceBehaviorTests
+{
+
+
+	private static TaskCompletionSource CreateSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+	private sealed class MockServiceProvider : IServiceProvider
+	{
+		public object? GetService(Type serviceType) => null;
+	}
+
+	[Fact]
+	public async Task PrioritizedService_MapsPriorityAndCancelsMatchingPendingTasks()
+	{
+		MockServiceProvider provider = new();
+		using PrioritizedEndpointQueueService service = new(provider);
+		const string key = "priority-service";
+		TaskCompletionSource started = CreateSignal();
+		TaskCompletionSource release = CreateSignal();
+		Task<int> active = service.ExecuteAsync(key, async _ =>
+		{
+			started.TrySetResult();
+			await release.Task;
+			return 0;
+		}, TaskPriority.Normal, Current.CancellationToken);
+		await started.Task;
+		Task<int> high = service.ExecuteAsync(key, _ => Task.FromResult(5), customPriority: 2, cancellationToken: Current.CancellationToken);
+
+		(await service.CancelTasksAsync(key, TaskPriority.High)).ShouldBeTrue();
+		await Should.ThrowAsync<TaskCanceledException>(async () => await high);
+
+		release.TrySetResult();
+		(await active).ShouldBe(0);
+		PrioritizedQueueStats stats = await service.GetQueueStatsAsync(key);
+		stats.PriorityBreakdown[TaskPriority.High].CancelledTasks.ShouldBe(1);
+		(await service.CancelTasksAsync("missing", TaskPriority.Low)).ShouldBeFalse();
+	}
+
+}

@@ -411,3 +411,44 @@ public sealed class QueryParametersTests
 		result.ShouldBe("   ");
 	}
 }
+
+public sealed class QueryParametersBehaviorTests
+{
+
+	[Theory]
+	[InlineData(true, false, false, "abc123", "abc123")]
+	[InlineData(false, true, false, "abc", "abc")]
+	[InlineData(false, false, true, "123", "123")]
+	[InlineData(false, true, true, "abc", "abc")]
+	[InlineData(false, true, true, "123", "123")]
+	[InlineData(true, false, false, "abc-123", "fallback")]
+	[InlineData(false, true, false, "123", "fallback")]
+	[InlineData(false, false, true, "abc", "fallback")]
+	[InlineData(true, true, true, "abc123", "abc123")]
+	public void SanitizeSqlParameter_WithCharacterModes_ShouldSelectExpectedResult(
+		bool onlyAlphanumeric,
+		bool onlyAlphaChars,
+		bool onlyNumberChars,
+		string input,
+		string expected)
+	{
+		input.SanitizeSqlParameter(onlyAlphanumeric, onlyAlphaChars, onlyNumberChars, defaultValue: "fallback").ShouldBe(expected);
+	}
+
+	[Theory]
+	[InlineData(null, null, null, null, null)]
+	[InlineData("value", 4, null, "fallback", "fallback")]
+	[InlineData("value", 5, 5, "bad", "value")]
+	[InlineData("value", 5, 6, "bad", "bad")]
+	[InlineData("value", null, 5, "bad", "value")]
+	public void SanitizeSqlParameter_WithNullableLengths_ShouldRespectBoundaries(
+		string? input,
+		int? maxLength,
+		int? minLength,
+		string? defaultValue,
+		string? expected)
+	{
+		input.SanitizeSqlParameter(maxLength: maxLength, minLength: minLength, defaultValue: defaultValue).ShouldBe(expected);
+	}
+
+}

@@ -138,7 +138,7 @@ public static class QueryParameters
 		{
 			if (onlyAlphanumeric || onlyAlphaChars || onlyNumberChars)
 			{
-				if((onlyAlphanumeric && parameter.IsAlphanumeric()) || (onlyAlphaChars && parameter.IsAlphaOnly()) || (onlyNumberChars && parameter.IsNumericOnly()))
+				if ((onlyAlphanumeric && parameter.IsAlphanumeric()) || (onlyAlphaChars && parameter.IsAlphaOnly()) || (onlyNumberChars && parameter.IsNumericOnly()))
 				{
 					result = parameter;
 				}

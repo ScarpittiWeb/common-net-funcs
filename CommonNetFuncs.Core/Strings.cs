@@ -2072,10 +2072,7 @@ public static partial class Strings
 	{
 		// TimeSpan.ToString() is the "c" format ([-][d.]hh:mm:ss[.fffffff], max 26 chars), which is also TryFormat's default
 		Span<char> formatted = stackalloc char[32];
-		if (!t.TryFormat(formatted, out int written))
-		{
-			return TimespanToShortFormFallback(t);
-		}
+		t.TryFormat(formatted, out int written);
 
 		ReadOnlySpan<char> stringForm = formatted[..written];
 
@@ -2114,46 +2111,6 @@ public static partial class Strings
 
 		return stringForm.ToString();
 	}
-
-	// Original string-based implementation, only reached if TryFormat unexpectedly needs more than the stack buffer
-	private static string TimespanToShortFormFallback(in TimeSpan t)
-	{
-		string stringForm = t.ToString();
-
-		if (t.Milliseconds > 0)
-		{
-			stringForm = stringForm.Replace($".{stringForm.Split(".")[^1]}", string.Empty); //Remove milliseconds component
-
-		}
-
-		stringForm = stringForm.Split(".")[^1];
-		string days = string.Empty;
-
-		if (t.Days > 0)
-		{
-			days = t.Days.ToString();
-			if (days[..1].StrComp("0"))
-			{
-				days = days[1..];
-			}
-		}
-		else
-		{
-			if (stringForm[..3].StrComp("00:"))
-			{
-				stringForm = stringForm[3..];  //Remove hours if there aren't any
-
-				if (stringForm[..1].StrComp("0"))
-				{
-					stringForm = stringForm[1..]; //Remove leading 0 in minutes
-
-				}
-			}
-		}
-
-		return string.IsNullOrWhiteSpace(days) ? stringForm : $"{days}:{stringForm}";
-	}
-
 
 	/// <summary>
 	/// Takes in a string and returns the hashed value of it using the passed in hashing algorithm

@@ -1,8 +1,8 @@
-using System.Text;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using System.Text;
 
 namespace CommonNetFuncs.SubsetModelBinder;
 
@@ -28,25 +28,21 @@ public sealed class SubsetValidatorGenerator : IIncrementalGenerator
 
 	private static SubsetModel? CreateModel(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
 	{
-		// ForAttributeWithMetadataName only invokes the transform for nodes whose attribute binds to FullyQualifiedAttributeName,
-		// and TargetSymbol == GetDeclaredSymbol(TargetNode).
+		// ForAttributeWithMetadataName only invokes the transform for class declarations whose attribute binds to FullyQualifiedAttributeName,
+		// and TargetSymbol is the declared symbol for TargetNode.
 		ClassDeclarationSyntax subsetClass = (ClassDeclarationSyntax)context.TargetNode;
-		if (context.TargetSymbol is not INamedTypeSymbol subsetClassSymbol)
-		{
-			return null;
-		}
+		INamedTypeSymbol subsetClassSymbol = (INamedTypeSymbol)context.TargetSymbol;
 
 		List<DiagnosticInfo> diagnostics = [];
-		HashSet<string> reportedDiagnostics = [];
 
 		// Check if the class is marked as partial
 		if (!subsetClass.Modifiers.Any(SyntaxKind.PartialKeyword))
 		{
-			AddDiagnosticOnce(diagnostics, reportedDiagnostics, "SG0003", "Class must be partial", $"The class '{subsetClassSymbol.Name}' decorated with SubsetOf attribute must be marked as partial", subsetClass.Identifier.GetLocation());
+			diagnostics.Add(new DiagnosticInfo("SG0003", "Class must be partial", $"The class '{subsetClassSymbol.Name}' decorated with SubsetOf attribute must be marked as partial", subsetClass.Identifier.GetLocation()));
 		}
 
-		AttributeData? subsetOfAttribute = subsetClassSymbol.GetAttributes().FirstOrDefault(a => string.Equals(a.AttributeClass?.Name, AttributeName));
-		if (subsetOfAttribute == null || subsetOfAttribute.ConstructorArguments[0].Value is not INamedTypeSymbol originalTypeSymbol)
+		AttributeData subsetOfAttribute = subsetClassSymbol.GetAttributes().First(a => string.Equals(a.AttributeClass?.Name, AttributeName));
+		if (subsetOfAttribute.ConstructorArguments.Length == 0 || subsetOfAttribute.ConstructorArguments[0].Value is not INamedTypeSymbol originalTypeSymbol)
 		{
 			return new SubsetModel(null, null, null, false, new EquatableArray<DiagnosticInfo>(diagnostics.ToArray()));
 		}
@@ -63,25 +59,17 @@ public sealed class SubsetValidatorGenerator : IIncrementalGenerator
 			cancellationToken.ThrowIfCancellationRequested();
 			if (!originalProperties.TryGetValue(subsetProperty.Name, out IPropertySymbol? originalProperty))
 			{
-				AddDiagnosticOnce(diagnostics, reportedDiagnostics, "SG0002", "Property not found", $"Property '{subsetProperty.Name}' is not present in the parent class '{originalTypeSymbol.Name}'{(allowInheritedProperties ? " or its base classes" : string.Empty)}",
-					subsetProperty.Locations.FirstOrDefault());
+				diagnostics.Add(new DiagnosticInfo("SG0002", "Property not found", $"Property '{subsetProperty.Name}' is not present in the parent class '{originalTypeSymbol.Name}'{(allowInheritedProperties ? " or its base classes" : string.Empty)}",
+					subsetProperty.Locations.FirstOrDefault()));
 			}
 			else if (!ignoreType && !SymbolEqualityComparer.Default.Equals(subsetProperty.Type, originalProperty.Type))
 			{
-				AddDiagnosticOnce(diagnostics, reportedDiagnostics, "SG0001", "Property type mismatch", $"Property '{subsetProperty.Name}' has a different type than in the original class '{originalTypeSymbol.Name}'{(allowInheritedProperties ? " or its base classes" : string.Empty)}. Expected: {originalProperty.Type.Name}, Found: {subsetProperty.Type.Name}",
-					subsetProperty.Locations.FirstOrDefault());
+				diagnostics.Add(new DiagnosticInfo("SG0001", "Property type mismatch", $"Property '{subsetProperty.Name}' has a different type than in the original class '{originalTypeSymbol.Name}'{(allowInheritedProperties ? " or its base classes" : string.Empty)}. Expected: {originalProperty.Type.Name}, Found: {subsetProperty.Type.Name}",
+					subsetProperty.Locations.FirstOrDefault()));
 			}
 		}
 
 		return new SubsetModel(subsetClassSymbol.ContainingNamespace.ToDisplayString(), subsetClassSymbol.Name, originalTypeSymbol.Name, isMvcApp, new EquatableArray<DiagnosticInfo>(diagnostics.ToArray()));
-	}
-
-	private static void AddDiagnosticOnce(List<DiagnosticInfo> diagnostics, HashSet<string> reportedDiagnostics, string id, string title, string message, Location? location)
-	{
-		if (reportedDiagnostics.Add($"{id}:{location}:{message}"))
-		{
-			diagnostics.Add(new DiagnosticInfo(id, title, message, location));
-		}
 	}
 
 	private static void Emit(SourceProductionContext context, SubsetModel model)
@@ -89,7 +77,7 @@ public sealed class SubsetValidatorGenerator : IIncrementalGenerator
 		foreach (DiagnosticInfo diagnostic in model.Diagnostics.Items)
 		{
 			DiagnosticDescriptor descriptor = new(diagnostic.Id, diagnostic.Title, diagnostic.Message, nameof(SubsetValidatorGenerator), DiagnosticSeverity.Error, isEnabledByDefault: true);
-			context.ReportDiagnostic(Diagnostic.Create(descriptor, diagnostic.Location ?? Location.None));
+			context.ReportDiagnostic(Diagnostic.Create(descriptor, diagnostic.Location!));
 		}
 
 		if (model.ClassName != null)

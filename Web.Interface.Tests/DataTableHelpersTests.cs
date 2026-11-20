@@ -325,3 +325,33 @@ public sealed class DataTableHelpersTests
 		result.SearchValues.Count.ShouldBe(0);
 	}
 }
+
+public sealed class DataTableHelpersBehaviorTests
+{
+
+	[Fact]
+	public void GetDataTableRequest_ExpandingAndShrinkingSnapshot_PreservesAllEnumeratedFields()
+	{
+		KeyValuePair<string, StringValues>[] fields =
+		[
+			new("draw", new StringValues("17")),
+			new("start", new StringValues("25"))
+		];
+		IFormCollection form = A.Fake<IFormCollection>();
+		A.CallTo(() => form.Count).Returns(1);
+		A.CallTo(() => ((IEnumerable<KeyValuePair<string, StringValues>>)form).GetEnumerator())
+			.ReturnsLazily(() => ((IEnumerable<KeyValuePair<string, StringValues>>)fields).GetEnumerator());
+
+		HttpRequest request = A.Fake<HttpRequest>();
+		A.CallTo(() => request.ContentType).Returns("application/x-www-form-urlencoded");
+		A.CallTo(() => request.Form).Returns(form);
+
+		DataTableRequest result = request.GetDataTableRequest();
+
+		result.Draw.ShouldBe("17");
+		result.Skip.ShouldBe(25);
+		result.PageSize.ShouldBe(0);
+		result.SearchValues.ShouldBeEmpty();
+	}
+
+}

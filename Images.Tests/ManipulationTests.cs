@@ -1,5 +1,6 @@
 ﻿using CommonNetFuncs.Images;
 using SkiaSharp;
+using System.Text;
 using xRetry.v3;
 
 namespace Images.Tests;
@@ -3281,4 +3282,263 @@ public sealed class ManipulationTests : IDisposable
 	}
 
 	#endregion
+}
+
+public sealed class ImageManipulationBehaviorTests
+{
+	private static readonly string TestDataDirectory = Path.Combine(AppContext.BaseDirectory, "TestData");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static MemoryStream OpenTestImage() =>
+		new(File.ReadAllBytes(Path.Combine(TestDataDirectory, "test.png")));
+
+	private static SKBitmap CreateBitmap()
+	{
+		SKBitmap bitmap = new(8, 8);
+		bitmap.Erase(SKColors.Red);
+		return bitmap;
+	}
+
+	private sealed class NonSeekableReadStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public override bool CanSeek => false;
+	}
+
+	[Fact]
+	public void ResizeImage_TiffUnsupported_ReturnsFalseWithoutOutput()
+	{
+		string input = Path.Combine(TestDataDirectory, "test.tiff");
+		string output = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
+
+		try
+		{
+			bool result = Manipulation.ResizeImage(input, output, 8, 8);
+
+			result.ShouldBeFalse();
+			File.Exists(output).ShouldBeFalse();
+		}
+		finally
+		{
+			File.Delete(output);
+		}
+	}
+
+	[Fact]
+	public void ResizeImage_SameDimensions_DoesNotResizeAndStillEncodes()
+	{
+		using SKBitmap source = SKBitmap.Decode(Path.Combine(TestDataDirectory, "test.png"));
+		using MemoryStream output = new();
+
+		bool result = Manipulation.ResizeImage(
+			File.ReadAllBytes(Path.Combine(TestDataDirectory, "test.png")),
+			output,
+			new ResizeOptions
+			{
+				Size = new ImageSize(source.Width, source.Height),
+				Mode = ResizeMode.Max
+			},
+			SKEncodedImageFormat.Png);
+
+		result.ShouldBeTrue();
+		using SKBitmap decoded = SKBitmap.Decode(output);
+		decoded.Width.ShouldBe(source.Width);
+		decoded.Height.ShouldBe(source.Height);
+	}
+
+	[Fact]
+	public void ResizeImage_CropMode_UsesExactTargetDimensions()
+	{
+		using MemoryStream input = OpenTestImage();
+		using MemoryStream output = new();
+
+		Manipulation.ResizeImage(input, output, new ResizeOptions
+		{
+			Size = new ImageSize(7, 11),
+			Mode = ResizeMode.Crop
+		}, SKEncodedImageFormat.Png).ShouldBeTrue();
+
+		using SKBitmap decoded = SKBitmap.Decode(output);
+		decoded.Width.ShouldBe(7);
+		decoded.Height.ShouldBe(11);
+	}
+
+	[Fact]
+	public void ResizeImage_NonSeekableInput_EncodesImageAndLeavesOutputRewound()
+	{
+		using NonSeekableReadStream input = new(File.ReadAllBytes(Path.Combine(TestDataDirectory, "test.png")));
+		using MemoryStream output = new();
+
+		Manipulation.ResizeImage(input, output, 9, 6, SKEncodedImageFormat.Png).ShouldBeTrue();
+
+		output.Position.ShouldBe(0);
+		using SKBitmap decoded = SKBitmap.Decode(output);
+		decoded.Width.ShouldBe(9);
+		decoded.Height.ShouldBe(6);
+	}
+
+	[Fact]
+	public void ReduceImageQuality_SameFileUnsupportedEncoder_ReturnsFalseAndPreservesInput()
+	{
+		string path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
+		File.Copy(Path.Combine(TestDataDirectory, "test.png"), path);
+		byte[] original = File.ReadAllBytes(path);
+
+		try
+		{
+			bool result = Manipulation.ReduceImageQualityBase(
+				path,
+				path,
+				80,
+				null,
+				null,
+				null,
+				null,
+				SKEncodedImageFormat.Gif,
+				false,
+				null);
+
+			result.ShouldBeFalse();
+			File.ReadAllBytes(path).ShouldBe(original);
+		}
+		finally
+		{
+			File.Delete(path);
+		}
+	}
+
+	[Fact]
+	public void ResizeTo_UnsupportedEncoder_Throws()
+	{
+		using MemoryStream input = OpenTestImage();
+		using MemoryStream output = new();
+
+		Should.Throw<InvalidOperationException>(() =>
+			input.ResizeTo(output, 8, 8, SKEncodedImageFormat.Gif, 100));
+	}
+
+	[Fact]
+	public void ResizeTo_NullBitmap_ThrowsInsteadOfDereferencingPixels()
+	{
+		SKBitmap? bitmap = null;
+
+		Should.Throw<ArgumentNullException>(() => bitmap!.ResizeTo(4, 4));
+	}
+
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public void TryDetectImageType_InvalidInputs_ReturnFalse(bool useStream)
+	{
+		SKEncodedImageFormat? format;
+		bool result = useStream
+			? Manipulation.TryDetectImageType(new MemoryStream(Encoding.UTF8.GetBytes("definitely not an image")), out format)
+			: Manipulation.TryDetectImageType((string)null!, out format);
+
+		result.ShouldBeFalse();
+		format.ShouldBeNull();
+	}
+
+	[Theory]
+	[InlineData("path")]
+	[InlineData("stream")]
+	[InlineData("span")]
+	public void TryGetMetadata_InvalidEncodedData_ReturnsFalse(string inputKind)
+	{
+		byte[] invalid = Encoding.UTF8.GetBytes("not image data");
+		ImageInfo metadata;
+		bool result;
+		if (inputKind == "path")
+		{
+			string path = Path.GetTempFileName();
+			try
+			{
+				File.WriteAllBytes(path, invalid);
+				result = Manipulation.TryGetMetadata(path, out metadata);
+			}
+			finally
+			{
+				File.Delete(path);
+			}
+		}
+		else if (inputKind == "stream")
+		{
+			using MemoryStream stream = new(invalid);
+			result = Manipulation.TryGetMetadata(stream, out metadata);
+		}
+		else
+		{
+			result = Manipulation.TryGetMetadata(invalid, out metadata);
+		}
+
+		result.ShouldBeFalse();
+		metadata.Width.ShouldBe(0);
+		metadata.Height.ShouldBe(0);
+	}
+
+	[Fact]
+	public void ConvertImageFormat_SpanMutation_IsObservableInOutput()
+	{
+		byte[] bytes = File.ReadAllBytes(Path.Combine(TestDataDirectory, "test.png"));
+		using SKBitmap source = SKBitmap.Decode(bytes);
+		using MemoryStream output = new();
+
+		Manipulation.ConvertImageFormat(bytes, output, SKEncodedImageFormat.Png, bitmap =>
+		{
+			SKBitmap copy = new(bitmap.Info);
+			copy.Erase(SKColors.Magenta);
+			return copy;
+		}).ShouldBeTrue();
+
+		using SKBitmap result = SKBitmap.Decode(output);
+		result.GetPixel(0, 0).ShouldBe(new SKColor(255, 0, 255, 255));
+	}
+
+	[Fact]
+	public async Task ConvertImageFormatAsync_InferFormatFromOutputExtension_CreatesPng()
+	{
+		string input = Path.Combine(TestDataDirectory, "test.jpg");
+		string output = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
+
+		try
+		{
+			bool result = await Manipulation.ConvertImageFormatAsync(input, output);
+
+			result.ShouldBeTrue();
+			Manipulation.TryDetectImageType(output, out SKEncodedImageFormat? format).ShouldBeTrue();
+			format.ShouldBe(SKEncodedImageFormat.Png);
+		}
+		finally
+		{
+			File.Delete(output);
+		}
+	}
+
+	[Theory]
+	[InlineData("webp", SKEncodedImageFormat.Webp)]
+	[InlineData(".WEBP", SKEncodedImageFormat.Webp)]
+	public void GetImageFormatByExtension_Webp_IsCaseInsensitive(string extension, SKEncodedImageFormat expected)
+	{
+		Manipulation.GetImageFormatByExtension(extension).ShouldBe(expected);
+	}
+
 }

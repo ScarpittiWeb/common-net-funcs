@@ -1,6 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
 using CommonNetFuncs.Web.Common.ValidationAttributes;
+using System.ComponentModel.DataAnnotations;
 
 namespace Web.Common.Tests.ValidationAttributes;
 
@@ -416,4 +416,31 @@ public sealed class DenyCharactersAttributeTests : ValidationTestBase
 			result.ShouldNotBeNull();
 		}
 	}
+}
+
+public sealed class DenyCharactersAttributeBehaviorTests : ValidationTestBase
+{
+
+
+
+
+	[Fact]
+	public void DenyCharacters_FormatErrorMessage_WithoutConfiguredMessage_UsesFallback()
+	{
+		DenyCharactersAttribute attribute = new("<>")
+		{
+			ErrorMessage = null!,
+			ErrorMessageResourceName = nameof(EmptyValidationResource.Empty),
+			ErrorMessageResourceType = typeof(EmptyValidationResource),
+		};
+
+		attribute.FormatErrorMessage("FileName")
+			.ShouldBe("The field FileName must not contain any of the following characters: '<>'.");
+	}
+
+}
+
+public static class EmptyValidationResource
+{
+	public static string Empty => string.Empty;
 }

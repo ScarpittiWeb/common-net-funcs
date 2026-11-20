@@ -11,21 +11,23 @@ bound large or untrusted exports.
 
 ## Contents
 
-- [Setup](#setup)
-- [Export APIs](#export-apis)
-  - [`GenericExcelExport`](#genericexcelexport)
-  - [`AddGenericTable`](#addgenerictable)
-  - [`ExcelExport`](#excelexport)
-  - [`ExportFromTable`](#exportfromtable)
-- [Cell, range, and named-range helpers](#cell-range-and-named-range-helpers)
-- [Reading worksheets and tables](#reading-worksheets-and-tables)
-- [Tables and measurements](#tables-and-measurements)
-- [Images](#images)
-- [Styles, borders, and fonts](#styles-borders-and-fonts)
-- [Writing workbooks](#writing-workbooks)
-- [Export behavior and errors](#export-behavior-and-errors)
-- [Installation](#installation)
-- [License](#license)
+- [CommonNetFuncs.Excel.ClosedXml](#commonnetfuncsexcelclosedxml)
+  - [Contents](#contents)
+  - [Setup](#setup)
+  - [Export APIs](#export-apis)
+    - [`GenericExcelExport`](#genericexcelexport)
+    - [`AddGenericTable`](#addgenerictable)
+    - [`ExcelExport`](#excelexport)
+    - [`ExportFromTable`](#exportfromtable)
+  - [Cell, range, and named-range helpers](#cell-range-and-named-range-helpers)
+  - [Reading worksheets and tables](#reading-worksheets-and-tables)
+  - [Tables and measurements](#tables-and-measurements)
+  - [Images](#images)
+  - [Styles, borders, and fonts](#styles-borders-and-fonts)
+  - [Writing workbooks](#writing-workbooks)
+  - [Export behavior and errors](#export-behavior-and-errors)
+  - [Installation](#installation)
+  - [License](#license)
 
 ## Setup
 

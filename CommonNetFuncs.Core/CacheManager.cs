@@ -1,7 +1,7 @@
+﻿using CommonNetFuncs.Core.CollectionClasses;
+using CommonNetFuncs.Core.Internal;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
-using CommonNetFuncs.Core.CollectionClasses;
-using CommonNetFuncs.Core.Internal;
 
 namespace CommonNetFuncs.Core;
 

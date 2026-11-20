@@ -1,5 +1,5 @@
-﻿using System.IO.Compression;
-using CommonNetFuncs.Email;
+﻿using CommonNetFuncs.Email;
+using System.IO.Compression;
 using static CommonNetFuncs.Email.Email;
 using static Xunit.TestContext;
 

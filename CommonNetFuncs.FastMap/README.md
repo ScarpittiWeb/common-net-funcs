@@ -8,10 +8,12 @@ Expression-tree mapping for `net11.0` and `netstandard2.1`.
 
 ## Contents
 
-- [Installation](#installation)
-- [`FastMap`](#fastmap)
-- [Cache management](#cache-management)
-- [License](#license)
+- [CommonNetFuncs.FastMap](#commonnetfuncsfastmap)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [`FastMap`](#fastmap)
+  - [Cache management](#cache-management)
+  - [License](#license)
 
 ## Installation
 

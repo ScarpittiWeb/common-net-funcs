@@ -1,10 +1,10 @@
-﻿using System.Text.Json;
-using System.Text.Json.Serialization;
-using CommonNetFuncs.Web.Middleware;
+﻿using CommonNetFuncs.Web.Middleware;
 using FakeItEasy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using xRetry.v3;
 
 namespace Web.Middleware.Tests;

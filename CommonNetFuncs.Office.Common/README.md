@@ -9,11 +9,13 @@ LibreOffice process. The package targets `net11.0` and `netstandard2.1`.
 
 ## Contents
 
-- [Installation](#installation)
-- [Public API](#public-api)
-- [Behavior and requirements](#behavior-and-requirements)
-- [Usage examples for every method and exception constructor](#usage-examples-for-every-method-and-exception-constructor)
-- [License](#license)
+- [CommonNetFuncs.Office.Common](#commonnetfuncsofficecommon)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [Public API](#public-api)
+  - [Behavior and requirements](#behavior-and-requirements)
+  - [Usage examples for every method and exception constructor](#usage-examples-for-every-method-and-exception-constructor)
+  - [License](#license)
 
 ## Installation
 

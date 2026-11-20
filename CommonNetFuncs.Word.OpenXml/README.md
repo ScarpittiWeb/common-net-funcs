@@ -12,10 +12,12 @@ visible text, or support the binary `.doc` format.
 
 ## Contents
 
-- [Installation](#installation)
-- [API and behavior](#api-and-behavior)
-- [Usage examples for every overload](#usage-examples-for-every-overload)
-- [License](#license)
+- [CommonNetFuncs.Word.OpenXml](#commonnetfuncswordopenxml)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [API and behavior](#api-and-behavior)
+  - [Usage examples for every overload](#usage-examples-for-every-overload)
+  - [License](#license)
 
 ## Installation
 

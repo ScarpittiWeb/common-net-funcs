@@ -8,16 +8,18 @@
 
 ## Contents
 
-- [Installation and activation](#installation-and-activation)
-- [Supported usage](#supported-usage)
-- [Attribute inputs](#attribute-inputs)
-- [Generated contract](#generated-contract)
-- [Diagnostics](#diagnostics)
-- [Generator public API](#generator-public-api)
-- [Validation details](#validation-details)
-- [Current runtime and code-shape limitations](#current-runtime-and-code-shape-limitations)
-- [Target and package layout](#target-and-package-layout)
-- [License](#license)
+- [CommonNetFuncs.SubsetModelBinder.Generator](#commonnetfuncssubsetmodelbindergenerator)
+  - [Contents](#contents)
+  - [Installation and activation](#installation-and-activation)
+  - [Supported usage](#supported-usage)
+  - [Attribute inputs](#attribute-inputs)
+  - [Generated contract](#generated-contract)
+  - [Diagnostics](#diagnostics)
+  - [Generator public API](#generator-public-api)
+  - [Validation details](#validation-details)
+  - [Current runtime and code-shape limitations](#current-runtime-and-code-shape-limitations)
+  - [Target and package layout](#target-and-package-layout)
+  - [License](#license)
 
 ## Installation and activation
 

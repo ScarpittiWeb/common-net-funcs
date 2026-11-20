@@ -1,11 +1,12 @@
-﻿using System.Data;
-using System.Runtime.CompilerServices;
-using AutoFixture;
+﻿using AutoFixture;
 using CommonNetFuncs.Excel.OpenXml;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using System.Data;
+using System.Runtime.CompilerServices;
 using xRetry.v3;
+using static CommonNetFuncs.Excel.OpenXml.Common;
 
 namespace Excel.OpenXml.Tests;
 
@@ -910,4 +911,166 @@ public sealed class SaxExportTests
 		sheet.ShouldNotBeNull();
 		sheet.SheetId?.Value.ShouldBeGreaterThan(0u);
 	}
+}
+
+public sealed class OpenXmlSaxExportBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static SpreadsheetDocument CreateDocument(MemoryStream stream, out WorksheetPart worksheetPart)
+	{
+		SpreadsheetDocument document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook);
+		uint sheetId = document.CreateNewSheet("Data");
+		worksheetPart = document.WorkbookPart!.GetPartById(
+			document.WorkbookPart.Workbook!.Descendants<Sheet>().Single(x => x.SheetId!.Value == sheetId).Id!) as WorksheetPart
+			?? throw new InvalidOperationException();
+		return document;
+	}
+
+	private static MemoryStream BuildOrphanedTableWorkbook()
+	{
+		MemoryStream result = new();
+		using SpreadsheetDocument document = SpreadsheetDocument.Create(result, SpreadsheetDocumentType.Workbook);
+		WorkbookPart workbookPart = document.AddWorkbookPart();
+		workbookPart.Workbook = new Workbook(new Sheets());
+		WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
+		worksheetPart.Worksheet = new Worksheet(new SheetData());
+		TableDefinitionPart tablePart = worksheetPart.AddNewPart<TableDefinitionPart>();
+		tablePart.Table = new Table
+		{
+			Id = 1,
+			Name = "Orphan",
+			DisplayName = "Orphan",
+			Reference = "A1:A1",
+			TableColumns = new TableColumns(new TableColumn { Id = 1, Name = "Value" }) { Count = 1 }
+		};
+		document.Save();
+		result.Position = 0;
+		return result;
+	}
+
+	private static MemoryStream BuildLookupDefectWorkbook(string defect)
+	{
+		MemoryStream result = new();
+		using SpreadsheetDocument document = SpreadsheetDocument.Create(result, SpreadsheetDocumentType.Workbook);
+		WorkbookPart workbookPart = document.AddWorkbookPart();
+		workbookPart.Workbook = new Workbook();
+		WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
+		Row row = new();
+		if (defect != "NoRowIndex")
+		{
+			row.RowIndex = 1;
+		}
+		Cell cell = new();
+		cell.CellReference = defect switch
+		{
+			"NoCellReference" => null,
+			"MalformedCellReference" => "INVALID",
+			_ => "A1"
+		};
+		cell.CellValue = new CellValue("Header");
+		row.AppendChild(cell);
+		worksheetPart.Worksheet = new Worksheet(new SheetData(row));
+		TableDefinitionPart tablePart = worksheetPart.AddNewPart<TableDefinitionPart>();
+		tablePart.Table = new Table
+		{
+			Id = 1,
+			Name = "Lookup",
+			DisplayName = "Lookup",
+			Reference = "A1:A1",
+			TableColumns = new TableColumns(new TableColumn { Id = 1, Name = "Header" }) { Count = 1 }
+		};
+		string partId = workbookPart.GetIdOfPart(worksheetPart);
+		workbookPart.Workbook.AppendChild(new Sheets(new Sheet { Id = partId, SheetId = 1, Name = "Data" }));
+		document.Save();
+		result.Position = 0;
+		return result;
+	}
+
+	private static async IAsyncEnumerable<OpenXmlExportRow> ThrowingAsyncRows()
+	{
+		yield return new OpenXmlExportRow { Value = "first" };
+		await Task.Yield();
+		throw new InvalidOperationException("async source failed");
+	}
+
+	private sealed class OpenXmlExportRow
+	{
+		public string? Value { get; set; }
+	}
+
+	private sealed class ThrowingExportRow
+	{
+		public string Value => throw new InvalidOperationException("getter failed");
+	}
+
+	private sealed class ThrowingValue
+	{
+		public override string ToString() => throw new InvalidOperationException("serialization failed");
+	}
+
+	[Fact]
+	public async Task ExportFromTableSaxAsync_DataTableWithSkippedColumnAndTable_ProducesExactVisibleColumns()
+	{
+		using MemoryStream stream = new();
+		using SpreadsheetDocument document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook);
+		WorkbookPart workbookPart = document.InitializeExcelFile();
+		WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
+		using DataTable table = new();
+		table.Columns.Add("Keep");
+		table.Columns.Add("Skip");
+		table.Rows.Add("shown", "hidden");
+
+		await CommonNetFuncs.Excel.OpenXml.Export.ExportFromTableSaxAsync(document, worksheetPart, table, new ExportSettings(createTable: true, tableName: "Visible", skipColumnNames: ["Skip"]), TestContext.Current.CancellationToken);
+
+		Table tableDefinition = worksheetPart.TableDefinitionParts.Single().Table!;
+		tableDefinition.TableColumns!.Elements<TableColumn>().Select(x => x.Name!.Value).ShouldBe(["Keep"]);
+	}
+
+	[Fact]
+	public async Task ExportFromTableSaxAsync_PropertyGetterFailure_IsSwallowed()
+	{
+		using MemoryStream stream = new();
+		using SpreadsheetDocument document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook);
+		WorkbookPart workbookPart = document.InitializeExcelFile();
+		WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
+
+		await Should.NotThrowAsync(() => CommonNetFuncs.Excel.OpenXml.Export.ExportFromTableSaxAsync(
+			document, worksheetPart, new[] { new ThrowingExportRow() }));
+	}
+
+	[Fact]
+	public async Task ExportFromTableSaxAsync_DataTableWithDisposedDocument_IsSwallowed()
+	{
+		SpreadsheetDocument document = SpreadsheetDocument.Create(new MemoryStream(), SpreadsheetDocumentType.Workbook);
+		WorkbookPart workbookPart = document.InitializeExcelFile();
+		WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
+		using DataTable table = new();
+		table.Columns.Add("Value");
+		table.Rows.Add("value");
+		document.Dispose();
+
+		await Should.NotThrowAsync(() =>
+			CommonNetFuncs.Excel.OpenXml.Export.ExportFromTableSaxAsync(document, worksheetPart, table));
+	}
+
 }

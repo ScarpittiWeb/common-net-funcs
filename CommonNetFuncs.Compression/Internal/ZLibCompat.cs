@@ -1,4 +1,5 @@
 ﻿#if NETSTANDARD2_1
+
 using System.IO.Compression;
 
 namespace CommonNetFuncs.Compression.Internal;

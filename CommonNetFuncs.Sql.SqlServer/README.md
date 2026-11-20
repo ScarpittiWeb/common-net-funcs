@@ -8,15 +8,17 @@ SQL Server implementation of `IDirectQuery` from `CommonNetFuncs.Sql.Common`. Ta
 
 ## Contents
 
-- [Important behavior](#important-behavior)
-- [Construction](#construction)
-- [All `DirectQuery` operations](#all-directquery-operations)
-- [Streaming and ownership](#streaming-and-ownership)
-- [Parameterized SQL Server commands](#parameterized-sql-server-commands)
-- [Transactions](#transactions)
-- [Diagnostic T-SQL rendering](#diagnostic-t-sql-rendering)
-- [Installation](#installation)
-- [License](#license)
+- [CommonNetFuncs.Sql.SqlServer](#commonnetfuncssqlsqlserver)
+  - [Contents](#contents)
+  - [Important behavior](#important-behavior)
+  - [Construction](#construction)
+  - [All `DirectQuery` operations](#all-directquery-operations)
+  - [Streaming and ownership](#streaming-and-ownership)
+  - [Parameterized SQL Server commands](#parameterized-sql-server-commands)
+  - [Transactions](#transactions)
+  - [Diagnostic T-SQL rendering](#diagnostic-t-sql-rendering)
+  - [Installation](#installation)
+  - [License](#license)
 
 ## Important behavior
 

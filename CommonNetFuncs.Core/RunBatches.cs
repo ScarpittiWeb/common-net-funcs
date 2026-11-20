@@ -1,9 +1,9 @@
 ﻿namespace CommonNetFuncs.Core;
 
-using CommonNetFuncs.Core.Internal;
-
 /// <summary>
 /// Run batches of operations on a collection of items.
+
+using CommonNetFuncs.Core.Internal;
 /// </summary>
 public static class RunBatches
 {

@@ -8,15 +8,17 @@ PostgreSQL/Npgsql implementation of `IDirectQuery` from `CommonNetFuncs.Sql.Comm
 
 ## Contents
 
-- [Important behavior](#important-behavior)
-- [Construction](#construction)
-- [All `DirectQuery` operations](#all-directquery-operations)
-- [Streaming and ownership](#streaming-and-ownership)
-- [Parameterized PostgreSQL SQL](#parameterized-postgresql-sql)
-- [Transactions](#transactions)
-- [Diagnostic SQL rendering](#diagnostic-sql-rendering)
-- [Installation](#installation)
-- [License](#license)
+- [CommonNetFuncs.Sql.PostgreSql](#commonnetfuncssqlpostgresql)
+  - [Contents](#contents)
+  - [Important behavior](#important-behavior)
+  - [Construction](#construction)
+  - [All `DirectQuery` operations](#all-directquery-operations)
+  - [Streaming and ownership](#streaming-and-ownership)
+  - [Parameterized PostgreSQL SQL](#parameterized-postgresql-sql)
+  - [Transactions](#transactions)
+  - [Diagnostic SQL rendering](#diagnostic-sql-rendering)
+  - [Installation](#installation)
+  - [License](#license)
 
 ## Important behavior
 

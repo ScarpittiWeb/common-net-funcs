@@ -1,6 +1,6 @@
-﻿using System.Reflection;
+﻿using CommonNetFuncs.Core;
+using System.Reflection;
 using System.Runtime.CompilerServices;
-using CommonNetFuncs.Core;
 using static CommonNetFuncs.DeepClone.ExpressionTrees;
 
 namespace DeepClone.Tests;
@@ -646,4 +646,40 @@ public sealed class ExpressionTreesTests : IDisposable
 			clone.Child.NumberArray!.SequenceEqual(new[] { 3 }).ShouldBeTrue();
 		}
 	}
+}
+
+public sealed class ExpressionTreesBehaviorTests
+{
+	private sealed class CloneRoot
+	{
+		public CloneChild? Child { get; set; }
+	}
+
+	private sealed class CloneChild
+	{
+		public int Value { get; init; }
+	}
+
+	[Fact]
+	public void CreateCompiledLambdaCopyFunctionForType_WhenInvokedWithoutActiveCallMemo_ShouldCloneNestedReferences()
+	{
+		// Arrange
+		CloneRoot source = new() { Child = new CloneChild { Value = 42 } };
+		Dictionary<object, object> copiedReferences = new(CommonNetFuncs.DeepClone.ReferenceEqualityComparer.Instance);
+		Func<object, Dictionary<object, object>, object> copy =
+			CommonNetFuncs.DeepClone.ExpressionTrees.CreateCompiledLambdaCopyFunctionForType(typeof(CloneRoot), useCache: true).Compile();
+
+		// Act
+		CloneRoot result = copy(source, copiedReferences).ShouldBeOfType<CloneRoot>();
+
+		// Assert
+		result.ShouldNotBeSameAs(source);
+		result.Child.ShouldNotBeNull();
+		result.Child.ShouldNotBeSameAs(source.Child);
+		result.Child.Value.ShouldBe(42);
+		copiedReferences.Count.ShouldBe(2);
+		copiedReferences[source].ShouldBeSameAs(result);
+		copiedReferences[source.Child].ShouldBeSameAs(result.Child);
+	}
+
 }

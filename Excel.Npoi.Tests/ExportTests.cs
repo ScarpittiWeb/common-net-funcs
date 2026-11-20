@@ -1,9 +1,10 @@
-﻿using System.Data;
-using AutoFixture;
+﻿using AutoFixture;
 using CommonNetFuncs.Excel.Npoi;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.Streaming;
 using NPOI.XSSF.UserModel;
+using NSubstitute;
+using System.Data;
 using xRetry.v3;
 
 namespace Excel.Npoi.Tests;
@@ -1189,4 +1190,75 @@ public class ExportTests
 	}
 
 	#endregion
+}
+
+public sealed class NpoiExportBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+	private static MemoryStream CreateWorkbookStream()
+	{
+		using XSSFWorkbook workbook = new();
+		ISheet sheet = workbook.CreateSheet("Data");
+		IRow first = sheet.CreateRow(0);
+		first.CreateCell(0).SetCellValue("A");
+		first.CreateCell(1).SetCellValue("B");
+		IRow second = sheet.CreateRow(1);
+		second.CreateCell(0).SetCellValue("C");
+		second.CreateCell(1).SetCellValue("D");
+		MemoryStream stream = new();
+		workbook.Write(stream, true);
+		stream.Position = 0;
+		return stream;
+	}
+
+	private sealed class NpoiExportRow
+	{
+		public string? Value { get; set; }
+	}
+
+	private sealed class ThrowingValue
+	{
+		public override string ToString() => throw new InvalidOperationException("serialization failed");
+	}
+
+	[Fact]
+	public async Task GenericExcelExport_DataTableValueSerializationFailure_ReturnsNull()
+	{
+		using System.Data.DataTable table = new();
+		table.Columns.Add("Value", typeof(object));
+		table.Rows.Add(new ThrowingValue());
+
+		MemoryStream? result = await table.GenericExcelExport(cancellationToken: TestContext.Current.CancellationToken);
+
+		result.ShouldBeNull();
+	}
+
+	[Fact]
+	public void ExcelExport_WhenColumnSizingFails_StillReturnsTrue()
+	{
+		using SXSSFWorkbook workbook = new();
+		ISheet worksheet = Substitute.For<ISheet>();
+		IRow row = Substitute.For<IRow>();
+		ICell cell = Substitute.For<ICell>();
+		worksheet.GetRow(Arg.Any<int>()).Returns(row);
+		worksheet.CreateRow(Arg.Any<int>()).Returns(row);
+		worksheet.SheetName.Returns("Data");
+		row.GetCell(Arg.Any<int>()).Returns(cell);
+		row.CreateCell(Arg.Any<int>()).Returns(cell);
+		worksheet.When(x => x.SetColumnWidth(Arg.Any<int>(), Arg.Any<double>()))
+			.Do(_ => throw new InvalidOperationException("font metrics unavailable"));
+
+		new[] { new NpoiExportRow { Value = "value" } }.ExcelExport(workbook, worksheet, cancellationToken: TestContext.Current.CancellationToken).ShouldBeTrue();
+	}
+
 }

@@ -1,5 +1,6 @@
 ﻿using CommonNetFuncs.Images;
 using SkiaSharp;
+using System.Text;
 using xRetry.v3;
 
 namespace Images.Tests;
@@ -446,4 +447,120 @@ public sealed class Base64Tests : IDisposable
 internal sealed class NonReadableMemoryStream(byte[] buffer) : MemoryStream(buffer)
 {
 	public override bool CanRead => false;
+}
+
+public sealed class ImageBase64BehaviorTests
+{
+	private static readonly string TestDataDirectory = Path.Combine(AppContext.BaseDirectory, "TestData");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static MemoryStream OpenTestImage() =>
+		new(File.ReadAllBytes(Path.Combine(TestDataDirectory, "test.png")));
+
+	private static SKBitmap CreateBitmap()
+	{
+		SKBitmap bitmap = new(8, 8);
+		bitmap.Erase(SKColors.Red);
+		return bitmap;
+	}
+
+	private sealed class NonSeekableReadStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public override bool CanSeek => false;
+	}
+
+	[Theory]
+	[InlineData(-1)]
+	[InlineData(101)]
+	public void ImageSaveToFile_InvalidQuality_Throws(short quality)
+	{
+		Should.Throw<ArgumentOutOfRangeException>(() =>
+			Base64.ImageSaveToFile(Convert.ToBase64String(Encoding.UTF8.GetBytes("not an image")), Path.GetTempFileName(), quality: quality));
+	}
+
+	[Theory]
+	[InlineData(-1)]
+	[InlineData(101)]
+	public async Task ImageSaveToFileAsync_InvalidQuality_Throws(short quality)
+	{
+		await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
+			Base64.ImageSaveToFileAsync(Convert.ToBase64String(Encoding.UTF8.GetBytes("not an image")), Path.GetTempFileName(), quality: quality));
+	}
+
+	[Fact]
+	public void ImageSaveToFile_ValidBase64ButNotImage_ReturnsFalseWithoutCreatingFile()
+	{
+		string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+		string value = Convert.ToBase64String(Encoding.UTF8.GetBytes("not an image"));
+
+		try
+		{
+			bool result = value.ImageSaveToFile(path);
+
+			result.ShouldBeFalse();
+			File.Exists(path).ShouldBeFalse();
+		}
+		finally
+		{
+			File.Delete(path);
+		}
+	}
+
+	[Fact]
+	public async Task ImageSaveToFileAsync_ValidBase64ButNotImage_ReturnsFalseWithoutCreatingFile()
+	{
+		string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+		string value = Convert.ToBase64String(Encoding.UTF8.GetBytes("not an image"));
+
+		try
+		{
+			bool result = await value.ImageSaveToFileAsync(path);
+
+			result.ShouldBeFalse();
+			File.Exists(path).ShouldBeFalse();
+		}
+		finally
+		{
+			File.Delete(path);
+		}
+	}
+
+	[Fact]
+	public void ExtractBase64_MatchedButInvalidImageData_ReturnsNull()
+	{
+		"data:image/png;base64,AAAA".ExtractBase64().ShouldBeNull();
+	}
+
+	[Fact]
+	public void ExtractBase64_ShortNonUrlInput_FollowsCurrentThrowingContract()
+	{
+		Should.Throw<ArgumentOutOfRangeException>(() => "abc".ExtractBase64());
+	}
+
+	[Fact]
+	public void RemoveImageVersionQuery_ExactMarkerOnly_RemainsUnchanged()
+	{
+		"?v=".RemoveImageVersionQuery().ShouldBe("?v=");
+	}
+
 }

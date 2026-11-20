@@ -293,3 +293,33 @@ public class EncodingTypesTests
 		EncodingTypes.Deflate.ShouldBe("deflate");
 	}
 }
+
+[Collection(FormDataExtensionCoverageCollection.Name)]
+public sealed class ContentTypesBehaviorTests
+{
+
+	[Fact]
+	public void GetContentTypeByExtension_MutableRegisteredFormDataType_ReturnsUrlEncodedFormData()
+	{
+		const string extension = ".registered-form-data";
+		string original = ContentTypes.FormDataTypes[0];
+		ContentTypes.FormDataTypes[0] = extension;
+
+		try
+		{
+			ContentTypes.GetContentTypeByExtension(extension)
+				.ShouldBe(ContentTypes.UrlEncodedFormData);
+		}
+		finally
+		{
+			ContentTypes.FormDataTypes[0] = original;
+		}
+	}
+
+}
+
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class FormDataExtensionCoverageCollection
+{
+	public const string Name = "FormData extension coverage";
+}

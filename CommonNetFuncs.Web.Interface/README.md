@@ -8,11 +8,18 @@ ASP.NET Core MVC helpers for DataTables-style requests, model-state error projec
 
 ## Contents
 
-- [Installation](#installation)
-- [DataTables request helpers](#datatables-request-helpers)
-- [Model-state errors](#model-state-errors)
-- [Select-list items](#select-list-items)
-- [License](#license)
+- [CommonNetFuncs.Web.Interface](#commonnetfuncswebinterface)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [DataTables request helpers](#datatables-request-helpers)
+    - [Types](#types)
+    - [Parse a DataTables request](#parse-a-datatables-request)
+    - [Convert to a paging/sorting model](#convert-to-a-pagingsorting-model)
+    - [Return the DataTables response](#return-the-datatables-response)
+    - [Apply sorting and paging safely](#apply-sorting-and-paging-safely)
+  - [Model-state errors](#model-state-errors)
+  - [Select-list items](#select-list-items)
+  - [License](#license)
 
 ## Installation
 
@@ -22,7 +29,7 @@ dotnet add package CommonNetFuncs.Web.Interface
 
 ## DataTables request helpers
 
-`GetDataTableRequest` is an `HttpRequest` extension. It reads only form requests whose content type contains `application/x-www-form-urlencoded` or `multipart/form-data`, case-insensitively. It returns an empty/default `DataTableRequest` when the content type is unsuitable or `request.Form` is unavailable. Any parsing exception is logged and the method returns the partially populated/default object rather than rethrowing.
+`GetDataTableRequest` is an `HttpRequest` extension. It reads only form requests whose content type contains `application/x-www-form-urlencoded` or `multipart/form-data`, case-insensitively. It returns an empty/default `DataTableRequest` when the content type is unsuitable or `request.Form` is unavailable. Any parsing exception is logged and the method returns the partially populated/default object rather than re-throwing.
 
 Recognized fields:
 

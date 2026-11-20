@@ -8,14 +8,16 @@ A small JWT issuer for applications that already authenticate a username/passwor
 
 ## Contents
 
-- [Target frameworks](#target-frameworks)
-- [Installation](#installation)
-- [Public API](#public-api)
-  - [`Authenticate`](#authenticate)
-- [Usage](#usage)
-- [Signing-key and lifetime guidance](#signing-key-and-lifetime-guidance)
-- [Token validation and authorization](#token-validation-and-authorization)
-- [License](#license)
+- [CommonNetFuncs.Web.Jwt](#commonnetfuncswebjwt)
+  - [Contents](#contents)
+  - [Target frameworks](#target-frameworks)
+  - [Installation](#installation)
+  - [Public API](#public-api)
+    - [`Authenticate`](#authenticate)
+  - [Usage](#usage)
+  - [Signing-key and lifetime guidance](#signing-key-and-lifetime-guidance)
+  - [Token validation and authorization](#token-validation-and-authorization)
+  - [License](#license)
 
 ---
 
@@ -59,7 +61,7 @@ Behavior:
 - Missing/whitespace submitted credentials, or an exact case-sensitive mismatch of username or password, return `null`.
 - Matching credentials produce a compact JWT signed with symmetric **HMAC-SHA512**.
 - The subject always contains the submitted name claim.
-- An email claim is always added; it is an empty string when `email` is null. Nonblank `issuer` and `audience` values populate their standard token fields; null/whitespace values omit them.
+- An email claim is always added; it is an empty string when `email` is null. Non-blank `issuer` and `audience` values populate their standard token fields; null/whitespace values omit them.
 - The environment comparison for the literal `Development` is case-insensitive. Only that environment uses `devTokenLifespan`; every other environment, including unknown values, uses `stdTokenLifespan`.
 - `JwtExpireTime` is the same expiration used in the token descriptor.
 - `RefreshToken` is not implemented and remains `null` for tokens issued by this package.

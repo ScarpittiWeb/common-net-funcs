@@ -1,9 +1,9 @@
-﻿using System.Data.Common;
+﻿using Npgsql;
+using NpgsqlTypes;
+using System.Data.Common;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
-using Npgsql;
-using NpgsqlTypes;
 
 namespace CommonNetFuncs.Sql.PostgreSql;
 

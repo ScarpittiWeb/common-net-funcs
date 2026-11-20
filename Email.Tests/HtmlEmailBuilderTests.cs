@@ -1,5 +1,5 @@
-﻿using System.Data;
-using CommonNetFuncs.Email;
+﻿using CommonNetFuncs.Email;
+using System.Data;
 using static CommonNetFuncs.Email.HtmlEmailBuilder;
 using static Xunit.TestContext;
 
@@ -306,4 +306,70 @@ public sealed class HtmlEmailBuilderTests
 			result.ShouldNotContain("<br><br>");
 		}
 	}
+}
+
+public sealed class HtmlEmailBuilderBehaviorTests
+{
+	private sealed class ThrowingAttachment : IMailAttachment
+	{
+		public string? AttachmentName => throw new InvalidOperationException("Cannot serialize attachment name.");
+
+		string? IMailAttachment.AttachmentName
+		{
+			get => AttachmentName;
+			set { }
+		}
+
+		public Stream? GetStream() => null;
+	}
+
+	private sealed class StaticAttachment(string? name, Stream? stream) : IMailAttachment
+	{
+		public string? AttachmentName { get; set; } = name;
+
+		public Stream? GetStream() => stream;
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+	[Fact]
+	public void CreateHtmlTable_DataTableOptionsAndNullCellsAreEmittedVerbatim()
+	{
+		using DataTable table = new();
+		table.Columns.Add("Name");
+		table.Columns.Add("Optional", typeof(string));
+		table.Rows.Add("Ada", DBNull.Value);
+
+		string result = table.CreateHtmlTable(applyTableCss: false, customCss: "ignored", cancellationToken: Current.CancellationToken);
+
+		result.ShouldBe("<table><tr><th>Name</th><th>Optional</th></tr><tr><td>Ada</td><td></td></tr></table>");
+	}
+
+	[Fact]
+	public void BuildHtmlEmail_NullAndEmptyTablesDoNotAddTableBreaks()
+	{
+		BuildHtmlEmail("Body", (DataTable?)null, cancellationToken: Current.CancellationToken).ShouldBe("<html><body>BodyBody</body></html>");
+		BuildHtmlEmail("Body", (List<List<string>>?)null, cancellationToken: Current.CancellationToken).ShouldBe("<html><body>Body</body></html>");
+
+		using DataTable empty = new();
+		BuildHtmlEmail("Body", empty, cancellationToken: Current.CancellationToken).ShouldBe("<html><body>BodyBody</body></html>");
+		BuildHtmlEmail("Body", new List<List<string>>(), cancellationToken: Current.CancellationToken).ShouldBe("<html><body>Body</body></html>");
+	}
+
+	[Fact]
+	public void BuildHtmlEmail_WhitespaceFooterDoesNotAddBreak()
+	{
+		BuildHtmlEmail("Body", "   ").ShouldBe("<html><body>BodyBody   </body></html>");
+		BuildHtmlEmail("Body", (List<List<string>>?)null, "\t", Current.CancellationToken).ShouldBe("<html><body>Body&nbsp&nbsp&nbsp</body></html>");
+	}
+
 }

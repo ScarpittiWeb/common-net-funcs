@@ -1,4 +1,6 @@
 ﻿using CommonNetFuncs.Core;
+using System.ComponentModel.DataAnnotations;
+using System.Data;
 using static CommonNetFuncs.Core.Random;
 using static Xunit.TestContext;
 
@@ -820,4 +822,131 @@ public sealed class StreamsTests
 
 		});
 	}
+}
+
+public sealed class CoreStreamsBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static DataTable CreateOneRowTable()
+	{
+		DataTable table = new();
+		table.Columns.Add("Value", typeof(int));
+		table.Rows.Add(9);
+		return table;
+	}
+
+	[GapNullTypeId]
+	private sealed class GapNullTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNullTypeIdAttribute : Attribute
+	{
+		public override object TypeId => null!;
+	}
+
+	[GapNamelessTypeId]
+	private sealed class GapNamelessTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNamelessTypeIdAttribute : Attribute
+	{
+		public override object TypeId { get; } = new object();
+	}
+
+	private sealed class GapNestedEquality
+	{
+		public GapNestedValue? Child { get; set; }
+	}
+
+	private sealed class GapNestedValue
+	{
+		public int Value { get; set; }
+	}
+
+	private sealed class GapHashHolder
+	{
+		public List<GapNestedValue?> Values { get; set; } = [];
+	}
+
+	private sealed class GapNonSeekableReadStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public bool AllowRead { get; set; } = true;
+
+		public override bool CanRead => AllowRead;
+
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonWritableTargetStream : MemoryStream
+	{
+		public override bool CanWrite => false;
+	}
+
+	private sealed class GapUnseekableSourceStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonSeekableWriteStream : MemoryStream
+	{
+		public override bool CanSeek => false;
+
+		public byte[] Data => ToArray();
+	}
+
+	private sealed class GapValidated
+	{
+		[Required]
+		public string? Required { get; set; }
+
+		[Range(1, 10)]
+		public int Count { get; set; }
+
+		public string? Optional { get; set; }
+	}
+
+	[Fact]
+	public async Task Streams_UseNonExposedCopyPathAndRejectInvalidCapabilities()
+	{
+		byte[] bytes = [1, 2, 3, 4];
+		await using GapNonSeekableReadStream nonSeekable = new(bytes);
+		(await nonSeekable.ReadStreamAsync(bufferSize: 2, cancellationToken: Current.CancellationToken)).ShouldBe(bytes);
+
+		await using GapNonSeekableReadStream unreadable = new(bytes);
+		unreadable.AllowRead = false;
+		using MemoryStream target = new();
+		await Should.ThrowAsync<InvalidOperationException>(() => target.WriteStreamToStream(unreadable));
+
+		await using GapNonWritableTargetStream nonWritable = new();
+		await Should.ThrowAsync<InvalidOperationException>(() => nonWritable.WriteStreamToStream(new MemoryStream(bytes)));
+		await Should.ThrowAsync<InvalidOperationException>(() =>
+			new MemoryStream().WriteStreamToStream(new GapUnseekableSourceStream(bytes)));
+	}
+
 }

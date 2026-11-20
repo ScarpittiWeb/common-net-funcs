@@ -1,9 +1,16 @@
-﻿using System.Globalization;
-using System.Reflection;
-using CommonNetFuncs.Web.Requests;
+﻿using CommonNetFuncs.Web.Requests;
+using MessagePack;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.JsonPatch;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Formatters;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Globalization;
+using System.Reflection;
 
 namespace Web.Requests.Tests;
 
@@ -547,4 +554,157 @@ public class PatchCreatorTests
 		JsonPatchDocument patch = PatchCreator.CreatePatch(circularObject, circularObject);
 		patch.Operations.ShouldBeEmpty();
 	}
+}
+
+public sealed class PatchCreatorDateBehaviorTests
+{
+	private static readonly FieldInfo JValueTypeField = typeof(JValue).GetField("_valueType", BindingFlags.Instance | BindingFlags.NonPublic)!;
+	private static readonly FieldInfo JValueValueField = typeof(JValue).GetField("_value", BindingFlags.Instance | BindingFlags.NonPublic)!;
+	private static readonly MethodInfo FillPatchForObjectMethod = typeof(PatchCreator).GetMethod("FillPatchForObject", BindingFlags.Static | BindingFlags.NonPublic)!;
+
+
+
+
+
+
+
+
+	private static ServiceProvider CreateServices(MessagePackSerializerOptions options, bool addSupportedFormatter)
+	{
+		ServiceCollection services = new();
+		MvcOptions mvcOptions = new();
+		mvcOptions.OutputFormatters.Add(addSupportedFormatter
+			? new FormatterWithOptions(options)
+			: new FormatterWithOptions(options, supportsMessagePack: false));
+		services.AddSingleton<IOptions<MvcOptions>>(Options.Create(mvcOptions));
+		return services.BuildServiceProvider();
+	}
+
+	private static DefaultHttpContext CreateContext(string accept)
+	{
+		DefaultHttpContext context = new();
+		context.Response.Body = new MemoryStream();
+		context.Request.Headers.Accept = accept;
+		context.Features.Set<IServiceProvidersFeature>(new RequestServicesFeature());
+		return context;
+	}
+
+	private static JValue CreateArtificialDateValue(object value)
+	{
+		JValue result = new("seed");
+		JValueTypeField.SetValue(result, JTokenType.Date);
+		JValueValueField.SetValue(result, value);
+		return result;
+	}
+
+	private static async IAsyncEnumerable<StreamingModel> AsyncItems(params StreamingModel[] items)
+	{
+		foreach (StreamingModel item in items)
+		{
+			await Task.Yield();
+			yield return item;
+		}
+	}
+
+	[MessagePackObject(AllowPrivate = true)]
+	internal sealed class StreamingModel
+	{
+		[Key(0)]
+		public int Id { get; set; }
+
+		[Key(1)]
+		public string Name { get; set; } = string.Empty;
+	}
+
+	private sealed class FormatterWithOptions : OutputFormatter
+	{
+		private readonly MessagePackSerializerOptions options;
+
+		public FormatterWithOptions(MessagePackSerializerOptions options, bool supportsMessagePack = true)
+		{
+			this.options = options;
+			SupportedMediaTypes.Add(supportsMessagePack ? "application/x-msgpack" : "application/xml");
+		}
+
+		public override Task WriteResponseBodyAsync(OutputFormatterWriteContext context) => Task.CompletedTask;
+	}
+
+	private sealed class FormatterWithoutOptions : OutputFormatter
+	{
+		public FormatterWithoutOptions()
+		{
+			SupportedMediaTypes.Add("application/x-msgpack");
+		}
+
+		public override Task WriteResponseBodyAsync(OutputFormatterWriteContext context) => Task.CompletedTask;
+	}
+
+	private sealed class RequestServicesFeature : IServiceProvidersFeature
+	{
+		public IServiceProvider RequestServices { get; set; } = null!;
+	}
+
+	private sealed class ConvertibleDateValue(DateTime value) : IConvertible
+	{
+		public TypeCode GetTypeCode() => TypeCode.Object;
+		public bool ToBoolean(IFormatProvider? provider) => Convert.ToBoolean(value, provider);
+		public byte ToByte(IFormatProvider? provider) => Convert.ToByte(value, provider);
+		public char ToChar(IFormatProvider? provider) => Convert.ToChar(value, provider);
+		public DateTime ToDateTime(IFormatProvider? provider) => value;
+		public decimal ToDecimal(IFormatProvider? provider) => Convert.ToDecimal(value, provider);
+		public double ToDouble(IFormatProvider? provider) => Convert.ToDouble(value, provider);
+		public short ToInt16(IFormatProvider? provider) => Convert.ToInt16(value, provider);
+		public int ToInt32(IFormatProvider? provider) => Convert.ToInt32(value, provider);
+		public long ToInt64(IFormatProvider? provider) => Convert.ToInt64(value, provider);
+		public sbyte ToSByte(IFormatProvider? provider) => Convert.ToSByte(value, provider);
+		public float ToSingle(IFormatProvider? provider) => Convert.ToSingle(value, provider);
+		public string ToString(IFormatProvider? provider) => value.ToString(provider);
+		public object ToType(Type conversionType, IFormatProvider? provider) => Convert.ChangeType(value, conversionType, provider);
+		public ushort ToUInt16(IFormatProvider? provider) => Convert.ToUInt16(value, provider);
+		public uint ToUInt32(IFormatProvider? provider) => Convert.ToUInt32(value, provider);
+		public ulong ToUInt64(IFormatProvider? provider) => Convert.ToUInt64(value, provider);
+	}
+
+	[Fact]
+	public void PatchCreator_DateTokenWithNonDateRuntimeValue_IsIgnored()
+	{
+		JObject original = new(new JProperty("Moment", CreateArtificialDateValue(DateTime.Parse("2024-01-01"))));
+		JObject modified = new(new JProperty("Moment", CreateArtificialDateValue(new ConvertibleDateValue(new DateTime(2024, 1, 2)))));
+		JsonPatchDocument patch = new();
+
+		FillPatchForObjectMethod.Invoke(null, [original, modified, patch, "/"]);
+
+		patch.Operations.ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void PatchCreator_DateTimeOffsetPattern_HandlesEqualAndChangedOffsets()
+	{
+		JObject original = new(new JProperty("Moment", new JValue(new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.FromHours(2)))));
+		JObject equal = new(new JProperty("Moment", new JValue(new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.FromHours(2)))));
+		JObject changed = new(new JProperty("Moment", new JValue(new DateTimeOffset(2024, 1, 2, 0, 0, 0, TimeSpan.FromHours(2)))));
+		JsonPatchDocument equalPatch = new();
+		JsonPatchDocument changedPatch = new();
+
+		FillPatchForObjectMethod.Invoke(null, [original, equal, equalPatch, "/"]);
+		FillPatchForObjectMethod.Invoke(null, [original, changed, changedPatch, "/"]);
+
+		equalPatch.Operations.ShouldBeEmpty();
+		changedPatch.Operations.Count.ShouldBe(1);
+		changedPatch.Operations[0].op.ShouldBe("replace");
+		changedPatch.Operations[0].path.ShouldBe("/Moment");
+	}
+
+	[Fact]
+	public void PatchCreator_DateTimeOffsetPattern_IgnoresConvertibleNonOffsetRuntimeValue()
+	{
+		JObject original = new(new JProperty("Moment", new JValue(new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero))));
+		JObject modified = new(new JProperty("Moment", CreateArtificialDateValue(new ConvertibleDateValue(new DateTime(2024, 1, 2)))));
+		JsonPatchDocument patch = new();
+
+		FillPatchForObjectMethod.Invoke(null, [original, modified, patch, "/"]);
+
+		patch.Operations.ShouldBeEmpty();
+	}
+
 }

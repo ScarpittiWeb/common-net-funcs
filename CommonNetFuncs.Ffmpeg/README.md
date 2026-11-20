@@ -8,12 +8,14 @@ Xabe.FFmpeg wrappers, raw `ffmpeg`/`ffprobe` process helpers, progress/FPS parsi
 
 ## Contents
 
-- [Installation](#installation)
-- [High-level `ConversionTask`](#high-level-conversiontask)
-- [Raw process conversion](#raw-process-conversion)
-- [Media, FPS, and result helpers](#media-fps-and-result-helpers)
-- [Hardware checks and public types](#hardware-checks-and-public-types)
-- [License](#license)
+- [CommonNetFuncs.Ffmpeg](#commonnetfuncsffmpeg)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [High-level `ConversionTask`](#high-level-conversiontask)
+  - [Raw process conversion](#raw-process-conversion)
+  - [Media, FPS, and result helpers](#media-fps-and-result-helpers)
+  - [Hardware checks and public types](#hardware-checks-and-public-types)
+  - [License](#license)
 
 ## Installation
 

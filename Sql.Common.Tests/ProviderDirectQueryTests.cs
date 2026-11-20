@@ -1,5 +1,8 @@
 ﻿using CommonNetFuncs.Sql.Common;
+using System.Data;
+using static Xunit.TestContext;
 using OdbcDirectQuery = CommonNetFuncs.Sql.Odbc.DirectQuery;
+using PostgreSqlDirectQuery = CommonNetFuncs.Sql.PostgreSql.DirectQuery;
 using SqlServerDirectQuery = CommonNetFuncs.Sql.SqlServer.DirectQuery;
 
 namespace Sql.Common.Tests;
@@ -112,4 +115,130 @@ public sealed class ProviderDirectQueryTests
 	private sealed class ProviderFactoryException : Exception;
 
 	private sealed class ProviderRow;
+}
+
+public sealed class ProviderDirectQueryZeroRetryTests
+{
+	private const string SqlText = "SELECT 1";
+	private const string SqlServerConnectionString = "Server=localhost;Database=unit-tests;User Id=unit-tests;Password=unit-tests;TrustServerCertificate=True";
+	private const string OdbcConnectionString = "Driver={Unit Test};Server=provider-tests;Database=test;";
+#if CORE_NATIVE_BUILD
+	private const string PostgreSqlConnectionString = "Host=localhost;Database=unit-tests;Username=unit-tests;Password=unit-tests";
+#endif
+
+
+	public enum Provider
+	{
+		SqlServer,
+		Odbc,
+#if CORE_NATIVE_BUILD
+		PostgreSql
+#endif
+	}
+
+	public enum Operation
+	{
+		GetDataTableAsync,
+		GetDataTable,
+		RunUpdateQueryAsync,
+		RunUpdateQuery,
+		GetDataStreamAsync,
+		GetDataStream,
+		GetDataDirectAsync
+	}
+
+	private sealed class ProviderRow;
+
+	[Theory]
+	[InlineData(Provider.SqlServer, Operation.GetDataTableAsync)]
+	[InlineData(Provider.SqlServer, Operation.GetDataTable)]
+	[InlineData(Provider.SqlServer, Operation.RunUpdateQueryAsync)]
+	[InlineData(Provider.SqlServer, Operation.RunUpdateQuery)]
+	[InlineData(Provider.SqlServer, Operation.GetDataStreamAsync)]
+	[InlineData(Provider.SqlServer, Operation.GetDataStream)]
+	[InlineData(Provider.SqlServer, Operation.GetDataDirectAsync)]
+	[InlineData(Provider.Odbc, Operation.GetDataTableAsync)]
+	[InlineData(Provider.Odbc, Operation.GetDataTable)]
+	[InlineData(Provider.Odbc, Operation.RunUpdateQueryAsync)]
+	[InlineData(Provider.Odbc, Operation.RunUpdateQuery)]
+	[InlineData(Provider.Odbc, Operation.GetDataStreamAsync)]
+	[InlineData(Provider.Odbc, Operation.GetDataStream)]
+	[InlineData(Provider.Odbc, Operation.GetDataDirectAsync)]
+#if CORE_NATIVE_BUILD
+	[InlineData(Provider.PostgreSql, Operation.GetDataTableAsync)]
+	[InlineData(Provider.PostgreSql, Operation.GetDataTable)]
+	[InlineData(Provider.PostgreSql, Operation.RunUpdateQueryAsync)]
+	[InlineData(Provider.PostgreSql, Operation.RunUpdateQuery)]
+	[InlineData(Provider.PostgreSql, Operation.GetDataStreamAsync)]
+	[InlineData(Provider.PostgreSql, Operation.GetDataStream)]
+	[InlineData(Provider.PostgreSql, Operation.GetDataDirectAsync)]
+#endif
+	public async Task DefaultFactory_WithZeroRetries_ShouldBuildWrapperAndReturnEmptyResult(Provider provider, Operation operation)
+	{
+		IDirectQuery query = provider switch
+		{
+			Provider.SqlServer => new SqlServerDirectQuery(),
+			Provider.Odbc => new OdbcDirectQuery(),
+#if CORE_NATIVE_BUILD
+			Provider.PostgreSql => new PostgreSqlDirectQuery(),
+#endif
+			_ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null)
+		};
+		string connectionString = provider switch
+		{
+			Provider.SqlServer => SqlServerConnectionString,
+			Provider.Odbc => OdbcConnectionString,
+#if CORE_NATIVE_BUILD
+			Provider.PostgreSql => PostgreSqlConnectionString,
+#endif
+			_ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null)
+		};
+
+		switch (operation)
+		{
+			case Operation.GetDataTableAsync:
+				using (DataTable table = await query.GetDataTableAsync(SqlText, connectionString, maxRetry: 0, cancellationToken: Current.CancellationToken))
+				{
+					table.Rows.Count.ShouldBe(0);
+					table.Columns.Count.ShouldBe(0);
+				}
+				break;
+			case Operation.GetDataTable:
+				using (DataTable table = query.GetDataTable(SqlText, connectionString, maxRetry: 0))
+				{
+					table.Rows.Count.ShouldBe(0);
+					table.Columns.Count.ShouldBe(0);
+				}
+				break;
+			case Operation.RunUpdateQueryAsync:
+				(await query.RunUpdateQueryAsync(SqlText, connectionString, maxRetry: 0, cancellationToken: Current.CancellationToken)).ShouldSatisfyAllConditions(
+					result => result.Success.ShouldBeFalse(),
+					result => result.RecordsChanged.ShouldBe(0));
+				break;
+			case Operation.RunUpdateQuery:
+				query.RunUpdateQuery(SqlText, connectionString, maxRetry: 0).ShouldSatisfyAllConditions(
+					result => result.Success.ShouldBeFalse(),
+					result => result.RecordsChanged.ShouldBe(0));
+				break;
+			case Operation.GetDataStreamAsync:
+				{
+					int count = 0;
+					await foreach (ProviderRow _ in query.GetDataStreamAsync<ProviderRow>(SqlText, connectionString, maxRetry: 0, cancellationToken: Current.CancellationToken))
+					{
+						count++;
+					}
+					count.ShouldBe(0);
+					break;
+				}
+			case Operation.GetDataStream:
+				query.GetDataStream<ProviderRow>(SqlText, connectionString, maxRetry: 0, cancellationToken: Current.CancellationToken).ShouldBeEmpty();
+				break;
+			case Operation.GetDataDirectAsync:
+				(await query.GetDataDirectAsync<ProviderRow>(SqlText, connectionString, maxRetry: 0, cancellationToken: Current.CancellationToken)).ShouldBeEmpty();
+				break;
+			default:
+				throw new ArgumentOutOfRangeException(nameof(operation), operation, null);
+		}
+	}
+
 }

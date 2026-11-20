@@ -1,6 +1,4 @@
-﻿using System.IO.Compression;
-
-#if !CORE_NATIVE_BUILD
+﻿#if !CORE_NATIVE_BUILD
 
 namespace Compression.Tests.Internal;
 

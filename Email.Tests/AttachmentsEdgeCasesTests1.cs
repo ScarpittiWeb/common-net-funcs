@@ -1,7 +1,7 @@
-﻿using System.IO.Compression;
-using AutoFixture.Xunit3;
+﻿using AutoFixture.Xunit3;
 using CommonNetFuncs.Email;
 using MimeKit;
+using System.IO.Compression;
 using static CommonNetFuncs.Email.Email;
 using static Xunit.TestContext;
 

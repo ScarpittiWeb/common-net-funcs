@@ -1,9 +1,9 @@
-﻿using System.Buffers;
-using System.Globalization;
-using CommonNetFuncs.Web.Api.MsgPack;
+﻿using CommonNetFuncs.Web.Api.MsgPack;
 using MessagePack;
 using MessagePack.Formatters;
 using MessagePack.Resolvers;
+using System.Buffers;
+using System.Globalization;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests.MsgPack;

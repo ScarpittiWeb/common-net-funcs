@@ -1,10 +1,11 @@
-﻿using System.Data;
-using AutoFixture;
+﻿using AutoFixture;
 using CommonNetFuncs.Excel.OpenXml;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using System.Data;
 using xRetry.v3;
+using static CommonNetFuncs.Excel.OpenXml.Common;
 
 namespace Excel.OpenXml.Tests;
 
@@ -1075,13 +1076,13 @@ public sealed class ExportTests : IDisposable
 
 		// Act
 		using MemoryStream? result = testData.GenericExcelExport(
-							memoryStream: new MemoryStream(),
-							sheetName: "CustomSheet",
-							new(
-							createTable: true,
-							tableName: "CustomTable",
-							skipColumnNames: new() { "Description" },
-							wrapText: true));
+													memoryStream: new MemoryStream(),
+													sheetName: "CustomSheet",
+													new(
+													createTable: true,
+													tableName: "CustomTable",
+													skipColumnNames: new() { "Description" },
+													wrapText: true));
 
 		// Assert
 		result.ShouldNotBeNull();
@@ -1116,14 +1117,14 @@ public sealed class ExportTests : IDisposable
 
 		// Act
 		using MemoryStream? result = dataTable.GenericExcelExport
-				(
-					memoryStream: new MemoryStream(),
-					sheetName: "DataSheet",
-					new(createTable: true,
-					tableName: "DataTable",
-					skipColumnNames: new() { "Col3" },
-					wrapText: true)
-				);
+										(
+											memoryStream: new MemoryStream(),
+											sheetName: "DataSheet",
+											new(createTable: true,
+											tableName: "DataTable",
+											skipColumnNames: new() { "Col3" },
+											wrapText: true)
+										);
 
 		// Assert
 		result.ShouldNotBeNull();
@@ -1534,4 +1535,190 @@ public sealed class ExportTests : IDisposable
 		names.ShouldContain("Sheet1");
 		names.ShouldContain("Sheet1 (1)");
 	}
+}
+
+public sealed class OpenXmlExportBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static SpreadsheetDocument CreateDocument(MemoryStream stream, out WorksheetPart worksheetPart)
+	{
+		SpreadsheetDocument document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook);
+		uint sheetId = document.CreateNewSheet("Data");
+		worksheetPart = document.WorkbookPart!.GetPartById(
+			document.WorkbookPart.Workbook!.Descendants<Sheet>().Single(x => x.SheetId!.Value == sheetId).Id!) as WorksheetPart
+			?? throw new InvalidOperationException();
+		return document;
+	}
+
+	private static MemoryStream BuildOrphanedTableWorkbook()
+	{
+		MemoryStream result = new();
+		using SpreadsheetDocument document = SpreadsheetDocument.Create(result, SpreadsheetDocumentType.Workbook);
+		WorkbookPart workbookPart = document.AddWorkbookPart();
+		workbookPart.Workbook = new Workbook(new Sheets());
+		WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
+		worksheetPart.Worksheet = new Worksheet(new SheetData());
+		TableDefinitionPart tablePart = worksheetPart.AddNewPart<TableDefinitionPart>();
+		tablePart.Table = new Table
+		{
+			Id = 1,
+			Name = "Orphan",
+			DisplayName = "Orphan",
+			Reference = "A1:A1",
+			TableColumns = new TableColumns(new TableColumn { Id = 1, Name = "Value" }) { Count = 1 }
+		};
+		document.Save();
+		result.Position = 0;
+		return result;
+	}
+
+	private static MemoryStream BuildLookupDefectWorkbook(string defect)
+	{
+		MemoryStream result = new();
+		using SpreadsheetDocument document = SpreadsheetDocument.Create(result, SpreadsheetDocumentType.Workbook);
+		WorkbookPart workbookPart = document.AddWorkbookPart();
+		workbookPart.Workbook = new Workbook();
+		WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
+		Row row = new();
+		if (defect != "NoRowIndex")
+		{
+			row.RowIndex = 1;
+		}
+		Cell cell = new();
+		cell.CellReference = defect switch
+		{
+			"NoCellReference" => null,
+			"MalformedCellReference" => "INVALID",
+			_ => "A1"
+		};
+		cell.CellValue = new CellValue("Header");
+		row.AppendChild(cell);
+		worksheetPart.Worksheet = new Worksheet(new SheetData(row));
+		TableDefinitionPart tablePart = worksheetPart.AddNewPart<TableDefinitionPart>();
+		tablePart.Table = new Table
+		{
+			Id = 1,
+			Name = "Lookup",
+			DisplayName = "Lookup",
+			Reference = "A1:A1",
+			TableColumns = new TableColumns(new TableColumn { Id = 1, Name = "Header" }) { Count = 1 }
+		};
+		string partId = workbookPart.GetIdOfPart(worksheetPart);
+		workbookPart.Workbook.AppendChild(new Sheets(new Sheet { Id = partId, SheetId = 1, Name = "Data" }));
+		document.Save();
+		result.Position = 0;
+		return result;
+	}
+
+	private static async IAsyncEnumerable<OpenXmlExportRow> ThrowingAsyncRows()
+	{
+		yield return new OpenXmlExportRow { Value = "first" };
+		await Task.Yield();
+		throw new InvalidOperationException("async source failed");
+	}
+
+	private sealed class OpenXmlExportRow
+	{
+		public string? Value { get; set; }
+	}
+
+	private sealed class ThrowingExportRow
+	{
+		public string Value => throw new InvalidOperationException("getter failed");
+	}
+
+	private sealed class ThrowingValue
+	{
+		public override string ToString() => throw new InvalidOperationException("serialization failed");
+	}
+
+	[Fact]
+	public void AddGenericTable_ReadOnlyDocument_ReturnsFalse()
+	{
+		MemoryStream stream = new();
+		using (SpreadsheetDocument source = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook))
+		{
+			source.InitializeExcelFile("Data");
+		}
+		stream.Position = 0;
+		using SpreadsheetDocument document = SpreadsheetDocument.Open(stream, false);
+
+		document.AddGenericTable(
+			[new OpenXmlExportRow { Value = "value" }],
+			"Second").ShouldBeFalse();
+	}
+
+	[Fact]
+	public void GenericExcelExport_DataTableValueSerializationFailure_ReturnsNull()
+	{
+		using DataTable table = new();
+		table.Columns.Add("Value", typeof(object));
+		table.Rows.Add(new ThrowingValue());
+
+		MemoryStream? result = table.GenericExcelExport();
+
+		result.ShouldBeNull();
+	}
+
+	[Fact]
+	public async Task GenericExcelExportAsync_WhenOutputCannotBeWritten_CompletesWithoutExternalFailure()
+	{
+		using MemoryStream disposedStream = new();
+		await disposedStream.DisposeAsync();
+		OpenXmlExportRow[] data = [new() { Value = "value" }];
+
+		await Should.NotThrowAsync(() => data.GenericExcelExportAsync(disposedStream));
+	}
+
+	[Fact]
+	public async Task GenericExcelExportAsync_AsyncSourcePropertyFailure_IsSwallowed()
+	{
+		using MemoryStream stream = new();
+
+		await Should.NotThrowAsync(() => ThrowingAsyncRows().GenericExcelExportAsync(stream));
+		stream.Length.ShouldBeGreaterThan(0);
+		stream.Position.ShouldBe(stream.Length);
+	}
+
+	[Fact]
+	public async Task GenericExcelExportAsync_AsyncSourceWithDisposedOutput_IsSwallowed()
+	{
+		using MemoryStream stream = new();
+		await stream.DisposeAsync();
+
+		await Should.NotThrowAsync(() => ThrowingAsyncRows().GenericExcelExportAsync(stream));
+	}
+
+	[Fact]
+	public async Task GenericExcelExportAsync_DataTablePropertyStateFailure_IsSwallowed()
+	{
+		using MemoryStream disposedStream = new();
+		await disposedStream.DisposeAsync();
+		using DataTable table = new();
+		table.Columns.Add("Value");
+		table.Rows.Add("value");
+
+		await Should.NotThrowAsync(() => table.GenericExcelExportAsync(disposedStream));
+	}
+
 }

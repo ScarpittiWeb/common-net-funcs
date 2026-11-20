@@ -1,9 +1,4 @@
-﻿using System.Data;
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Text.RegularExpressions;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
 using CommonNetFuncs.Excel.Common;
 using NPOI.HSSF.UserModel;
 using NPOI.HSSF.Util;
@@ -17,12 +12,18 @@ using NPOI.Util;
 using NPOI.XSSF.Streaming;
 using NPOI.XSSF.UserModel;
 using SkiaSharp;
+using System.Data;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.RegularExpressions;
 using static System.Convert;
 using static System.Math;
 
-
 #if NETSTANDARD2_1
+
 using CommonNetFuncs.Excel.Npoi.Internal;
+
 #endif
 
 namespace CommonNetFuncs.Excel.Npoi;
@@ -1665,11 +1666,8 @@ public static partial class Common
 						foreach (XSSFTable sheetTable in ((XSSFSheet)ws).GetTables())
 						{
 							tableName = sheetTable.Name;
-							if (!string.IsNullOrWhiteSpace(tableName))
-							{
-								table = wb.GetTable(tableName);
-								break;
-							}
+							table = wb.GetTable(tableName);
+							break;
 						}
 
 						if (table != null)

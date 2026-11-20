@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-
-namespace CommonNetFuncs.Ffmpeg.Internal;
+﻿namespace CommonNetFuncs.Ffmpeg.Internal;
 
 /// <summary>
 /// Shims for BCL/Core members that only exist on newer TFMs, needed so this project can multi-target netstandard2.1.

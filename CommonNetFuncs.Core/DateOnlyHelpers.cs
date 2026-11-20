@@ -1,7 +1,7 @@
 ﻿namespace CommonNetFuncs.Core;
 
 /// <summary>
-/// Helpers for dealing with DateOnlys
+/// Helpers for dealing with DateOnly Values
 /// </summary>
 public static class DateOnlyHelpers
 {

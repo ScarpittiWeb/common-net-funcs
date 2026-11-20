@@ -1,4 +1,5 @@
 ﻿#if CORE_NATIVE_BUILD
+
 using System.Data;
 using Microsoft.Data.SqlClient;
 using SqlServerDebug = CommonNetFuncs.Sql.SqlServer.Debug;
@@ -213,3 +214,75 @@ public sealed class SqlServerDebugTests
 	}
 }
 #endif
+
+public sealed class SqlServerDebugBehaviorTests
+{
+
+
+
+	public static TheoryData<object, string, string> PostgreSqlInferredValues()
+	{
+		Guid id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+		return new()
+		{
+			{ 1L, "bigint", "1" },
+			{ (short)2, "smallint", "2" },
+			{ (byte)3, "smallint", "3" },
+			{ true, "boolean", "TRUE" },
+			{ 4.5m, "numeric(18,0)", "4.5" },
+			{ 5.5d, "double", "5.5" },
+			{ 6.5f, "double", "6.5" },
+			{ new DateTime(2025, 2, 3, 4, 5, 6, DateTimeKind.Unspecified), "timestamp", "'2025-02-03 04:05:06.000000'::timestamp" },
+			{ new DateTimeOffset(2025, 2, 3, 4, 5, 6, 7, TimeSpan.FromHours(2)), "timestamptz", "'2025-02-03 04:05:06.007000+02:00'::timestamptz" },
+			{ id, "uuid", "'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'::uuid" },
+			{ new byte[] { 0xAB, 0xCD }, "bytea", "'\\xabcd'::bytea" },
+			{ new DateOnly(2025, 2, 3), "date", "'2025-02-03'::date" },
+			{ new TimeOnly(4, 5, 6, 7), "time", "'04:05:06.007000'::time" },
+			{ new TimeSpan(1, 2, 3, 4), "interval", "'1.02:03:04'::interval" },
+			{ new[] { 1, 2 }, "text[]", "ARRAY[1, 2]" }
+		};
+	}
+
+
+
+
+	[Theory]
+	[InlineData(1L, "BIGINT", "1")]
+	[InlineData((short)2, "SMALLINT", "2")]
+	[InlineData((byte)3, "TINYINT", "3")]
+	[InlineData(true, "BIT", "1")]
+	[InlineData(4.5d, "FLOAT", "4.5")]
+	[InlineData(5.5f, "FLOAT", "5.5")]
+	public void SqlServerDebug_WithInferredScalarType_ShouldRenderDeclaration(object value, string typeName, string literal)
+	{
+		using FakeDbCommand command = new() { CommandText = "SELECT @Value" };
+		command.Parameters.Add(new FakeDbParameter { ParameterName = "Value", Value = value });
+
+		string script = SqlServerDebug.RenderCommandAsScript(command);
+
+		script.ShouldContain($"DECLARE @Value {typeName} = {literal};");
+	}
+
+	[Fact]
+	public void SqlServerDebug_WithInferredComplexScalars_ShouldRenderExactDeclarations()
+	{
+		Guid id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+		DateTime created = new(2025, 2, 3, 4, 5, 6, DateTimeKind.Unspecified);
+		DateTimeOffset updated = new(2025, 2, 3, 4, 5, 6, 7, TimeSpan.FromHours(2));
+		using FakeDbCommand command = new() { CommandText = "SELECT @Amount, @Created, @Updated, @Id, @Data" };
+		command.Parameters.Add(new FakeDbParameter { ParameterName = "Amount", Value = 6.25m });
+		command.Parameters.Add(new FakeDbParameter { ParameterName = "Created", Value = created });
+		command.Parameters.Add(new FakeDbParameter { ParameterName = "Updated", Value = updated });
+		command.Parameters.Add(new FakeDbParameter { ParameterName = "Id", Value = id });
+		command.Parameters.Add(new FakeDbParameter { ParameterName = "Data", Value = new byte[] { 0xAB, 0xCD } });
+
+		string script = SqlServerDebug.RenderCommandAsScript(command);
+
+		script.ShouldContain("DECLARE @Amount DECIMAL(18,0) = 6.25;");
+		script.ShouldContain("DECLARE @Created DATETIME2 = '2025-02-03 04:05:06.000';");
+		script.ShouldContain("DECLARE @Updated DATETIMEOFFSET = '2025-02-03 04:05:06.007 +02:00';");
+		script.ShouldContain("DECLARE @Id UNIQUEIDENTIFIER = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';");
+		script.ShouldContain("DECLARE @Data VARBINARY = 0xABCD;");
+	}
+
+}

@@ -1,4 +1,8 @@
-﻿namespace ReinforcedTypings.Tests;
+﻿using CommonNetFuncs.ReinforcedTypings;
+using Reinforced.Typings;
+using System.Reflection;
+
+namespace ReinforcedTypings.Tests;
 
 public sealed class ReinforcedTypingsFluentConfigTests
 {
@@ -454,4 +458,229 @@ public sealed class ReinforcedTypingsFluentConfigTests
 	}
 
 	#endregion
+}
+
+public sealed class ReinforcedTypingsFluentConfigBehaviorTests
+{
+	private static readonly Type GeneratorType = typeof(ReinforcedTypingsFluentConfig);
+
+	private static MethodInfo PrivateMethod(string name) => GeneratorType.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)
+		?? throw new InvalidOperationException($"{name} was not found.");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	[Fact]
+	public void Configure_EmptySourceAssembliesUsesLibraryAssemblyAndNoSchemas()
+	{
+		string output = Path.Combine(Path.GetTempPath(), "rt-empty-source-" + Guid.NewGuid().ToString("N"));
+		ExportContext context = new([], new FilesOperations())
+		{
+			Hierarchical = true,
+			TargetDirectory = output,
+			ConfigurationMethod = ReinforcedTypingsFluentConfig.Configure
+		};
+
+		Should.NotThrow(() => new TsExporter(context).Initialize());
+		Directory.GetFiles(output, "*", SearchOption.AllDirectories).ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void Configure_RelativeSingleTargetWithoutDirectorySkipsHandWrittenFiles()
+	{
+		ExportContext context = new([typeof(ReinforcedTypingsFluentConfigBehaviorTests).Assembly], new FilesOperations())
+		{
+			Hierarchical = false,
+			TargetFile = "single-file.ts",
+			ConfigurationMethod = ReinforcedTypingsFluentConfig.Configure
+		};
+
+		Should.NotThrow(() => new TsExporter(context).Initialize());
+	}
+
+	[Fact]
+	public void Configure_TsConstSerializesFalseDatesAndSkipsIgnoredOrUnreadableProperties()
+	{
+		string outDir = RtTestHarness.RunConfigure(ctx =>
+		{
+			ctx.Global.UseModules = true;
+			ctx.Global.WriteWarningComment = false;
+			ctx.Global.RootNamespace = "ReinforcedTypings.Tests.TestModels";
+		});
+
+		string content = RtTestHarness.ReadGenerated(outDir, "Coverage/RichCoverageConsts.ts");
+
+		content.ShouldContain("Disabled: false,");
+		content.ShouldContain("UpdatedAt: '2025-02-03T04:05:06.0000000+00:00',");
+		content.ShouldContain("Included: 'yes'");
+		content.ShouldNotContain("Ignored");
+		content.ShouldNotContain("WriteOnly");
+	}
+
+	[Fact]
+	public void Configure_TsCollectionsHandlesGenericDictionariesEnumerablesNullableAndUnexportedEnums()
+	{
+		string outDir = RtTestHarness.RunConfigure(ctx =>
+		{
+			ctx.Global.UseModules = true;
+			ctx.Global.WriteWarningComment = false;
+			ctx.Global.UnresolvedToUnknown = true;
+			ctx.Global.RootNamespace = "ReinforcedTypings.Tests.TestModels";
+		});
+
+		string content = RtTestHarness.ReadGenerated(outDir, "Coverage/CollectionShapeCoverage.ts");
+
+		content.ShouldNotContain("GenericDictionary");
+		content.ShouldContain("ExactEnumerable: [1] as number[],");
+		content.ShouldContain("NullableValues: [1, null] as number[],");
+		content.ShouldContain("UnexportedEnumValues: [1] as unknown[],");
+	}
+
+	[Fact]
+	public void Configure_PureTypingsUsesNamespaceAndGlobalDeclarationsAccordingToNamespace()
+	{
+		string outDir = RtTestHarness.RunConfigure(ctx =>
+		{
+			ctx.Global.UseModules = false;
+			ctx.Global.ExportPureTypings = true;
+			ctx.Global.WriteWarningComment = false;
+			ctx.Global.RootNamespace = "ReinforcedTypings.Tests.TestModels";
+		});
+
+		string namespacedConst = RtTestHarness.ReadGenerated(outDir, "Coverage/NamespacedCoverageCollections.ts");
+		namespacedConst.ShouldContain("declare namespace Coverage");
+		namespacedConst.ShouldContain("export const NamespacedCoverageCollectionsCollections");
+
+		string globalConst = RtTestHarness.ReadGenerated(outDir, "GlobalCoverageConsts.ts");
+		globalConst.ShouldContain("declare const GlobalCoverageConsts");
+		globalConst.ShouldNotContain("namespace ");
+	}
+
+	[Fact]
+	public void Configure_DiscardNamespacesFlattensModuleOutput()
+	{
+		string outDir = RtTestHarness.RunConfigure(ctx =>
+		{
+			ctx.Global.UseModules = true;
+			ctx.Global.DiscardNamespacesWhenUsingModules = true;
+			ctx.Global.WriteWarningComment = false;
+			ctx.Global.RootNamespace = "ReinforcedTypings.Tests.TestModels";
+		});
+
+		RtTestHarness.GeneratedFileExists(outDir, "NamespacedCoverageCollections.ts").ShouldBeTrue();
+		RtTestHarness.GeneratedFileExists(outDir, "Coverage/NamespacedCoverageCollections.ts").ShouldBeFalse();
+	}
+
+	[Fact]
+	public void Configure_ChildCollectionImportsParentTypeWithParentRelativePath()
+	{
+		string outDir = RtTestHarness.RunConfigure(ctx =>
+		{
+			ctx.Global.UseModules = true;
+			ctx.Global.WriteWarningComment = false;
+			ctx.Global.RootNamespace = "ReinforcedTypings.Tests.TestModels";
+		});
+
+		string content = RtTestHarness.ReadGenerated(outDir, "Coverage/Child/ChildReferenceCollection.ts");
+
+		content.ShouldContain("from '../ParentReference';");
+	}
+
+	[Fact]
+	public void Configure_NonHierarchicalTargetResolvesTargetFileDirectory()
+	{
+		string outDir = RtTestHarness.RunConfigure(ctx =>
+		{
+			ctx.Hierarchical = false;
+			ctx.TargetFile = Path.Combine(ctx.TargetDirectory!, "bundle.ts");
+			ctx.Global.UseModules = true;
+			ctx.Global.WriteWarningComment = false;
+			ctx.Global.RootNamespace = "ReinforcedTypings.Tests.TestModels";
+		});
+
+		RtTestHarness.GeneratedFileExists(outDir, "Coverage/RichCoverageConsts.ts").ShouldBeTrue();
+	}
+
+	[Fact]
+	public void PrivateSerializationHelpers_ReturnDeterministicFallbacksAndNames()
+	{
+		MethodInfo serializeCollection = PrivateMethod("SerializeCollectionLiteral");
+		MethodInfo toPropertyName = PrivateMethod("ToPropertyName");
+		ExportContext context = new([typeof(ReinforcedTypingsFluentConfigBehaviorTests).Assembly], new FilesOperations());
+		GlobalParameters global = context.Global;
+
+		((string)serializeCollection.Invoke(null, ["not-a-collection", global])!).ShouldBe("[]");
+		((string)serializeCollection.Invoke(null, [42, global])!).ShouldBe("[]");
+		((string)toPropertyName.Invoke(null, ["", global])!).ShouldBeEmpty();
+		global.CamelCaseForProperties = true;
+		((string)toPropertyName.Invoke(null, ["", global])!).ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void ResolveTsNamespace_HandlesUnrelatedAndExactRootNamespaces()
+	{
+		GlobalParameters global = new ExportContext([typeof(ReinforcedTypingsFluentConfigBehaviorTests).Assembly], new FilesOperations()).Global;
+		MethodInfo resolve = PrivateMethod("ResolveTsNamespace");
+
+		global.RootNamespace = "Unrelated.Root";
+		((string?)resolve.Invoke(null, [typeof(TestModels.Coverage.RichCoverageConsts), global])!)
+			.ShouldBe("ReinforcedTypings.Tests.TestModels.Coverage");
+
+		global.RootNamespace = typeof(TestModels.Coverage.RichCoverageConsts).Namespace;
+		((string?)resolve.Invoke(null, [typeof(TestModels.Coverage.RichCoverageConsts), global])!)
+			.ShouldBeNull();
+	}
+
+	[Fact]
+	public void GetImportSpecifier_DifferingNamespaceCaseThatMapsToSameFolderUsesBareFileName()
+	{
+		GlobalParameters global = new ExportContext([typeof(ReinforcedTypingsFluentConfigBehaviorTests).Assembly], new FilesOperations()).Global;
+		global.RootNamespace = "ReinforcedTypings.Tests.TestModels";
+
+		string result = (string)PrivateMethod("GetImportSpecifier").Invoke(null,
+		[
+			typeof(TestModels.PathCase.UPPER.ChildCaseModel),
+			typeof(TestModels.PathCase.Upper.ParentCaseModel),
+			global
+		])!;
+
+		result.ShouldBe("ParentCaseModel");
+
+		string fromGlobal = (string)PrivateMethod("GetImportSpecifier").Invoke(null,
+			[typeof(GlobalCoverageConsts), typeof(TestModels.PathCase.UPPER.ChildCaseModel), global])!;
+		string toGlobal = (string)PrivateMethod("GetImportSpecifier").Invoke(null,
+			[typeof(TestModels.PathCase.UPPER.ChildCaseModel), typeof(GlobalCoverageConsts), global])!;
+		fromGlobal.ShouldBe("./PathCase/UPPER/ChildCaseModel");
+		toGlobal.ShouldBe("../../GlobalCoverageConsts");
+	}
+
+	[Fact]
+	public void ResolveOutputDirectory_RelativeTargetWithoutDirectoryReturnsNull()
+	{
+		ExportContext context = new([typeof(ReinforcedTypingsFluentConfigBehaviorTests).Assembly], new FilesOperations())
+		{
+			Hierarchical = false,
+			TargetFile = "models.ts"
+		};
+
+		string? result = (string?)PrivateMethod("ResolveOutputDirectory").Invoke(null, [context]);
+
+		result.ShouldBeNull();
+	}
+
 }

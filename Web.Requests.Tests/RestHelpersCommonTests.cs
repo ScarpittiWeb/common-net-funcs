@@ -1,6 +1,6 @@
-﻿using System.Net;
+﻿using CommonNetFuncs.Web.Requests.Rest;
+using System.Net;
 using System.Text;
-using CommonNetFuncs.Web.Requests.Rest;
 using static Xunit.TestContext;
 
 namespace Web.Requests.Tests;

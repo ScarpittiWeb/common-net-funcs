@@ -1,8 +1,8 @@
-﻿using System.Collections;
+﻿using FastExpressionCompiler;
+using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
-using FastExpressionCompiler;
 using static CommonNetFuncs.Core.ReflectionCaches;
 
 namespace CommonNetFuncs.Core;
@@ -274,11 +274,6 @@ public static class Copy
 	/// <returns>A new instance of the destination type with properties copied from the source.</returns>
 	private static object? CopyObject(object source, Type destType, int depth, int maxDepth)
 	{
-		if (source == null)
-		{
-			return null;
-		}
-
 		Type sourceType = source.GetType();
 		object? dest = Activator.CreateInstance(destType);
 
@@ -347,11 +342,6 @@ public static class Copy
 	/// <returns>A new collection of the specified type containing deep copies of the elements in the source collection. Returns <see langword="null"/> if <paramref name="source"/> is <see langword="null"/>.</returns>
 	private static object? CopyCollection(object source, Type destType, int maxDepth, CancellationToken cancellationToken = default)
 	{
-		if (source == null)
-		{
-			return null;
-		}
-
 		IEnumerable sourceCollection = (IEnumerable)source;
 
 		// Check if the destination type is a dictionary
@@ -583,11 +573,6 @@ public static class Copy
 	/// <returns>A new instance of the destination type with copied properties.</returns>
 	private static TDest? CopyPropertiesToNewRecursiveExpressionTrees<TSource, TDest>(this TSource source, int maxDepth = -1) where TSource : class where TDest : class, new()
 	{
-		if (source == null)
-		{
-			return default;
-		}
-
 		Func<object, object?, int, int, object?> copyFunc = GetOrCreateCopyFunction(typeof(TSource), typeof(TDest));
 		return (TDest?)copyFunc(source, null, 0, maxDepth);
 	}
@@ -735,16 +720,7 @@ public static class Copy
 	/// <returns> <see langword="true"/> if <paramref name="sourceType"/> can be converted into <paramref name="destType"/>, otherwise <see langword="false"/>.</returns>
 	private static bool CanConvertTypes(Type sourceType, Type destType)
 	{
-		// Check for implicit/explicit conversions
-		try
-		{
-			// This is a simple check - you might want to make this more sophisticated
-			return sourceType == destType || destType.IsAssignableFrom(sourceType) || (sourceType.IsPrimitive && destType.IsPrimitive);
-		}
-		catch
-		{
-			return false;
-		}
+		return sourceType == destType || destType.IsAssignableFrom(sourceType) || (sourceType.IsPrimitive && destType.IsPrimitive);
 	}
 
 	/// <summary>

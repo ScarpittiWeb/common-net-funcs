@@ -10,17 +10,19 @@ and exporting either source shape. The package targets `net11.0` and
 
 ## Contents
 
-- [Reading typed records](#reading-typed-records)
-  - [`ReadCsv`](#readcsv)
-  - [`ReadCsvAsync`](#readcsvasync)
-  - [`ReadCsvAsyncEnumerable`](#readcsvasyncenumerable)
-- [Reading into a DataTable](#reading-into-a-datatable)
-- [Writing CSV](#writing-csv)
-  - [Typed generic sequences](#typed-generic-sequences)
-  - [`DataTable`](#datatable)
-- [Behavior and limitations](#behavior-and-limitations)
-- [Installation](#installation)
-- [License](#license)
+- [CommonNetFuncs.Csv](#commonnetfuncscsv)
+  - [Contents](#contents)
+  - [Reading typed records](#reading-typed-records)
+    - [`ReadCsv`](#readcsv)
+    - [`ReadCsvAsync`](#readcsvasync)
+    - [`ReadCsvAsyncEnumerable`](#readcsvasyncenumerable)
+  - [Reading into a DataTable](#reading-into-a-datatable)
+  - [Writing CSV](#writing-csv)
+    - [Typed generic sequences](#typed-generic-sequences)
+    - [`DataTable`](#datatable)
+  - [Behavior and limitations](#behavior-and-limitations)
+  - [Installation](#installation)
+  - [License](#license)
 
 All examples below assume:
 
@@ -38,7 +40,7 @@ public sealed class Person
 }
 ```
 
-CsvHelper's mapping features still apply. For headerless data, positional
+CsvHelper's mapping features still apply. For data without headers, positional
 attributes/mapping or a matching member order are needed. Choose a culture
 explicitly when parsing culture-sensitive values rather than depending on the
 process culture.

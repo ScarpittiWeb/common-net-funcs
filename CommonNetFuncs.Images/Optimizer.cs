@@ -1,8 +1,11 @@
-﻿#if !NETSTANDARD2_1
-using System.Collections.Frozen;
-#endif
-using CliWrap;
+﻿using CliWrap;
 using CliWrap.Buffered;
+
+#if !NETSTANDARD2_1
+
+using System.Collections.Frozen;
+
+#endif
 
 namespace CommonNetFuncs.Images;
 

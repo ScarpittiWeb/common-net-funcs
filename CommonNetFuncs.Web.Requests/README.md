@@ -8,16 +8,34 @@ HTTP request, response, retry, streaming, JSON Patch, cache, and MessagePack hel
 
 ## Contents
 
-- [Installation](#installation)
-- [Direct REST helpers](#direct-rest-helpers)
-- [Request and response contracts](#request-and-response-contracts)
-- [Dependency-injected REST wrapper](#dependency-injected-rest-wrapper)
-- [Response stream readers and chunking](#response-stream-readers-and-chunking)
-- [MessagePack/NDJSON server streaming](#messagepackndjson-server-streaming)
-- [JSON Patch](#json-patch)
-- [Distributed cache extensions](#distributed-cache-extensions)
-- [Other public models](#other-public-models)
-- [License](#license)
+- [CommonNetFuncs.Web.Requests](#commonnetfuncswebrequests)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [Direct REST helpers](#direct-rest-helpers)
+    - [Call all direct helper overloads](#call-all-direct-helper-overloads)
+    - [Inspect status, headers, and result](#inspect-status-headers-and-result)
+  - [Request and response contracts](#request-and-response-contracts)
+    - [`RequestOptions<TBody>`](#requestoptionstbody)
+    - [Response types](#response-types)
+    - [Header constants](#header-constants)
+  - [Dependency-injected REST wrapper](#dependency-injected-rest-wrapper)
+    - [Register services](#register-services)
+    - [Wrapper options](#wrapper-options)
+    - [Retry configuration and exact semantics](#retry-configuration-and-exact-semantics)
+    - [Every wrapper method](#every-wrapper-method)
+  - [Response stream readers and chunking](#response-stream-readers-and-chunking)
+    - [Read a complete response](#read-a-complete-response)
+    - [Read an asynchronous stream](#read-an-asynchronous-stream)
+    - [Compute chunk sizes](#compute-chunk-sizes)
+  - [MessagePack/NDJSON server streaming](#messagepackndjson-server-streaming)
+  - [JSON Patch](#json-patch)
+    - [Generate a patch](#generate-a-patch)
+    - [Install the MVC input formatter](#install-the-mvc-input-formatter)
+  - [Distributed cache extensions](#distributed-cache-extensions)
+  - [Other public models](#other-public-models)
+    - [MessagePack/MemoryPack data sample](#messagepackmemorypack-data-sample)
+    - [Problem details with errors](#problem-details-with-errors)
+  - [License](#license)
 
 ## Installation
 
@@ -214,7 +232,7 @@ factoryStream.Response?.Dispose();
 | `PatchDocument` | PATCH `HttpContent`. |
 | `BearerToken` | Adds an `Authorization: Bearer ...` header. |
 | `HttpHeaders` | Custom request headers. |
-| `Timeout` | Per-request seconds; null/nonpositive uses 100 seconds. |
+| `Timeout` | Per-request seconds; null/non-positive uses 100 seconds. |
 | `JsonSerializerOptions` | System.Text.Json response/options and JSON request-body configuration where supported. |
 | `UseNewtonsoftDeserializer` | Uses Newtonsoft.Json for JSON responses instead of System.Text.Json. |
 | `MessagePackSerializerOptions` | MessagePack request/response options. |

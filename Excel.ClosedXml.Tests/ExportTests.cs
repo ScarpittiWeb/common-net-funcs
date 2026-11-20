@@ -1,8 +1,11 @@
-﻿using System.Data;
-using AutoFixture;
+﻿using AutoFixture;
 using ClosedXML.Excel;
 using CommonNetFuncs.Excel.ClosedXml;
 using CommonNetFuncs.Excel.Common;
+using DocumentFormat.OpenXml;
+using NSubstitute;
+using System.Data;
+using System.Reflection;
 using static CommonNetFuncs.Excel.ClosedXml.Export;
 using static Xunit.TestContext;
 
@@ -897,4 +900,65 @@ public sealed class ExportTests : IDisposable
 	}
 
 	#endregion
+}
+
+public sealed class ClosedXmlExportBehaviorTests
+{
+
+
+
+
+
+
+	private static IEnumerable<ClosedXmlExportRow> ThrowAfterOne()
+	{
+		yield return new ClosedXmlExportRow { Value = "first" };
+		throw new InvalidOperationException("enumeration failed");
+	}
+
+	private sealed class ClosedXmlExportRow
+	{
+		public string? Value { get; set; }
+	}
+
+	private sealed class ThrowingValue
+	{
+		public override string ToString() => throw new InvalidOperationException("serialization failed");
+	}
+
+	[Fact]
+	public async Task GenericExcelExport_WhenEnumerationFails_ReturnsNull()
+	{
+		MemoryStream? result = await ThrowAfterOne().GenericExcelExport(cancellationToken: Current.CancellationToken);
+
+		result.ShouldBeNull();
+	}
+
+	[Fact]
+	public async Task GenericExcelExport_DataTableValueSerializationFailure_ReturnsNull()
+	{
+		using System.Data.DataTable table = new();
+		table.Columns.Add("Value", typeof(object));
+		table.Rows.Add(new ThrowingValue());
+
+		MemoryStream? result = await table.GenericExcelExport(cancellationToken: Current.CancellationToken);
+
+		result.ShouldBeNull();
+	}
+
+	[Fact]
+	public void FinalizeWorksheet_WhenColumnSizingFails_SwallowsFailure()
+	{
+		IXLWorksheet worksheet = Substitute.For<IXLWorksheet>();
+		IXLRange range = Substitute.For<IXLRange>();
+		IXLColumn column = Substitute.For<IXLColumn>();
+		worksheet.Range(1, 1, 2, 1).Returns(range);
+		worksheet.Column(1).Returns(column);
+		column.AdjustToContents().Returns(_ => throw new InvalidOperationException("font metrics unavailable"));
+		MethodInfo method = typeof(CommonNetFuncs.Excel.ClosedXml.Export)
+			.GetMethod("FinalizeWorksheet", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+		Should.NotThrow(() => method.Invoke(null, [worksheet, false, 2, 1, "Table", CommonNetFuncs.Excel.Common.ETableStyle.TableStyleMedium1]));
+	}
+
 }

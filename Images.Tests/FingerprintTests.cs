@@ -759,3 +759,69 @@ public sealed class FingerprintTests
 		a.ShouldBe(b);
 	}
 }
+
+public sealed class ImageFingerprintBehaviorTests
+{
+	private static readonly string TestDataDirectory = Path.Combine(AppContext.BaseDirectory, "TestData");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static MemoryStream OpenTestImage() =>
+		new(File.ReadAllBytes(Path.Combine(TestDataDirectory, "test.png")));
+
+	private static SKBitmap CreateBitmap()
+	{
+		SKBitmap bitmap = new(8, 8);
+		bitmap.Erase(SKColors.Red);
+		return bitmap;
+	}
+
+	private sealed class NonSeekableReadStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public override bool CanSeek => false;
+	}
+
+	[Fact]
+	public void FingerprintImage_InvalidAlgorithm_Throws()
+	{
+		using SKBitmap bitmap = CreateBitmap();
+
+		Should.Throw<ArgumentOutOfRangeException>(() => bitmap.FingerprintImage("invalid", (ImageHashAlgorithm)999));
+	}
+
+	[Fact]
+	public void FingerprintImage_InvalidSpan_ThrowsInvalidData()
+	{
+		ArgumentNullException? exception = null;
+		try
+		{
+			ReadOnlySpan<byte> bytes = [1, 2, 3, 4, 5];
+			bytes.FingerprintImage("invalid");
+		}
+		catch (ArgumentNullException ex)
+		{
+			exception = ex;
+		}
+		exception.ShouldNotBeNull();
+	}
+
+}

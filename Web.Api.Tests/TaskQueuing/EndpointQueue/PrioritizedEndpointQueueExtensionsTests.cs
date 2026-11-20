@@ -1,13 +1,17 @@
-﻿using System.Net;
-using CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
+﻿using CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
+using FakeItEasy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Moq;
+using System.Net;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests.TaskQueuing.EndpointQueue;
@@ -292,4 +296,72 @@ public sealed class PrioritizedEndpointQueueExtensionsTests
 	#endregion
 
 	public class TestController : ControllerBase;
+}
+
+public sealed class PrioritizedEndpointQueueExtensionsDefaultBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+	private static async Task<WebApplication> CreateApp(Action<WebApplication> configure)
+	{
+		WebApplicationBuilder builder = WebApplication.CreateBuilder();
+		builder.Logging.ClearProviders();
+		builder.WebHost.UseTestServer();
+		WebApplication app = builder.Build();
+		configure(app);
+		await app.StartAsync();
+		return app;
+	}
+
+	private static OpenApiDocumentTransformerContext CreateOpenApiContext() => new()
+	{
+		DocumentName = "coverage",
+		DescriptionGroups = [],
+		ApplicationServices = null!
+	};
+
+	private sealed class CoverageController : ControllerBase;
+
+	[Fact]
+	public async Task PrioritizedEndpointQueueExtensions_NoActionDefaultKeysAndTokensAreExact()
+	{
+		ControllerBase controller = new CoverageController();
+		Mock<IPrioritizedEndpointQueueService> service = new();
+		using CancellationTokenSource requestAbort = new();
+		controller.ControllerContext = new ControllerContext
+		{
+			HttpContext = new DefaultHttpContext { RequestAborted = requestAbort.Token },
+			ActionDescriptor = null!
+		};
+		service.Setup(x => x.ExecuteAsync(
+				"Coverage.NoAction",
+				It.IsAny<Func<CancellationToken, Task<int>>>(),
+				TaskPriority.High,
+				requestAbort.Token))
+			.ReturnsAsync(21);
+		service.Setup(x => x.ExecuteAsync(
+				"Coverage.NoAction",
+				It.IsAny<Func<CancellationToken, Task<int>>>(),
+				7,
+				requestAbort.Token))
+			.ReturnsAsync(22);
+
+		int level = await controller.ExecutePrioritizedAsync(service.Object, _ => Task.FromResult(0), TaskPriority.High);
+		int custom = await controller.ExecutePrioritizedAsync(service.Object, _ => Task.FromResult(0), 7);
+
+		level.ShouldBe(21);
+		custom.ShouldBe(22);
+		service.VerifyAll();
+	}
+
 }

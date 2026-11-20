@@ -1,7 +1,7 @@
-﻿using System.Globalization;
+﻿using CommonNetFuncs.Core;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
-using CommonNetFuncs.Core;
 using static Xunit.TestContext;
 
 namespace Core.Tests;
@@ -3905,3 +3905,379 @@ public sealed class StringsTests
 }
 
 	#endregion
+
+public sealed class StringsBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	public sealed class GapStringHolder
+	{
+		public string? Value { get; set; }
+
+		public GapStringHolder? Child { get; set; }
+	}
+
+	public sealed class GapNoStringHolder
+	{
+		public int Value { get; set; }
+	}
+
+	[Theory]
+	[InlineData("already lowercase")]
+	[InlineData("ALL")]
+	[InlineData("PascalCase")]
+	public void ParsePascalCase_CoversUnchangedAndExpandedInputs(string input)
+	{
+		string expected = input switch
+		{
+			"PascalCase" => "Pascal Case",
+			"ALL" => "A L L",
+			_ => input
+		};
+
+		input.ParsePascalCase().ShouldBe(expected);
+		input.AsSpan().ParsePascalCase().ToString().ShouldBe(expected);
+	}
+
+	[Fact]
+	public void ToTitleCase_LongUppercaseWord_UsesAllocationSafePath()
+	{
+		string word = new('A', 300);
+		string notAllUppercase = "A" + new string('b', 299);
+
+		word.ToTitleCase("en-US", TitleCaseUppercaseWordHandling.ConvertAllUppercase, cancellationToken: Current.CancellationToken).ShouldBe(char.ToUpperInvariant('a') + word[1..].ToLowerInvariant());
+		notAllUppercase.ToTitleCase("en-US", TitleCaseUppercaseWordHandling.ConvertAllUppercase, cancellationToken: Current.CancellationToken).ShouldBe(notAllUppercase);
+	}
+
+	[Theory]
+	[InlineData("abc", 'b', 1)]
+	[InlineData("abc", null, -1)]
+	public void IndexOfInvariant_SpanChar_HandlesFoundAndNull(string input, char? target, int expected)
+	{
+		input.AsSpan().IndexOfInvariant(target).ShouldBe(expected);
+	}
+
+	[Theory]
+	[InlineData(true, "a\u0301")]
+	[InlineData(false, " a\u0301 ")]
+	public void NormalizeObjectStringsR_HandlesTrimMode(bool trim, string expected)
+	{
+		GapStringHolder value = new() { Value = " a\u0301 " };
+
+		value.NormalizeObjectStringsR(trim, NormalizationForm.FormD).ShouldBeSameAs(value);
+		value.Value.ShouldBe(expected);
+	}
+
+	[Fact]
+	public void ObjectStringHelpers_HandleObjectsWithoutStringPropertiesAndNulls()
+	{
+		GapNoStringHolder noStrings = new();
+		GapStringHolder nested = new() { Value = "null", Child = null };
+
+		noStrings.TrimObjectStrings(true).ShouldBeSameAs(noStrings);
+		noStrings.MakeObjectNullNull(true).ShouldBeSameAs(noStrings);
+		nested.TrimObjectStrings(true).Value.ShouldBe("null");
+		nested.MakeObjectNullNull(true).Value.ShouldBeNull();
+		((GapStringHolder?)null).NormalizeObjectStringsR().ShouldBeNull();
+	}
+
+	[Fact]
+	public void NullableToNString_ReturnsNullOrFormattedValue()
+	{
+		((DateTime?)null).ToNString("yyyy").ShouldBeNull();
+		((DateOnly?)null).ToNString("yyyy").ShouldBeNull();
+		((TimeSpan?)null).ToNString("c").ShouldBeNull();
+
+		((DateTime?)new DateTime(2025, 3, 4)).ToNString("yyyy-MM-dd").ShouldBe("2025-03-04");
+		((DateOnly?)new DateOnly(2025, 3, 4)).ToNString("yyyy-MM-dd").ShouldBe("2025-03-04");
+		((TimeSpan?)new TimeSpan(1, 2, 3)).ToNString("c").ShouldBe("01:02:03");
+	}
+
+	[Theory]
+	[InlineData("2024-02-29")]
+	[InlineData("45291.5")]
+	[InlineData("not-a-date")]
+	public void ToNDateTime_StringAndSpan_UseCultureAndOaDateFallback(string value)
+	{
+		DateTime? fromString = value.ToNDateTime(CultureInfo.InvariantCulture);
+		DateTime? fromSpan = value.AsSpan().ToNDateTime(CultureInfo.InvariantCulture);
+
+		fromString.ShouldBe(fromSpan);
+		if (value == "not-a-date")
+		{
+			fromString.ShouldBeNull();
+		}
+	}
+
+	[Theory]
+	[InlineData("2024-02-29")]
+	[InlineData("45291.5")]
+	[InlineData("not-a-date")]
+	public void ToNDateOnly_StringAndSpan_UseCultureAndOaDateFallback(string value)
+	{
+		DateOnly? fromString = value.ToNDateOnly(CultureInfo.InvariantCulture);
+		DateOnly? fromSpan = value.AsSpan().ToNDateOnly(CultureInfo.InvariantCulture);
+
+		fromString.ShouldBe(fromSpan);
+		if (value == "not-a-date")
+		{
+			fromString.ShouldBeNull();
+		}
+	}
+
+	[Fact]
+	public void TimespanToShortForm_NullableNullAndMilliseconds_Work()
+	{
+		((TimeSpan?)null).TimespanToShortForm().ShouldBeEmpty();
+		new TimeSpan(0, 1, 2, 3, 400).TimespanToShortForm().ShouldBe("01:02:03");
+	}
+
+	[Fact]
+	public void FormatDateString_NullAndBlankOutputUseContractDefaults()
+	{
+		((string?)null).FormatDateString("yyyyMMdd").ShouldBeNull();
+		"20240305".FormatDateString("yyyyMMdd", " ").ShouldBe("03/05/2024");
+		"20240305".AsSpan().FormatDateString("yyyyMMdd", " ").ToString().ShouldBe("03/05/2024");
+		ReadOnlySpan<char>.Empty.FormatDateString("yyyyMMdd").IsEmpty.ShouldBeTrue();
+	}
+
+	[Fact]
+	public void ReplaceInverse_AddsManyDistinctRegexesWithoutChangingResults()
+	{
+		"ab".ReplaceInverse("a", "_").ShouldBe("a_");
+		"ab".ReplaceInverse("a", "_").ShouldBe("a_");
+		for (int i = 0; i < 70; i++)
+		{
+			"ab".ReplaceInverse($"a(?!{i})", "_").ShouldBe("a_");
+		}
+	}
+
+	[Fact]
+	public void UrlEncodeReadable_UsesDefaultsAndPreservesWhitespaceInput()
+	{
+		"hello world/test".UrlEncodeReadable(cancellationToken: Current.CancellationToken).ShouldBe("hello world/test");
+		"   ".UrlEncodeReadable(cancellationToken: Current.CancellationToken).ShouldBe("   ");
+	}
+
+	[Theory]
+	[InlineData("11234567890", "$", "+1 123$3$4")]
+	[InlineData("121234567890", "$", "+12 123$3$4")]
+	[InlineData("123456789", "$", "123456789x42")]
+	public void FormatPhoneNumber_RegexFallback_PinsSubstitutionAndDefaultBehavior(string number, string separator, string expected)
+	{
+		if (number == "123456789")
+		{
+			number += "x42";
+		}
+
+		number.FormatPhoneNumber(separator).ShouldBe(expected);
+	}
+
+	[Fact]
+	public void FormatPhoneNumber_NullWhitespaceAndEmptySeparatorFollowContract()
+	{
+		((string?)null).FormatPhoneNumber().ShouldBeNull();
+		" ".FormatPhoneNumber().ShouldBe(" ");
+		"1234567".FormatPhoneNumber(string.Empty).ShouldBe("1234567");
+	}
+
+	[Fact]
+	public void FormatPhoneNumber_RegexPathPreservesExtensionAfterFormattedNumber()
+	{
+		"11234567890x42".FormatPhoneNumber("$", true).ShouldBe("+1 (123)$3$4x42");
+	}
+
+	[Fact]
+	public void ToFractionString_NullableInputsAndWholeValues_PreserveOutputShape()
+	{
+		((decimal?)null).ToFractionString(2).ShouldBeNull();
+		((double?)null).ToFractionString(2).ShouldBeNull();
+		((decimal?)3.25m).ToFractionString(2).ShouldBe("3 1/4");
+		((double?)3.25d).ToFractionString(2).ShouldBe("3 1/4");
+	}
+
+	[Fact]
+	public void ToFractionString_ZeroGcdInputsKeepUnsimplifiedShape()
+	{
+		((decimal?)0m).ToFractionString(-1).ShouldBe("0 0/0");
+		0m.ToFractionString(-1).ShouldBe("0 0/0");
+		((double?)0d).ToFractionString(-1).ShouldBe("0 0/0");
+		0d.ToFractionString(-1).ShouldBe("0 0/0");
+	}
+
+	[Theory]
+	[InlineData("1/2", 0.5d)]
+	[InlineData("2 1/4", 2.25d)]
+	[InlineData("12.5", 12.5d)]
+	public void FractionParsers_ParseSimpleMixedAndDecimalForms(string input, double expected)
+	{
+		input.FractionToDecimal().ShouldBe((decimal)expected);
+		input.FractionToDouble().ShouldBe(expected);
+		input.TryFractionToDecimal(out decimal decimalResult).ShouldBeTrue();
+		decimalResult.ShouldBe((decimal)expected);
+		input.TryFractionToDouble(out double doubleResult).ShouldBeTrue();
+		doubleResult.ShouldBe(expected);
+	}
+
+	[Theory]
+	[InlineData(null)]
+	[InlineData("")]
+	[InlineData("one/two")]
+	[InlineData("1/2/3/4")]
+	[InlineData("1/0")]
+	public void FractionParsers_InvalidValuesAreReportedByTryOverloads(string? input)
+	{
+		input.TryFractionToDecimal(out decimal? nullableDecimal).ShouldBeFalse();
+		nullableDecimal.ShouldBeNull();
+		input.TryFractionToDecimal(out decimal decimalValue).ShouldBeFalse();
+		decimalValue.ShouldBe(0m);
+		bool doubleSuccess = input.TryFractionToDouble(out double? nullableDouble);
+		doubleSuccess.ShouldBe(input == "1/0");
+		if (input == "1/0")
+		{
+			nullableDouble.ShouldBe(double.PositiveInfinity);
+		}
+		else
+		{
+			nullableDouble.ShouldBeNull();
+		}
+	}
+
+	[Fact]
+	public void TryStringNumberParsers_RejectMalformedAndOverflowingInput()
+	{
+		const string value = "///";
+		value.TryStringToDecimal(out decimal? nullableDecimal).ShouldBeFalse();
+		nullableDecimal.ShouldBeNull();
+		value.TryStringToDecimal(out decimal decimalValue).ShouldBeFalse();
+		decimalValue.ShouldBe(0);
+		value.TryStringToDouble(out double? nullableDouble).ShouldBeFalse();
+		nullableDouble.ShouldBeNull();
+		value.TryStringToDouble(out double doubleValue).ShouldBeFalse();
+		doubleValue.ShouldBe(0);
+
+		string tooLargeForDecimal = new('9', 100);
+		tooLargeForDecimal.TryStringToDecimal(out decimal? overflowDecimal).ShouldBeFalse();
+		overflowDecimal.ShouldBeNull();
+		tooLargeForDecimal.TryStringToDecimal(out decimal overflowValue).ShouldBeFalse();
+		overflowValue.ShouldBe(0);
+
+		"1 2/0".TryFractionToDecimal(out decimal _).ShouldBeFalse();
+		Should.Throw<FormatException>(() => "1 2/x".FractionToDecimal());
+	}
+
+	[Fact]
+	public void FractionToDecimal_NullAndMalformedInputs_PreserveExceptions()
+	{
+		((string?)null).FractionToDecimal().ShouldBeNull();
+		Should.Throw<FormatException>(() => "1/2/3/4".FractionToDecimal());
+		Should.Throw<FormatException>(() => "1 two".FractionToDecimal());
+		Should.Throw<FormatException>(() => "1 2/x".FractionToDecimal());
+	}
+
+	[Theory]
+	[InlineData("abc 12.5", true, 12.5d)]
+	[InlineData("amount 3 1/4 kg", true, 3.25d)]
+	[InlineData("no digits", false, 0d)]
+	[InlineData("0", true, 0d)]
+	public void TryStringToNumber_ExercisesFractionAndFallbackParsing(string input, bool expected, double expectedValue)
+	{
+		input.TryStringToDecimal(out decimal? nullableDecimal).ShouldBe(expected);
+		input.TryStringToDecimal(out decimal decimalValue).ShouldBe(expected && expectedValue != 0);
+		input.TryStringToDouble(out double? nullableDouble).ShouldBe(expected);
+		input.TryStringToDouble(out double doubleValue).ShouldBe(expected && expectedValue != 0);
+
+		if (expected)
+		{
+			nullableDecimal.ShouldBe((decimal)expectedValue);
+			nullableDouble.ShouldBe(expectedValue);
+			if (expectedValue != 0)
+			{
+				decimalValue.ShouldBe((decimal)expectedValue);
+				doubleValue.ShouldBe(expectedValue);
+			}
+		}
+	}
+
+	[Fact]
+	public void LetterAndNumberFilters_UsePooledBuffersForLongInputs()
+	{
+		string letters = new string('A', 300) + "123";
+		string numbers = new string('x', 300) + " 12.5/2";
+
+		letters.GetOnlyLetters().ShouldBe(new string('A', 300));
+		numbers.GetOnlyNumbers().ShouldBe("12.52");
+		numbers.GetOnlyNumbers(true).ShouldBe("12.5/2");
+	}
+
+	[Fact]
+	public void RemoveOuterNonAlphanumeric_HandlesAlreadyCleanAndAllPunctuation()
+	{
+		"abc123".RemoveLeadingNonAlphanumeric().ShouldBe("abc123");
+		"abc123".AsSpan().RemoveLeadingNonAlphanumeric().ToString().ShouldBe("abc123");
+		"abc123".RemoveTrailingNonAlphanumeric().ShouldBe("abc123");
+		"abc123".AsSpan().RemoveTrailingNonAlphanumeric().ToString().ShouldBe("abc123");
+		"!!!".RemoveLeadingNonAlphanumeric().ShouldBeEmpty();
+		"!!!".AsSpan().RemoveTrailingNonAlphanumeric().ToString().ShouldBe("!");
+	}
+
+	[Fact]
+	public void CharacterThresholdChecks_CoverInvalidAndZeroThresholds()
+	{
+		Should.Throw<ArgumentException>(() => ReadOnlySpan<char>.Empty.HasNoMoreThanNumberOfChars('x', -1));
+		ReadOnlySpan<char>.Empty.HasNoMoreThanNumberOfChars('x', 0).ShouldBeTrue();
+		ReadOnlySpan<char>.Empty.HasNoLessThanNumberOfChars('x', 0).ShouldBeTrue();
+		"abc".AsSpan().HasNoLessThanNumberOfChars('a', 0).ShouldBeTrue();
+		"abc".AsSpan().HasNoLessThanNumberOfChars('z', 1).ShouldBeFalse();
+		Should.Throw<ArgumentException>(() => "abc".HasNoMoreThanNumberOfChars('x', -1));
+		Should.Throw<ArgumentException>(() => "abc".HasNoLessThanNumberOfChars('x', -1));
+		Should.Throw<InvalidDataException>(() => "abc".HasNoMoreThanNumberOfChars("xy", 1));
+		Should.Throw<InvalidDataException>(() => "abc".HasNoLessThanNumberOfChars("xy", 1));
+		Should.Throw<ArgumentException>(() => "abc".HasNoMoreThanNumberOfChars("x", -1));
+		Should.Throw<ArgumentException>(() => "abc".HasNoLessThanNumberOfChars("x", -1));
+		Should.Throw<ArgumentException>(() => "abc".AsSpan().HasNoLessThanNumberOfChars('x', -1));
+	}
+
+	[Fact]
+	public void RecursiveObjectStringHelpers_ExecuteNestedNullChecks()
+	{
+		GapStringHolder value = new()
+		{
+			Value = " outer ",
+			Child = new() { Value = " inner " }
+		};
+
+		value.NormalizeObjectStrings(true, NormalizationForm.FormD, recursive: true, useCache: false);
+		value.MakeObjectNullNull(recursive: true);
+		value.Child!.Value.ShouldBe("inner");
+
+		GapStringHolder noChild = new() { Child = null };
+		noChild.NormalizeObjectStrings(true, NormalizationForm.FormD, recursive: true, useCache: false);
+		noChild.MakeObjectNullNull(recursive: true);
+	}
+
+}

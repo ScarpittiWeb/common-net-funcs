@@ -8,15 +8,17 @@
 
 ## Contents
 
-- [Installation](#installation)
-- [Package relationship](#package-relationship)
-- [Usage](#usage)
-- [Attribute options](#attribute-options)
-- [Generator behavior](#generator-behavior)
-- [Diagnostics](#diagnostics)
-- [Runtime limitations and supported shapes](#runtime-limitations-and-supported-shapes)
-- [Targets and compatibility](#targets-and-compatibility)
-- [License](#license)
+- [CommonNetFuncs.SubsetModelBinder](#commonnetfuncssubsetmodelbinder)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [Package relationship](#package-relationship)
+  - [Usage](#usage)
+  - [Attribute options](#attribute-options)
+  - [Generator behavior](#generator-behavior)
+  - [Diagnostics](#diagnostics)
+  - [Runtime limitations and supported shapes](#runtime-limitations-and-supported-shapes)
+  - [Targets and compatibility](#targets-and-compatibility)
+  - [License](#license)
 
 ## Installation
 

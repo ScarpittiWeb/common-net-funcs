@@ -1,8 +1,9 @@
-﻿using System.Net;
-using CommonNetFuncs.Web.Requests.Rest;
+﻿using CommonNetFuncs.Web.Requests.Rest;
 using CommonNetFuncs.Web.Requests.Rest.Options;
 using CommonNetFuncs.Web.Requests.Rest.RestHelperWrapper;
 using MessagePack;
+using System.Collections.ObjectModel;
+using System.Net;
 using static CommonNetFuncs.Compression.Streams;
 using static CommonNetFuncs.Web.Common.ContentTypes;
 using static CommonNetFuncs.Web.Requests.Rest.RestHelperConstants;
@@ -997,4 +998,175 @@ public sealed class WrapperHelpersTests
 	}
 
 	#endregion
+}
+
+public sealed class WrapperHelpersBehaviorTests
+{
+
+
+
+
+
+
+
+	private sealed class HelperBody
+	{
+		public string Value { get; set; } = string.Empty;
+	}
+
+	[Fact]
+	public void UpdateStreamingHeaders_ConvertsReadOnlyDictionaryAndSetsExactJsonState()
+	{
+		RestHelperOptions options = new("stream", "api",
+			HttpHeaders: new ReadOnlyDictionary<string, string>(
+				new Dictionary<string, string> { ["X-Original"] = "kept" }));
+		IDictionary<string, string> original = options.HttpHeaders!;
+
+		WrapperHelpers.UpdateStreamingHeaders(options);
+
+		options.HttpHeaders.ShouldNotBeSameAs(original);
+		options.HttpHeaders.ShouldBeOfType<Dictionary<string, string>>();
+		options.HttpHeaders!["X-Original"].ShouldBe("kept");
+		options.HttpHeaders[AcceptHeader].ShouldBe(Json);
+		options.HttpHeaders.Count.ShouldBe(2);
+	}
+
+	[Fact]
+	public async Task PopulateBearerToken_UsesExactConfiguredDynamicAndCurrentTokenStates()
+	{
+		RestHelperOptions configured = new("endpoint", "api", BearerToken: "configured-token",
+			ResilienceOptions: new ResilienceOptions
+			{
+				GetBearerTokenFunc = (_, _) => ValueTask.FromResult("should-not-run")
+			});
+		(await WrapperHelpers.PopulateBearerToken(configured, 0, null, "current")).ShouldBe("configured-token");
+
+		List<(string ApiName, bool Refresh)> calls = [];
+		RestHelperOptions dynamic = new("endpoint", "api",
+			ResilienceOptions: new ResilienceOptions
+			{
+				GetBearerTokenFunc = (apiName, refresh) =>
+				{
+					calls.Add((apiName, refresh));
+					return ValueTask.FromResult(refresh ? "refreshed" : "initial");
+				}
+			});
+		(await WrapperHelpers.PopulateBearerToken(dynamic, 0, null, null)).ShouldBe("initial");
+		(await WrapperHelpers.PopulateBearerToken(dynamic, 1, new HttpResponseMessage(HttpStatusCode.Unauthorized), "old")).ShouldBe("refreshed");
+		(await WrapperHelpers.PopulateBearerToken(dynamic, 1, new HttpResponseMessage(HttpStatusCode.Forbidden), "old")).ShouldBe("refreshed");
+		(await WrapperHelpers.PopulateBearerToken(dynamic, 1, new HttpResponseMessage(HttpStatusCode.OK), "current")).ShouldBe("current");
+		(await WrapperHelpers.PopulateBearerToken(dynamic, 2, null, "current")).ShouldBe("current");
+		calls.ShouldBe([("api", false), ("api", true), ("api", true)]);
+
+		RestHelperOptions noFunction = new("endpoint", "api", BearerToken: " ");
+		(await WrapperHelpers.PopulateBearerToken(noFunction, 0, null, "fallback")).ShouldBe("fallback");
+		(await WrapperHelpers.PopulateBearerToken(noFunction, 4, new HttpResponseMessage(HttpStatusCode.Forbidden), "fallback")).ShouldBe("fallback");
+	}
+
+	[Fact]
+	public void ShouldRetry_CombinesCustomRunOnceSuccessAndNullStatesExactly()
+	{
+		HttpResponseMessage success = new(HttpStatusCode.OK);
+		ResilienceOptions customStop = new()
+		{
+			ShouldRetryFunc = (_, _) => true,
+			ShouldRetryByStatusFunc = _ => true
+		};
+		WrapperHelpers.ShouldRetry(success, customStop).ShouldBeFalse();
+
+		ResilienceOptions customContinue = new()
+		{
+			ShouldRetryFunc = (_, _) => false,
+			RunOnce = true,
+			NullOk = true,
+			ShouldRetryByStatusFunc = status => status == HttpStatusCode.Unauthorized
+		};
+		WrapperHelpers.ShouldRetry(success, customContinue).ShouldBeFalse();
+		WrapperHelpers.ShouldRetry(new HttpResponseMessage(HttpStatusCode.Unauthorized), customContinue).ShouldBeTrue();
+		WrapperHelpers.ShouldRetry(new HttpResponseMessage(HttpStatusCode.BadRequest), customContinue).ShouldBeFalse();
+		WrapperHelpers.ShouldRetry(null, customContinue).ShouldBeFalse();
+
+		WrapperHelpers.ShouldRetry(null, new ResilienceOptions { RunOnce = false, NullOk = true }).ShouldBeFalse();
+		WrapperHelpers.ShouldRetry(success, new ResilienceOptions { RunOnce = false, NullOk = false }).ShouldBeFalse();
+	}
+
+	[Theory]
+	[InlineData(HttpStatusCode.InsufficientStorage, true)]
+	[InlineData(HttpStatusCode.NetworkAuthenticationRequired, true)]
+	[InlineData(HttpStatusCode.MethodNotAllowed, false)]
+	[InlineData(HttpStatusCode.NotAcceptable, false)]
+	[InlineData(HttpStatusCode.Gone, false)]
+	[InlineData(HttpStatusCode.UnprocessableEntity, false)]
+	[InlineData(HttpStatusCode.Created, false)]
+	[InlineData((HttpStatusCode)418, false)]
+	public void ShouldRetry_StatusSwitchReturnsExactState(HttpStatusCode status, bool expected)
+	{
+		WrapperHelpers.ShouldRetry(new HttpResponseMessage(status), new ResilienceOptions()).ShouldBe(expected);
+	}
+
+	[Fact]
+	public void GetRequestOptions_PreservesExactNullBaseAndResilienceDefaults()
+	{
+		RestHelperOptions options = new("relative/items", "api", LogQuery: false, LogBody: false);
+		Dictionary<string, string> headers = new() { ["X-State"] = "none" };
+
+		RequestOptions<HelperBody> get = WrapperHelpers.GetRequestOptions<HelperBody>(
+			options, null, headers, HttpMethod.Delete, "token", new HelperBody { Value = "ignored" });
+
+		get.Url.ShouldBe("relative/items");
+		get.HttpMethod.ShouldBe(HttpMethod.Delete);
+		get.BearerToken.ShouldBe("token");
+		get.Timeout.ShouldBeNull();
+		get.ExpectTaskCancellation.ShouldBeFalse();
+		get.BodyObject.ShouldBeNull();
+		get.PatchDocument.ShouldBeNull();
+		get.HttpHeaders.ShouldBeSameAs(headers);
+		get.LogQuery.ShouldBeFalse();
+		get.LogBody.ShouldBeFalse();
+	}
+
+	[Fact]
+	public void GetRequestOptions_SetsExactPostPutPatchState()
+	{
+		RestHelperOptions options = new("/items", "api",
+			ResilienceOptions: new ResilienceOptions(RunOnce: true, TimeoutValue: 9));
+		Dictionary<string, string> headers = [];
+		HelperBody body = new() { Value = "body" };
+		StringContent patch = new("[]");
+
+		RequestOptions<HelperBody> post = WrapperHelpers.GetRequestOptions(
+			options, new Uri("https://api.unit/base/"), headers, HttpMethod.Post, null, body);
+		RequestOptions<HelperBody> put = WrapperHelpers.GetRequestOptions(
+			options, new Uri("https://api.unit/base"), headers, HttpMethod.Put, null, body);
+		RequestOptions<HelperBody> patchOptions = WrapperHelpers.GetRequestOptions(
+			options, new Uri("https://api.unit/base"), headers, HttpMethod.Patch, null, body, patch);
+
+		post.Url.ShouldBe("https://api.unit/base/items");
+		put.Url.ShouldBe("https://api.unit/base/items");
+		patchOptions.Url.ShouldBe("https://api.unit/base/items");
+		post.BodyObject.ShouldBeSameAs(body);
+		put.BodyObject.ShouldBeSameAs(body);
+		patchOptions.BodyObject.ShouldBeNull();
+		patchOptions.PatchDocument.ShouldBeSameAs(patch);
+		post.Timeout.ShouldBe(9);
+		post.ExpectTaskCancellation.ShouldBeTrue();
+	}
+
+	[Fact]
+	public void GetRequestOptions_PreservesNullTimeoutWhenTimeoutValueIsExplicitlyCleared()
+	{
+		ResilienceOptions resilience = new(RunOnce: true)
+		{
+			TimeoutValue = null
+		};
+		RestHelperOptions options = new("timeout", "api", ResilienceOptions: resilience);
+
+		RequestOptions<HelperBody> result = WrapperHelpers.GetRequestOptions<HelperBody>(
+			options, new Uri("https://api.unit/"), new Dictionary<string, string>(), HttpMethod.Get, null);
+
+		result.Timeout.ShouldBeNull();
+		result.ExpectTaskCancellation.ShouldBeTrue();
+		result.Url.ShouldBe("https://api.unit/timeout");
+	}
+
 }

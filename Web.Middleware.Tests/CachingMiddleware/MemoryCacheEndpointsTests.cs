@@ -1,8 +1,4 @@
-﻿using System.Net;
-using System.Net.Http.Json;
-using System.Text;
-using System.Text.Encodings.Web;
-using CommonNetFuncs.Web.Common.CachingSupportClasses;
+﻿using CommonNetFuncs.Web.Common.CachingSupportClasses;
 using CommonNetFuncs.Web.Middleware.CachingMiddleware;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -12,6 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Net;
+using System.Text;
+using System.Text.Encodings.Web;
 using xRetry.v3;
 
 namespace Web.Middleware.Tests.CachingMiddleware;

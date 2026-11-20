@@ -10,20 +10,22 @@ creating, reading, styling, and modifying `.xlsx` workbooks. The package targets
 
 ## Contents
 
-- [Installation](#installation)
-- [Export settings and exporter behavior](#export-settings-and-exporter-behavior)
-  - [Every exporter overload](#every-exporter-overload)
-- [Workbook, sheet, and lookup helpers](#workbook-sheet-and-lookup-helpers)
-- [Styles and stylesheet helpers](#styles-and-stylesheet-helpers)
-- [Cell insertion, formulas, shared strings, and tables](#cell-insertion-formulas-shared-strings-and-tables)
-- [Image insertion and drawing helpers](#image-insertion-and-drawing-helpers)
-- [Reading ranges and values](#reading-ranges-and-values)
-- [Column sizing and width calculation](#column-sizing-and-width-calculation)
-- [Every typed cell-setter overload](#every-typed-cell-setter-overload)
-- [Formula recalculation, validation, tables, and finalization](#formula-recalculation-validation-tables-and-finalization)
-- [`CellReference`, attributes, and enumerable mapping](#cellreference-attributes-and-enumerable-mapping)
-- [Correctness and resource notes](#correctness-and-resource-notes)
-- [License](#license)
+- [CommonNetFuncs.Excel.OpenXml](#commonnetfuncsexcelopenxml)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [Export settings and exporter behavior](#export-settings-and-exporter-behavior)
+    - [Every exporter overload](#every-exporter-overload)
+  - [Workbook, sheet, and lookup helpers](#workbook-sheet-and-lookup-helpers)
+  - [Styles and stylesheet helpers](#styles-and-stylesheet-helpers)
+  - [Cell insertion, formulas, shared strings, and tables](#cell-insertion-formulas-shared-strings-and-tables)
+  - [Image insertion and drawing helpers](#image-insertion-and-drawing-helpers)
+  - [Reading ranges and values](#reading-ranges-and-values)
+  - [Column sizing and width calculation](#column-sizing-and-width-calculation)
+  - [Every typed cell-setter overload](#every-typed-cell-setter-overload)
+  - [Formula recalculation, validation, tables, and finalization](#formula-recalculation-validation-tables-and-finalization)
+  - [`CellReference`, attributes, and enumerable mapping](#cellreference-attributes-and-enumerable-mapping)
+  - [Correctness and resource notes](#correctness-and-resource-notes)
+  - [License](#license)
 
 ## Installation
 

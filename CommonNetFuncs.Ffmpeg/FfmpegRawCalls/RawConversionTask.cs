@@ -1,6 +1,5 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
-using CommonNetFuncs.Ffmpeg.Internal;
 using Xabe.FFmpeg;
 
 namespace CommonNetFuncs.Ffmpeg.FfmpegRawCalls;

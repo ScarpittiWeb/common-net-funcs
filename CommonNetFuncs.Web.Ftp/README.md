@@ -8,17 +8,19 @@ Helpers for **SFTP over SSH** using SSH.NET's `SftpClient`, including connection
 
 ## Contents
 
-- [Target frameworks](#target-frameworks)
-- [Installation](#installation)
-- [Security and ownership boundaries](#security-and-ownership-boundaries)
-- [Connection configuration](#connection-configuration)
-- [Static `SshFtp` API](#static-sshftp-api)
-  - [Existence and listing](#existence-and-listing)
-  - [Read CSV records](#read-csv-records)
-  - [Delete](#delete)
-- [Dependency-injection service](#dependency-injection-service)
-- [Cancellation, paths, and failures](#cancellation-paths-and-failures)
-- [License](#license)
+- [CommonNetFuncs.Web.Ftp](#commonnetfuncswebftp)
+  - [Contents](#contents)
+  - [Target frameworks](#target-frameworks)
+  - [Installation](#installation)
+  - [Security and ownership boundaries](#security-and-ownership-boundaries)
+  - [Connection configuration](#connection-configuration)
+  - [Static `SshFtp` API](#static-sshftp-api)
+    - [Existence and listing](#existence-and-listing)
+    - [Read CSV records](#read-csv-records)
+    - [Delete](#delete)
+  - [Dependency-injection service](#dependency-injection-service)
+  - [Cancellation, paths, and failures](#cancellation-paths-and-failures)
+  - [License](#license)
 
 ---
 

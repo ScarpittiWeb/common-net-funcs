@@ -1,4 +1,4 @@
-using CommonNetFuncs.Email;
+﻿using CommonNetFuncs.Email;
 
 namespace Email.Tests;
 

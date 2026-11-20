@@ -8,14 +8,16 @@ SMTP email configuration, attachment handling, service wrappers, and HTML-buildi
 
 ## Contents
 
-- [Installation](#installation)
-- [Sending email](#sending-email)
-  - [Configuration types](#configuration-types)
-  - [`Email.SendEmail` overloads](#emailsendemail-overloads)
-  - [Services and Hangfire wrapper](#services-and-hangfire-wrapper)
-- [Attachment ownership and methods](#attachment-ownership-and-methods)
-- [HTML email helpers](#html-email-helpers)
-- [License](#license)
+- [CommonNetFuncs.Email](#commonnetfuncsemail)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [Sending email](#sending-email)
+    - [Configuration types](#configuration-types)
+    - [`Email.SendEmail` overloads](#emailsendemail-overloads)
+    - [Services and Hangfire wrapper](#services-and-hangfire-wrapper)
+  - [Attachment ownership and methods](#attachment-ownership-and-methods)
+  - [HTML email helpers](#html-email-helpers)
+  - [License](#license)
 
 ## Installation
 

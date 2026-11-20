@@ -1,11 +1,11 @@
-﻿using System.Net;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
-using CommonNetFuncs.Web.Requests.Rest;
+﻿using CommonNetFuncs.Web.Requests.Rest;
 using MemoryPack;
 using MemoryPack.Streaming;
 using MessagePack;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using static Xunit.TestContext;
 
 namespace Web.Requests.Tests;
@@ -674,6 +674,36 @@ public sealed class RestHelpersStaticTests
 		results.Count.ShouldBe(2);
 		results[0]!.Name.ShouldBe("a");
 		results[1]!.Name.ShouldBe("b");
+	}
+
+	[Theory]
+	[InlineData(HttpStatusCode.NoContent, null)]
+	[InlineData(HttpStatusCode.NoContent, "application/x-msgpack")]
+	[InlineData(HttpStatusCode.OK, null)]
+	public async Task HandleResponseAsync_YieldsNothingForEmptyBody(HttpStatusCode statusCode, string? contentType)
+	{
+		HttpResponseMessage response = new(statusCode)
+		{
+			Content = new ByteArrayContent([])
+		};
+		if (contentType != null)
+		{
+			response.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+		}
+
+		RequestOptions<TestModel> options = new()
+		{
+			Url = "http://test",
+			HttpMethod = HttpMethod.Post
+		};
+
+		List<TestModel?> results = new();
+		await foreach (TestModel? item in response.HandleResponseAsync<TestModel, TestModel>(options, cancellationToken: Current.CancellationToken))
+		{
+			results.Add(item);
+		}
+
+		results.ShouldBeEmpty();
 	}
 
 	[Fact]
@@ -1367,4 +1397,433 @@ internal partial class TestModel
 
 	[Key(1)]
 	public int Value { get; set; }
+}
+
+public sealed partial class RestHelpersStaticBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static async Task<MemoryStream> CompressAsync(string value, string encoding)
+	{
+		await using MemoryStream input = new(Encoding.UTF8.GetBytes(value));
+		return await CompressStreamAsync(input, encoding);
+	}
+
+	private static async Task<MemoryStream> CompressStreamAsync(Stream input, string encoding)
+	{
+		MemoryStream output = new();
+		Stream compressor = encoding switch
+		{
+			"gzip" => new System.IO.Compression.GZipStream(output, System.IO.Compression.CompressionMode.Compress, leaveOpen: true),
+			"br" => new System.IO.Compression.BrotliStream(output, System.IO.Compression.CompressionMode.Compress, leaveOpen: true),
+			_ => throw new ArgumentOutOfRangeException(nameof(encoding))
+		};
+
+		await using (compressor)
+		{
+			await input.CopyToAsync(compressor, Current.CancellationToken);
+		}
+
+		output.Position = 0;
+		return output;
+	}
+
+	private sealed class CapturingHandler(params HttpResponseMessage[] responses) : HttpMessageHandler
+	{
+		private readonly Queue<HttpResponseMessage> responses = new(responses);
+
+		public CapturedRequest? Captured { get; private set; }
+
+		protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+		{
+			Captured = new CapturedRequest(
+				request.Method.Method,
+				request.RequestUri!,
+				request.Headers.ToDictionary(x => x.Key, x => x.Value.ToArray()),
+				request.Content?.Headers.ContentType?.MediaType,
+				request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken));
+			return responses.Dequeue();
+		}
+	}
+
+	private sealed record CapturedRequest(
+		string Method,
+		Uri Uri,
+		IReadOnlyDictionary<string, string[]> Headers,
+		string? ContentType,
+		string Body);
+
+	private sealed class NonSeekableReadStream(byte[] bytes) : Stream
+	{
+		private readonly MemoryStream inner = new(bytes);
+
+		public override bool CanRead => true;
+		public override bool CanSeek => false;
+		public override bool CanWrite => false;
+		public override long Length => throw new NotSupportedException();
+		public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+		public override void Flush() => throw new NotSupportedException();
+		public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+		public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => inner.ReadAsync(buffer, cancellationToken);
+		public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+		public override void SetLength(long value) => throw new NotSupportedException();
+		public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+			{
+				inner.Dispose();
+			}
+			base.Dispose(disposing);
+		}
+	}
+
+	private sealed class RequestModel
+	{
+		public string Name { get; set; } = string.Empty;
+		public int Value { get; set; }
+	}
+
+	private sealed class WireResponse
+	{
+		public string WireName { get; set; } = string.Empty;
+		public int WireValue { get; set; }
+	}
+
+	[MemoryPackable]
+	[MessagePackObject(true, AllowPrivate = true)]
+	internal sealed partial class ResponseModel
+	{
+		[Key(0)]
+		public string Name { get; set; } = string.Empty;
+
+		[Key(1)]
+		public int Value { get; set; }
+	}
+
+	[Fact]
+	public async Task RestObjectRequest_SendsExactMethodUriHeadersAndBody()
+	{
+		CapturingHandler handler = new(new HttpResponseMessage(HttpStatusCode.OK)
+		{
+			Content = new StringContent("""{"name":"response","value":11}""", Encoding.UTF8, "application/json")
+		});
+		using HttpClient client = new(handler);
+		RequestOptions<RequestModel> options = new()
+		{
+			Url = "https://unit.test/resource?item=7",
+			HttpMethod = HttpMethod.Post,
+			BearerToken = "exact-token",
+			BodyObject = new RequestModel { Name = "captured", Value = 9 },
+			HttpHeaders = new Dictionary<string, string>
+			{
+				["X-Correlation"] = "coverage-42",
+				["Accept"] = "application/json"
+			},
+			LogRequest = true,
+			LogBody = true
+		};
+
+		RestObject<ResponseModel> response = await client.RestObjectRequest<ResponseModel, RequestModel>(options, Current.CancellationToken);
+
+		handler.Captured.ShouldNotBeNull();
+		handler.Captured!.Method.ShouldBe("POST");
+		handler.Captured.Uri.ShouldBe(new Uri("https://unit.test/resource?item=7"));
+		handler.Captured.Headers["Authorization"].Single().ShouldBe("Bearer exact-token");
+		handler.Captured.Headers["X-Correlation"].Single().ShouldBe("coverage-42");
+		handler.Captured.Headers["Accept"].Single().ShouldBe("application/json");
+		handler.Captured.ContentType.ShouldBe("application/json");
+		handler.Captured.Body.ShouldBe("""{"name":"captured","value":9}""");
+		response.Response?.StatusCode.ShouldBe(HttpStatusCode.OK);
+		response.Result.ShouldNotBeNull();
+		response.Result!.Name.ShouldBe("response");
+		response.Result.Value.ShouldBe(11);
+	}
+
+	[Fact]
+	public async Task StreamingRestRequest_SendsExactGetAndYieldsOrderedItems()
+	{
+		CapturingHandler handler = new(new HttpResponseMessage(HttpStatusCode.OK)
+		{
+			Content = new StringContent("""[{"name":"first","value":1},{"name":"second","value":2}]""", Encoding.UTF8, "application/json")
+		});
+		using HttpClient client = new(handler);
+		RequestOptions<RequestModel> options = new()
+		{
+			Url = "https://unit.test/stream?after=4",
+			HttpMethod = HttpMethod.Get,
+			HttpHeaders = null,
+			LogRequest = true,
+			LogBody = true,
+			LogQuery = false
+		};
+
+		List<ResponseModel?> items = [];
+		await foreach (ResponseModel? item in client.StreamingRestRequest<ResponseModel, RequestModel>(options, Current.CancellationToken))
+		{
+			items.Add(item);
+		}
+
+		handler.Captured!.Method.ShouldBe("GET");
+		handler.Captured.Uri.ShouldBe(new Uri("https://unit.test/stream?after=4"));
+		handler.Captured.Headers["Accept"].Single().ShouldBe("application/json");
+		handler.Captured.Body.ShouldBeEmpty();
+		items.Select(x => x!.Name).ShouldBe(["first", "second"]);
+		items.Select(x => x!.Value).ShouldBe([1, 2]);
+		options.HttpHeaders!.ShouldContainKey("Accept");
+	}
+
+	[Fact]
+	public async Task StreamingRestObjectRequest_PreservesExactEmptyNoContentState()
+	{
+		CapturingHandler handler = new(new HttpResponseMessage(HttpStatusCode.NoContent));
+		using HttpClient client = new(handler);
+		RequestOptions<RequestModel> options = new()
+		{
+			Url = "https://unit.test/empty",
+			HttpMethod = HttpMethod.Delete
+		};
+
+		StreamingRestObject<ResponseModel> response = await client.StreamingRestObjectRequest<ResponseModel, RequestModel>(options, Current.CancellationToken);
+		List<ResponseModel?> items = [];
+		await foreach (ResponseModel? item in response.Result!)
+		{
+			items.Add(item);
+		}
+
+		handler.Captured!.Method.ShouldBe("DELETE");
+		response.Response?.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+		items.ShouldBeEmpty();
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public async Task HandleResponse_ProblemDetailsEmptyBody_ReturnsNullWithoutLeakingHeaders(bool includeHeaders)
+	{
+		HttpResponseMessage response = new(HttpStatusCode.BadRequest)
+		{
+			Content = new ByteArrayContent([])
+		};
+		response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/problem+json");
+		response.Content.Headers.ContentEncoding.Add("identity");
+		RequestOptions<RequestModel> options = new()
+		{
+			Url = "https://unit.test/problem?secret=redacted",
+			HttpMethod = HttpMethod.Get,
+			LogQuery = false,
+			LogResponse = true,
+			HttpHeaders = includeHeaders
+				? new Dictionary<string, string> { ["X-Request"] = "state-1", ["Accept"] = "application/problem+json" }
+				: null
+		};
+
+		ResponseModel? result = await response.HandleResponse<ResponseModel, RequestModel>(options, Current.CancellationToken);
+
+		result.ShouldBeNull();
+		response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+	}
+
+	[Theory]
+	[InlineData("application/json", "gzip", false)]
+	[InlineData("application/json", "gzip", true)]
+	[InlineData("application/json", "br", false)]
+	[InlineData("application/json", "br", true)]
+	[InlineData("text/plain", "gzip", false)]
+	[InlineData("text/plain", "br", false)]
+	public async Task ReadResponseStream_DecompressesAndDeserializesExactValue(string contentType, string encoding, bool useNewtonsoft)
+	{
+		string plainText = contentType.Contains("json", StringComparison.Ordinal) ? """{"name":"decoded","value":17}""" : "decoded text";
+		await using MemoryStream compressed = await CompressAsync(plainText, encoding);
+
+		if (contentType.Contains("json", StringComparison.Ordinal))
+		{
+			ResponseModel? result = await compressed.ReadResponseStream<ResponseModel>(contentType, encoding, useNewtonsoft, cancellationToken: Current.CancellationToken);
+			result.ShouldNotBeNull();
+			result.Name.ShouldBe("decoded");
+			result.Value.ShouldBe(17);
+		}
+		else
+		{
+			string? result = await compressed.ReadResponseStream<string>(contentType, encoding, useNewtonsoft, cancellationToken: Current.CancellationToken);
+			result.ShouldBe("decoded text");
+		}
+	}
+
+	[Fact]
+	public async Task ReadResponseStream_MessagePackAndMemoryPack_ReturnExactValues()
+	{
+		ResponseModel expected = new() { Name = "binary", Value = 23 };
+
+		await using MemoryStream messagePack = new(MessagePackSerializer.Serialize(expected, cancellationToken: Current.CancellationToken));
+		ResponseModel? fromMessagePack = await messagePack.ReadResponseStream<ResponseModel>(
+			"application/x-msgpack", null, false, cancellationToken: Current.CancellationToken);
+
+		await using MemoryStream memoryPack = new(MemoryPackSerializer.Serialize(expected));
+		ResponseModel? fromMemoryPack = await memoryPack.ReadResponseStream<ResponseModel>(
+			"application/x-memorypack", null, false, cancellationToken: Current.CancellationToken);
+
+		fromMessagePack.ShouldBeEquivalentTo(expected);
+		fromMemoryPack.ShouldBeEquivalentTo(expected);
+	}
+
+	[Theory]
+	[InlineData("gzip")]
+	[InlineData("br")]
+	public async Task ReadResponseStream_CompressedMemoryPack_ReturnsExactValue(string encoding)
+	{
+		ResponseModel expected = new() { Name = "compressed-memory", Value = 37 };
+		await using MemoryStream plain = new(MemoryPackSerializer.Serialize(expected));
+		await using MemoryStream compressed = await CompressStreamAsync(plain, encoding);
+
+		ResponseModel? result = await compressed.ReadResponseStream<ResponseModel>(
+			"application/x-memorypack", encoding, false, cancellationToken: Current.CancellationToken);
+
+		result.ShouldBeEquivalentTo(expected);
+	}
+
+	[Theory]
+	[InlineData("gzip")]
+	[InlineData("br")]
+	public async Task ReadResponseStream_CompressedJsonUsesExactProvidedSerializerOptions(string encoding)
+	{
+		const string json = """{"wire_name":"configured","wire_value":41}""";
+		await using MemoryStream input = new(Encoding.UTF8.GetBytes(json));
+		await using MemoryStream compressed = await CompressStreamAsync(input, encoding);
+		System.Text.Json.JsonSerializerOptions options = new()
+		{
+			PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+		};
+
+		WireResponse? result = await compressed.ReadResponseStream<WireResponse>(
+			"application/json", encoding, false, options, cancellationToken: Current.CancellationToken);
+
+		result.ShouldNotBeNull();
+		result.WireName.ShouldBe("configured");
+		result.WireValue.ShouldBe(41);
+	}
+
+	[Fact]
+	public async Task ReadResponseStream_NonSeekableJsonStream_ReturnsExactValue()
+	{
+		await using NonSeekableReadStream stream = new(Encoding.UTF8.GetBytes("""{"name":"nonseekable","value":29}"""));
+
+		ResponseModel? result = await stream.ReadResponseStream<ResponseModel>(
+			"application/json", null, false, cancellationToken: Current.CancellationToken);
+
+		result.ShouldNotBeNull();
+		result.Name.ShouldBe("nonseekable");
+		result.Value.ShouldBe(29);
+	}
+
+	[Theory]
+	[InlineData(0, 1, 8, 1, 0)]
+	[InlineData(8, 2, 8, 2, 4)]
+	[InlineData(9, 2, 8, 2, 5)]
+	[InlineData(9, 1, 2, 1001, 1)]
+	public void GetChunkingParameters_ExactBoundaries(
+		int itemCount, int startingItemsPerChunk, int bufferLimit, int expectedItemsPerChunk, int expectedChunks)
+	{
+		(int itemsPerChunk, int chunks) = RestHelpersStatic.GetChunkingParameters(itemCount, startingItemsPerChunk, bufferLimit);
+
+		itemsPerChunk.ShouldBe(expectedItemsPerChunk);
+		chunks.ShouldBe(expectedChunks);
+	}
+
+	[Fact]
+	public async Task HandleResponseAsync_LogsErrorAndEmptyResults()
+	{
+		HttpResponseMessage response = new(HttpStatusCode.UnprocessableEntity)
+		{
+			Content = new StringContent("validation failed", Encoding.UTF8, "text/plain")
+		};
+		response.Content.Headers.ContentEncoding.Add("identity");
+		RequestOptions<RequestModel> options = new()
+		{
+			Url = "https://unit.test/errors",
+			HttpMethod = HttpMethod.Post,
+			HttpHeaders = new Dictionary<string, string> { ["X-State"] = "failed" },
+			LogResponse = true,
+			LogQuery = true
+		};
+
+		List<ResponseModel?> items = [];
+		await foreach (ResponseModel? item in response.HandleResponseAsync<ResponseModel, RequestModel>(options, Current.CancellationToken))
+		{
+			items.Add(item);
+		}
+
+		items.ShouldBeEmpty();
+	}
+
+	[Fact]
+	public async Task HandleResponseAsync_EmptyProblemDetailsUsesDefaultAndReturnsEmpty()
+	{
+		HttpResponseMessage response = new(HttpStatusCode.BadRequest)
+		{
+			Content = new ByteArrayContent([])
+		};
+		response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/problem+json");
+		RequestOptions<RequestModel> options = new()
+		{
+			Url = "https://unit.test/problem",
+			HttpMethod = HttpMethod.Patch,
+			PatchDocument = new StringContent("[]"),
+			LogRequest = true,
+			LogBody = true,
+			LogResponse = true,
+			UseNewtonsoftDeserializer = false,
+			JsonSerializerOptions = new System.Text.Json.JsonSerializerOptions()
+		};
+
+		List<ResponseModel?> items = [];
+		await foreach (ResponseModel? item in response.HandleResponseAsync<ResponseModel, RequestModel>(options, Current.CancellationToken))
+		{
+			items.Add(item);
+		}
+
+		items.ShouldBeEmpty();
+	}
+
+	[Fact]
+	public async Task HandleResponse_LogsProvidedJsonOptionsAndNewtonsoftStates()
+	{
+		System.Text.Json.JsonSerializerOptions options = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+		foreach (bool useNewtonsoft in new[] { false, true })
+		{
+			HttpResponseMessage response = new(HttpStatusCode.OK)
+			{
+				Content = new StringContent("""{"name":"logged","value":43}""", Encoding.UTF8, "application/json")
+			};
+			RequestOptions<RequestModel> requestOptions = new()
+			{
+				Url = "https://unit.test/logged?secret=value",
+				HttpMethod = HttpMethod.Get,
+				LogQuery = useNewtonsoft,
+				LogRequest = true,
+				LogResponse = true,
+				UseNewtonsoftDeserializer = useNewtonsoft,
+				JsonSerializerOptions = options
+			};
+
+			ResponseModel? result = await response.HandleResponse<ResponseModel, RequestModel>(requestOptions, Current.CancellationToken);
+
+			result.ShouldNotBeNull();
+			result.Name.ShouldBe("logged");
+			result.Value.ShouldBe(43);
+		}
+	}
+
 }

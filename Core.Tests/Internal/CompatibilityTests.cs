@@ -1,5 +1,5 @@
-﻿using System.Globalization;
-using CommonNetFuncs.Core.Internal;
+﻿using CommonNetFuncs.Core.Internal;
+using System.Globalization;
 using static Xunit.TestContext;
 
 namespace Core.Tests.Internal;
@@ -411,7 +411,7 @@ public sealed class HashAlgorithmExtensionsTests
 	[Fact]
 	public async Task ComputeHashAsync_Shim_ReturnsExpectedHash()
 	{
-		using System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create();
+using System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create();
 		using MemoryStream stream = new("hello world"u8.ToArray());
 		byte[] hash = await HashAlgorithmExtensions.ComputeHashAsync(md5, stream, Current.CancellationToken);
 		HashCompat.ToHexStringLower(hash).ShouldBe("5eb63bbbe01eeed093cb22bb8f5acdc3");

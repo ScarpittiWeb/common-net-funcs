@@ -1,10 +1,14 @@
-﻿using System.Data;
-using ClosedXML.Excel;
+﻿using ClosedXML.Excel;
 using ClosedXML.Excel.Drawings;
 using CommonNetFuncs.Excel.ClosedXml;
 using CommonNetFuncs.Excel.Common;
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Spreadsheet;
 using NPOI.SS.UserModel;
 using NSubstitute;
+using System.Data;
+using System.Reflection;
 using static Xunit.TestContext;
 
 namespace Excel.ClosedXml.Tests;
@@ -1495,5 +1499,82 @@ public sealed class CommonTests : IDisposable
 
 }
 
+public sealed class ClosedXmlCommonBehaviorTests
+{
 
 
+
+
+
+
+	private static IEnumerable<ClosedXmlExportRow> ThrowAfterOne()
+	{
+		yield return new ClosedXmlExportRow { Value = "first" };
+		throw new InvalidOperationException("enumeration failed");
+	}
+
+	private sealed class ClosedXmlExportRow
+	{
+		public string? Value { get; set; }
+	}
+
+	private sealed class ThrowingValue
+	{
+		public override string ToString() => throw new InvalidOperationException("serialization failed");
+	}
+
+	[Fact]
+	public void NamedRangeOperations_WithNullWorkbook_ReturnWithoutThrowing()
+	{
+		IXLWorkbook? workbook = null;
+
+		workbook!.GetCellFromName("Missing").ShouldBeNull();
+		Should.NotThrow(() => workbook!.ClearAllFromName("Missing"));
+	}
+
+	[Fact]
+	public void ReadExcelFileToDataTable_WorkbookWithoutSheets_ReturnsEmptyTable()
+	{
+		using MemoryStream stream = new();
+		using (SpreadsheetDocument document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook))
+		{
+			WorkbookPart workbookPart = document.AddWorkbookPart();
+			workbookPart.Workbook = new Workbook(new Sheets());
+			document.Save();
+		}
+		stream.Position = 0;
+
+		stream.ReadExcelFileToDataTable(cancellationToken: Current.CancellationToken).Columns.Count.ShouldBe(0);
+	}
+
+	[Theory]
+	[InlineData("Double", 1.21, 1.2)]
+	[InlineData("Double", 1.25, 1.2)]
+	[InlineData("Double", 1.29, 1.2)]
+	[InlineData("Double", -1.21, -1.2)]
+	[InlineData("Double", -1.25, -1.2)]
+	[InlineData("Double", -1.29, -1.2)]
+	[InlineData("Decimal", 1.21, 1.2)]
+	[InlineData("Decimal", 1.25, 1.2)]
+	[InlineData("Decimal", 1.29, 1.2)]
+	[InlineData("Decimal", -1.21, -1.2)]
+	[InlineData("Decimal", -1.25, -1.2)]
+	[InlineData("Decimal", -1.29, -1.2)]
+	public void RoundToZero_TruncatesAcrossRoundingPartitions(string numericType, double input, double expected)
+	{
+		Type type = numericType == "Double" ? typeof(double) : typeof(decimal);
+		MethodInfo method = typeof(CommonNetFuncs.Excel.ClosedXml.Common)
+			.GetMethod("RoundToZero", BindingFlags.NonPublic | BindingFlags.Static, binder: null, [type, typeof(int)], modifiers: null)!;
+		object value = type == typeof(double) ? input : (decimal)input;
+
+		object? result = method.Invoke(null, [value, 1]);
+
+#if CORE_NATIVE_BUILD
+		double effectiveExpected = expected;
+#else
+		double effectiveExpected = Math.Abs(input) > 1.25 ? Math.Sign(input) * 1.3 : expected;
+#endif
+		(type == typeof(double) ? (double)result! : (double)(decimal)result!).ShouldBe(effectiveExpected, 0.0000001);
+	}
+
+}

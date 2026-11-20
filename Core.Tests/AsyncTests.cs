@@ -1,8 +1,9 @@
-﻿using System.Collections.Concurrent;
-using System.Data;
-using AutoFixture;
+﻿using AutoFixture;
 using AutoFixture.AutoFakeItEasy;
 using CommonNetFuncs.Core;
+using System.Collections.Concurrent;
+using System.ComponentModel.DataAnnotations;
+using System.Data;
 using static Xunit.TestContext;
 
 namespace Core.Tests;
@@ -5910,4 +5911,196 @@ public sealed class AsyncTests
 #pragma warning restore S2094 // Classes should not be empty
 
 	#endregion
+}
+
+public sealed class AsyncBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static DataTable CreateOneRowTable()
+	{
+		DataTable table = new();
+		table.Columns.Add("Value", typeof(int));
+		table.Rows.Add(9);
+		return table;
+	}
+
+	[GapNullTypeId]
+	private sealed class GapNullTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNullTypeIdAttribute : Attribute
+	{
+		public override object TypeId => null!;
+	}
+
+	[GapNamelessTypeId]
+	private sealed class GapNamelessTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNamelessTypeIdAttribute : Attribute
+	{
+		public override object TypeId { get; } = new object();
+	}
+
+	private sealed class GapNestedEquality
+	{
+		public GapNestedValue? Child { get; set; }
+	}
+
+	private sealed class GapNestedValue
+	{
+		public int Value { get; set; }
+	}
+
+	private sealed class GapHashHolder
+	{
+		public List<GapNestedValue?> Values { get; set; } = [];
+	}
+
+	private sealed class GapNonSeekableReadStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public bool AllowRead { get; set; } = true;
+
+		public override bool CanRead => AllowRead;
+
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonWritableTargetStream : MemoryStream
+	{
+		public override bool CanWrite => false;
+	}
+
+	private sealed class GapUnseekableSourceStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonSeekableWriteStream : MemoryStream
+	{
+		public override bool CanSeek => false;
+
+		public byte[] Data => ToArray();
+	}
+
+	private sealed class GapValidated
+	{
+		[Required]
+		public string? Required { get; set; }
+
+		[Range(1, 10)]
+		public int Count { get; set; }
+
+		public string? Optional { get; set; }
+	}
+
+	[Fact]
+	public async Task ObjectFill_DataTableAndMemoryStream_HandleNullResults()
+	{
+		DataTable table = new();
+		await table.ObjectFill(Task.FromResult<DataTable?>(null));
+		table.Rows.Count.ShouldBe(0);
+
+		using MemoryStream destination = new();
+		await destination.ObjectFill(Task.FromResult<MemoryStream?>(null));
+		destination.Length.ShouldBe(0);
+	}
+
+	[Fact]
+	public async Task ObjectFill_NullSemaphoresFollowTheNoSemaphorePath()
+	{
+using SemaphoreSlim? semaphore = null;
+		ConcurrentBag<int>? bag = [];
+
+		await bag.ObjectFill(() => Task.FromResult<IEnumerable<int>?>([1, 2]), semaphore!, CancellationToken.None);
+		DataTable table = new();
+		await table.ObjectFill(() => Task.FromResult<DataTable?>(CreateOneRowTable()), semaphore!, CancellationToken.None);
+		using MemoryStream destination = new();
+		await destination.ObjectFill(() => Task.FromResult<MemoryStream?>(new MemoryStream([3, 4])), semaphore!, CancellationToken.None);
+
+		bag.ShouldBe([1, 2], ignoreOrder: true);
+		table.Rows.Count.ShouldBe(1);
+		destination.ToArray().ShouldBe([3, 4]);
+	}
+
+	[Fact]
+	public async Task RunAll_LogsTaskErrorsAndHonorsBreakOnError()
+	{
+		ConcurrentBag<int> successful = await new Func<Task<int>>[]
+		{
+			() => Task.FromResult(3)
+		}.RunAll();
+		successful.ShouldContain(3);
+
+		Func<Task<int>>[] valueTasks =
+		[
+			() => Task.FromException<int>(new InvalidOperationException("failed"))
+		];
+		ConcurrentBag<int> values = await valueTasks.RunAll(breakOnError: true);
+		values.ShouldBeEmpty();
+
+		Func<Task>[] tasks =
+		[
+			() => Task.FromException(new InvalidOperationException("failed")),
+			() => Task.CompletedTask
+		];
+		await tasks.RunAll(breakOnError: true);
+	}
+
+	[Fact]
+	public async Task TaskGroups_RunCreatedTasksWithAndWithoutSemaphores()
+	{
+		bool[] completed = [false, false];
+		ResultTaskGroup<int> results = new(
+		[
+			new Task<int>(() => 4),
+			Task.FromResult(5)
+		]);
+		(await results.RunTasks()).ShouldBe([4, 5]);
+
+		TaskGroup tasks = new(
+		[
+			new Task(() => completed[0] = true),
+			Task.CompletedTask
+		],
+		new SemaphoreSlim(1));
+		await tasks.RunTasks();
+		completed[0].ShouldBeTrue();
+		tasks.Tasks.ShouldBeEmpty();
+
+		TaskGroup completedWithoutSemaphore = new([new Task(() => completed[1] = true)]);
+		await completedWithoutSemaphore.RunTasks();
+		completed[1].ShouldBeTrue();
+
+		using SemaphoreSlim semaphore = new(1);
+		ResultTaskGroup<int> semaphoreResults = new([new Task<int>(() => 6)], semaphore);
+		(await semaphoreResults.RunTasks()).ShouldBe([6]);
+	}
+
 }

@@ -1,5 +1,5 @@
-﻿using System.Diagnostics;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
+using System.Diagnostics;
 using ZLinq;
 
 namespace CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;

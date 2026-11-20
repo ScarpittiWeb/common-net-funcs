@@ -1,5 +1,5 @@
-﻿using System.Reflection;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
+using System.Reflection;
 using xRetry.v3;
 using static Xunit.TestContext;
 
@@ -2928,4 +2928,324 @@ public sealed class CopyTests
 	}
 
 	#endregion
+}
+
+public sealed class CopyBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+	public sealed class GapScalar
+	{
+		public int Number { get; set; }
+	}
+
+	public sealed class GapCopySource
+	{
+		public int Number { get; set; }
+
+		public string? Text { get; set; }
+
+		public GapCopySource? Child { get; set; }
+
+		public List<int> Values { get; set; } = [];
+	}
+
+	public sealed class GapCopyDestination
+	{
+		public int Number { get; set; }
+
+		public string? Text { get; set; }
+
+		public GapCopyDestination? Child { get; set; }
+
+		public int[] Values { get; set; } = [];
+	}
+
+	public class GapBase
+	{
+		public string? Value { get; set; }
+	}
+
+	public sealed class GapDerivedSource : GapBase
+	{
+	}
+
+	public sealed class GapAssignableSource
+	{
+		public GapDerivedSource? Item { get; set; }
+	}
+
+	public sealed class GapAssignableDestination
+	{
+		public GapBase? Item { get; set; }
+	}
+
+
+	public sealed class GapArraySource
+	{
+		public List<GapScalar> Items { get; set; } = [];
+
+		public Dictionary<GapScalar, GapScalar> Lookup { get; set; } = [];
+	}
+
+	public interface IGapInterface
+	{
+	}
+
+	public sealed class GapInterfaceValue : IGapInterface
+	{
+		public string? Text { get; set; }
+	}
+
+	public sealed class GapInterfaceSource
+	{
+		public IGapInterface? Item { get; set; }
+	}
+
+	public sealed class GapInterfaceDestination
+	{
+		public object? Item { get; set; }
+	}
+
+	public sealed class GapArrayDestination
+	{
+		public GapScalar[] Items { get; set; } = [];
+
+		public Dictionary<GapScalar, GapScalar> Lookup { get; set; } = [];
+	}
+
+	public sealed class GapNullableDictionarySource
+	{
+		public Dictionary<string, GapScalar?> Values { get; set; } = [];
+	}
+
+	public sealed class GapNullableDictionaryDestination
+	{
+		public Dictionary<string, GapScalar?> Values { get; set; } = [];
+	}
+
+	public sealed class GapNoAddCollection<T> : IEnumerable<T>
+	{
+		public IEnumerator<T> GetEnumerator() => Enumerable.Empty<T>().GetEnumerator();
+
+		System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+	}
+
+	public sealed class GapNoAddSource
+	{
+		public List<GapScalar> Values { get; set; } = [];
+	}
+
+	public sealed class GapNoAddDestination
+	{
+		public GapNoAddCollection<GapScalar> Values { get; set; } = new();
+	}
+
+	public sealed class GapNeedsCtorSource
+	{
+		public GapScalar Child { get; set; } = new();
+	}
+
+	public sealed class GapNeedsCtor(string value)
+	{
+		public string Value { get; } = value;
+	}
+
+	public sealed class GapNeedsCtorDestination
+	{
+		public GapNeedsCtor Child { get; set; } = null!;
+	}
+
+	public sealed class GapReflectionCollectionSource
+	{
+		public List<int> Simple { get; set; } = [];
+
+		public List<string?> Nullable { get; set; } = [];
+	}
+
+	public sealed class GapReflectionCollectionDestination
+	{
+		public IEnumerable<int> Simple { get; set; } = [];
+
+		public string?[] Nullable { get; set; } = [];
+	}
+
+	public sealed class GapInterfaceCollectionSource
+	{
+		public List<GapScalar> Values { get; set; } = [];
+	}
+
+	public sealed class GapInterfaceCollectionDestination
+	{
+		public IEnumerable<GapScalar> Values { get; set; } = [];
+	}
+
+	public sealed class GapPropertyInfoInterfaceSource
+	{
+		public ICustomAttributeProvider Value { get; set; } = null!;
+	}
+
+	public sealed class GapPropertyInfoInterfaceDestination
+	{
+		public ICustomAttributeProvider Value { get; set; } = null!;
+	}
+
+	[Fact]
+	public void CopyPropertiesToNewRecursive_CollectionOfSameType_ReusesSimpleItems()
+	{
+		GapScalar original = new() { Number = 7 };
+		List<GapScalar> source = [original];
+
+		List<GapScalar> copy = source.CopyPropertiesToNewRecursive<List<GapScalar>, List<GapScalar>>(useCache: false);
+
+		copy.ShouldHaveSingleItem().ShouldBeSameAs(original);
+	}
+
+	[Fact]
+	public void CopyPropertiesToNewRecursive_UsesSimpleNullAndComplexNullBranches()
+	{
+		GapCopyDestination result = new GapCopySource
+		{
+			Number = 5,
+			Text = null,
+			Child = null,
+			Values = [1, 2]
+		}.CopyPropertiesToNewRecursive<GapCopySource, GapCopyDestination>(useCache: false);
+
+		result.Number.ShouldBe(5);
+		result.Text.ShouldBeNull();
+		result.Child.ShouldBeNull();
+		result.Values.ShouldBe([1, 2]);
+	}
+
+	[Fact]
+	public void CopyPropertiesToNewRecursive_DepthLimitNullsComplexProperties()
+	{
+		GapCopyDestination result = new GapCopySource
+		{
+			Child = new GapCopySource { Number = 9 }
+		}.CopyPropertiesToNewRecursive<GapCopySource, GapCopyDestination>(maxDepth: 0, useCache: true);
+
+		result.Child.ShouldBeNull();
+	}
+
+	[Fact]
+	public void CopyPropertiesToNewRecursive_AssignableClassPropertyUsesDirectAssignment()
+	{
+		GapDerivedSource value = new() { Value = "kept" };
+		GapAssignableDestination result = new GapAssignableSource { Item = value }
+			.CopyPropertiesToNewRecursive<GapAssignableSource, GapAssignableDestination>(useCache: true);
+
+		result.Item.ShouldNotBeSameAs(value);
+		result.Item.Value.ShouldBe("kept");
+	}
+
+	[Fact]
+	public void CopyPropertiesToNewRecursive_ArrayAndDictionaryCopiesContainConvertedValues()
+	{
+		GapArraySource source = new()
+		{
+			Items = [new GapScalar { Number = 1 }, new GapScalar { Number = 2 }],
+			Lookup = new() { [new GapScalar { Number = 3 }] = new GapScalar { Number = 4 } }
+		};
+
+		GapArrayDestination result = source.CopyPropertiesToNewRecursive<GapArraySource, GapArrayDestination>(useCache: true);
+
+		result.Items.Select(x => x.Number).ShouldBe([1, 2]);
+		result.Lookup.ShouldHaveSingleItem();
+		result.Lookup.Single().Key.Number.ShouldBe(3);
+		result.Lookup.Single().Value.Number.ShouldBe(4);
+	}
+
+	[Fact]
+	public void CopyPropertiesToNewRecursive_DictionaryNullValuesArePreserved()
+	{
+		GapNullableDictionarySource source = new()
+		{
+			Values = new() { ["null"] = null, ["value"] = new GapScalar { Number = 5 } }
+		};
+
+		GapNullableDictionaryDestination result =
+			source.CopyPropertiesToNewRecursive<GapNullableDictionarySource, GapNullableDictionaryDestination>(useCache: false);
+
+		result.Values["null"].ShouldBeNull();
+		result.Values["value"].Number.ShouldBe(5);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void CopyPropertiesToNewRecursive_NoAddDestinationCollectionRemainsEmpty(bool useCache)
+	{
+		GapNoAddSource source = new() { Values = [new() { Number = 1 }] };
+
+		GapNoAddDestination result =
+			source.CopyPropertiesToNewRecursive<GapNoAddSource, GapNoAddDestination>(useCache: useCache);
+
+		result.Values.ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void CopyPropertiesToNewRecursive_ReflectionCopiesNullSimpleAndInterfaceCollections()
+	{
+		GapReflectionCollectionSource source = new()
+		{
+			Simple = [1, 2],
+			Nullable = [null]
+		};
+
+		GapReflectionCollectionDestination result =
+			source.CopyPropertiesToNewRecursive<GapReflectionCollectionSource, GapReflectionCollectionDestination>(useCache: false);
+
+		result.Simple.ShouldBe([1, 2]);
+		result.Nullable.ShouldHaveSingleItem().ShouldBeNull();
+
+		GapInterfaceCollectionSource interfaceSource = new()
+		{
+			Values = [new() { Number = 8 }]
+		};
+		GapInterfaceCollectionDestination interfaceResult =
+			interfaceSource.CopyPropertiesToNewRecursive<GapInterfaceCollectionSource, GapInterfaceCollectionDestination>(useCache: false);
+		interfaceResult.Values.Cast<GapScalar>().Single().Number.ShouldBe(8);
+	}
+
+	[Fact]
+	public void CopyPropertiesToNewRecursive_ReflectionCanDirectAssignPropertyInfoInterfaceValue()
+	{
+		PropertyInfo sourceInfo = typeof(GapCopySource).GetProperty(nameof(GapCopySource.Number))!;
+		GapPropertyInfoInterfaceSource source = new() { Value = sourceInfo };
+
+		GapPropertyInfoInterfaceDestination result =
+			source.CopyPropertiesToNewRecursive<GapPropertyInfoInterfaceSource, GapPropertyInfoInterfaceDestination>(useCache: false);
+
+		result.Value.ShouldBeSameAs(sourceInfo);
+	}
+
+	[Fact]
+	public void CopyPropertiesToNewRecursive_NestedTypeWithoutDefaultConstructorThrowsDuringCreation()
+	{
+		GapNeedsCtorSource source = new() { Child = new GapScalar { Number = 1 } };
+
+		Should.Throw<MissingMethodException>(
+			() => source.CopyPropertiesToNewRecursive<GapNeedsCtorSource, GapNeedsCtorDestination>());
+	}
+
+	[Fact]
+	public void CopyPropertiesToNewRecursive_AssignableInterfaceUsesFallbackAssignment()
+	{
+		GapInterfaceValue value = new() { Text = "direct" };
+		GapInterfaceDestination result = new GapInterfaceSource { Item = value }
+			.CopyPropertiesToNewRecursive<GapInterfaceSource, GapInterfaceDestination>(useCache: true);
+
+		result.Item.ShouldBeSameAs(value);
+	}
+
 }

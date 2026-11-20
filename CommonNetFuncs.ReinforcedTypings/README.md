@@ -14,12 +14,14 @@ The package targets `net11.0`. It is not a runtime mapping or validation service
 
 ## Contents
 
-- [Installation](#installation)
-- [Setup](#setup)
-- [`TsConst`](#tsconst)
-- [`TsCollection`](#tscollection)
-- [Valibot schemas](#valibot-schemas)
-- [License](#license)
+- [CommonNetFuncs.ReinforcedTypings](#commonnetfuncsreinforcedtypings)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [Setup](#setup)
+  - [`TsConst`](#tsconst)
+  - [`TsCollection`](#tscollection)
+  - [Valibot schemas](#valibot-schemas)
+  - [License](#license)
 
 ## Installation
 
@@ -274,7 +276,7 @@ Supported built-in shapes:
 - non-System/non-Microsoft complex classes → inline `v.object(...)`
 - cycles and unrecognized types → `v.any()`.
 
-Supported validation attributes are `[Required]`, `[MaxLength]`, `[MinLength]`, `[StringLength]`, `[Range]`, `[RegularExpression]`, `[EmailAddress]`, `[Url]`, `[Phone]`, and `[CreditCard]`. Error messages are copied into the matching Valibot call when present. Required/nullable handling follows reflected C# nullability: nullable references and nullable value types may be `optional(nullable(...))`; required nullable values become `nullable(...)`; nonnullable value types without `[Required]` can still be optional. A nonnullable `string` without `[Required]` is not wrapped in `optional`.
+Supported validation attributes are `[Required]`, `[MaxLength]`, `[MinLength]`, `[StringLength]`, `[Range]`, `[RegularExpression]`, `[EmailAddress]`, `[Url]`, `[Phone]`, and `[CreditCard]`. Error messages are copied into the matching Valibot call when present. Required/nullable handling follows reflected C# nullability: nullable references and nullable value types may be `optional(nullable(...))`; required nullable values become `nullable(...)`; non-nullable value types without `[Required]` can still be optional. A non-nullable `string` without `[Required]` is not wrapped in `optional`.
 
 The generator additionally recognizes attributes from other assemblies by type name:
 

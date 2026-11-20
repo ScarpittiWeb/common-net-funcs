@@ -1,5 +1,4 @@
 ﻿using System.IO.Compression;
-
 using static CommonNetFuncs.Compression.Streams;
 
 namespace CommonNetFuncs.Compression;
@@ -52,11 +51,13 @@ public static class Files
 		if (files.Any())
 		{
 #if !NETSTANDARD2_1
-			await using ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true);
+			await using (ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true))
 #else
-			using ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true);
+			using (ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true))
 #endif
-			await files.AddFilesToZip(archive, compressionLevel, cancellationToken).ConfigureAwait(false);
+			{
+				await files.AddFilesToZip(archive, compressionLevel, cancellationToken).ConfigureAwait(false);
+			}
 			zipFileStream.Position = 0;
 		}
 		return zipFileStream ?? new();
@@ -75,11 +76,13 @@ public static class Files
 		if (files.Any())
 		{
 #if !NETSTANDARD2_1
-			await using ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true);
+			await using (ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true))
 #else
-			using ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true);
+			using (ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true))
 #endif
-			await files.AddFilesToZip(archive, compressionLevel, cancellationToken).ConfigureAwait(false);
+			{
+				await files.AddFilesToZip(archive, compressionLevel, cancellationToken).ConfigureAwait(false);
+			}
 			zipFileStream.Position = 0;
 		}
 		return zipFileStream ?? new();

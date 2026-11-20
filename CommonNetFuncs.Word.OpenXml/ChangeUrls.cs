@@ -1,5 +1,5 @@
-﻿using System.Text.RegularExpressions;
-using DocumentFormat.OpenXml.Packaging;
+﻿using DocumentFormat.OpenXml.Packaging;
+using System.Text.RegularExpressions;
 
 namespace CommonNetFuncs.Word.OpenXml;
 

@@ -8,13 +8,15 @@ Helpers for authenticated Hangfire dashboard access, job cancellation/matching, 
 
 ## Contents
 
-- [Installation](#installation)
-- [Dashboard authorization](#dashboard-authorization)
-- [Job matching and deletion](#job-matching-and-deletion)
-- [`HangfireJobException`](#hangfirejobexception)
-- [Shutdown observation](#shutdown-observation)
-- [Waiting for jobs](#waiting-for-jobs)
-- [License](#license)
+- [CommonNetFuncs.Hangfire](#commonnetfuncshangfire)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [Dashboard authorization](#dashboard-authorization)
+  - [Job matching and deletion](#job-matching-and-deletion)
+  - [`HangfireJobException`](#hangfirejobexception)
+  - [Shutdown observation](#shutdown-observation)
+  - [Waiting for jobs](#waiting-for-jobs)
+  - [License](#license)
 
 ## Installation
 

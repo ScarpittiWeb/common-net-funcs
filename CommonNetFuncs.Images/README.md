@@ -10,18 +10,20 @@ The package targets `net11.0` and `netstandard2.1`.
 
 ## Contents
 
-- [Installation](#installation)
-- [Public types and options](#public-types-and-options)
-- [Base64](#base64)
-- [Image manipulation](#image-manipulation)
-  - [Every synchronous resize overload](#every-synchronous-resize-overload)
-  - [Every `ResizeTo` overload](#every-resizeto-overload)
-  - [Every quality-reduction overload](#every-quality-reduction-overload)
-  - [Format detection, metadata, conversion, and extension lookup](#format-detection-metadata-conversion-and-extension-lookup)
-  - [Every asynchronous manipulation overload](#every-asynchronous-manipulation-overload)
-- [Perceptual fingerprinting](#perceptual-fingerprinting)
-- [External optimizer](#external-optimizer)
-- [License](#license)
+- [CommonNetFuncs.Images](#commonnetfuncsimages)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [Public types and options](#public-types-and-options)
+  - [Base64](#base64)
+  - [Image manipulation](#image-manipulation)
+    - [Every synchronous resize overload](#every-synchronous-resize-overload)
+    - [Every `ResizeTo` overload](#every-resizeto-overload)
+    - [Every quality-reduction overload](#every-quality-reduction-overload)
+    - [Format detection, metadata, conversion, and extension lookup](#format-detection-metadata-conversion-and-extension-lookup)
+    - [Every asynchronous manipulation overload](#every-asynchronous-manipulation-overload)
+  - [Perceptual fingerprinting](#perceptual-fingerprinting)
+  - [External optimizer](#external-optimizer)
+  - [License](#license)
 
 ## Installation
 

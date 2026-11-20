@@ -2,8 +2,11 @@
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+
 #if NETSTANDARD2_1
+
 using CommonNetFuncs.Compression.Internal;
+
 #endif
 
 namespace CommonNetFuncs.Compression;

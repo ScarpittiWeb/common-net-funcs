@@ -8,32 +8,34 @@ General-purpose C# extension methods and support types. The package targets `net
 
 ## Contents
 
-- [Async](#async)
-- [Cache managers and fixed-capacity dictionaries](#cache-managers-and-fixed-capacity-dictionaries)
-- [Collections](#collections)
-- [Copy](#copy)
-- [Dates](#dates)
-- [Dimension scaling](#dimension-scaling)
-- [Exception locations](#exception-locations)
-- [File helpers](#file-helpers)
-- [Inspection](#inspection)
-- [Math](#math)
-- [Randomization](#randomization)
-- [Batches](#batches)
-- [Streams](#streams)
-- [String constants and enums](#string-constants-and-enums)
-- [Slicing, casing, and whitespace](#slicing-casing-and-whitespace)
-- [String/collection tests and invariant searches](#stringcollection-tests-and-invariant-searches)
-- [Character classes and extraction](#character-classes-and-extraction)
-- [Object string normalization](#object-string-normalization)
-- [Conversion to/from nullable values](#conversion-tofrom-nullable-values)
-- [Hashing, date formats, regex, URL, phone, and lines](#hashing-date-formats-regex-url-phone-and-lines)
-- [Fractions and numeric extraction](#fractions-and-numeric-extraction)
-- [Log sanitization and written lists](#log-sanitization-and-written-lists)
-- [Type checks and type caches](#type-checks-and-type-caches)
-- [Unit conversion (`net11.0` only)](#unit-conversion-net110-only)
-- [Validation](#validation)
-- [License](#license)
+- [CommonNetFuncs.Core](#commonnetfuncscore)
+  - [Contents](#contents)
+  - [Async](#async)
+  - [Cache managers and fixed-capacity dictionaries](#cache-managers-and-fixed-capacity-dictionaries)
+  - [Collections](#collections)
+  - [Copy](#copy)
+  - [Dates](#dates)
+  - [Dimension scaling](#dimension-scaling)
+  - [Exception locations](#exception-locations)
+  - [File helpers](#file-helpers)
+  - [Inspection](#inspection)
+  - [Math](#math)
+  - [Randomization](#randomization)
+  - [Batches](#batches)
+  - [Streams](#streams)
+  - [String constants and enums](#string-constants-and-enums)
+  - [Slicing, casing, and whitespace](#slicing-casing-and-whitespace)
+  - [String/collection tests and invariant searches](#stringcollection-tests-and-invariant-searches)
+  - [Character classes and extraction](#character-classes-and-extraction)
+  - [Object string normalization](#object-string-normalization)
+  - [Conversion to/from nullable values](#conversion-tofrom-nullable-values)
+  - [Hashing, date formats, regex, URL, phone, and lines](#hashing-date-formats-regex-url-phone-and-lines)
+  - [Fractions and numeric extraction](#fractions-and-numeric-extraction)
+  - [Log sanitization and written lists](#log-sanitization-and-written-lists)
+  - [Type checks and type caches](#type-checks-and-type-caches)
+  - [Unit conversion (`net11.0` only)](#unit-conversion-net110-only)
+  - [Validation](#validation)
+  - [License](#license)
 
 ```bash
 dotnet add package CommonNetFuncs.Core
@@ -56,7 +58,7 @@ using CommonNetFuncs.Core.CollectionClasses;
 
 ## Async
 
-`ObjectFill` awaits a task and writes into the receiver. Class-to-class filling shallow-copies matching properties; list/bag/set overloads append results; dictionary overloads assign by key; `DataTable.Load` is used for tables; `MemoryStream.WriteTo` appends at the target's current position. These helpers catch/log exceptions rather than rethrowing them. A cancellation exception in an overload that accepts a token is therefore also swallowed. Some semaphore overloads release their semaphore in `finally` even when acquisition throws.
+`ObjectFill` awaits a task and writes into the receiver. Class-to-class filling shallow-copies matching properties; list/bag/set overloads append results; dictionary overloads assign by key; `DataTable.Load` is used for tables; `MemoryStream.WriteTo` appends at the target's current position. These helpers catch/log exceptions rather than re-throwing them. A cancellation exception in an overload that accepts a token is therefore also swallowed. Some semaphore overloads release their semaphore in `finally` even when acquisition throws.
 
 For DataTable and MemoryStream fills, the helper disposes the awaited result object after copying it.
 

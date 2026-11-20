@@ -1,8 +1,8 @@
-﻿using System.Runtime.CompilerServices;
-using System.Text;
-using CommonNetFuncs.Web.Requests.Rest.Options;
+﻿using CommonNetFuncs.Web.Requests.Rest.Options;
 using Microsoft.AspNetCore.JsonPatch;
 using NLog;
+using System.Runtime.CompilerServices;
+using System.Text;
 using static CommonNetFuncs.Web.Common.ContentTypes;
 using static CommonNetFuncs.Web.Requests.Rest.RestHelperWrapper.WrapperHelpers;
 using static Newtonsoft.Json.JsonConvert;
@@ -109,6 +109,9 @@ public sealed class RestHelpersWrapper
 					logger.Warn("{RequestLabel} {Url} still failing after max allowed attempts ({MaxRetry}).", requestLabel, options.Url, options.ResilienceOptions.MaxRetry);
 					break;
 				}
+
+				// Streaming responses are not buffered, so a discarded attempt must be disposed to release its connection (StatusCode remains readable)
+				result.Response?.Dispose();
 				await Task.Delay(GetWaitTime(options.ResilienceOptions, attempts), cancellationToken).ConfigureAwait(false);
 			}
 		}

@@ -1,6 +1,8 @@
-﻿using System.IO.Pipelines;
+﻿using CommonNetFuncs.Core;
+using System.ComponentModel.DataAnnotations;
+using System.Data;
+using System.IO.Pipelines;
 using System.Text;
-using CommonNetFuncs.Core;
 using static Xunit.TestContext;
 
 namespace Core.Tests;
@@ -1806,4 +1808,204 @@ public sealed class FileHelpersTests : IDisposable
 	}
 
 	#endregion
+}
+
+public sealed class FileHelpersBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static DataTable CreateOneRowTable()
+	{
+		DataTable table = new();
+		table.Columns.Add("Value", typeof(int));
+		table.Rows.Add(9);
+		return table;
+	}
+
+	[GapNullTypeId]
+	private sealed class GapNullTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNullTypeIdAttribute : Attribute
+	{
+		public override object TypeId => null!;
+	}
+
+	[GapNamelessTypeId]
+	private sealed class GapNamelessTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNamelessTypeIdAttribute : Attribute
+	{
+		public override object TypeId { get; } = new object();
+	}
+
+	private sealed class GapNestedEquality
+	{
+		public GapNestedValue? Child { get; set; }
+	}
+
+	private sealed class GapNestedValue
+	{
+		public int Value { get; set; }
+	}
+
+	private sealed class GapHashHolder
+	{
+		public List<GapNestedValue?> Values { get; set; } = [];
+	}
+
+	private sealed class GapNonSeekableReadStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public bool AllowRead { get; set; } = true;
+
+		public override bool CanRead => AllowRead;
+
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonWritableTargetStream : MemoryStream
+	{
+		public override bool CanWrite => false;
+	}
+
+	private sealed class GapUnseekableSourceStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonSeekableWriteStream : MemoryStream
+	{
+		public override bool CanSeek => false;
+
+		public byte[] Data => ToArray();
+	}
+
+	private sealed class GapValidated
+	{
+		[Required]
+		public string? Required { get; set; }
+
+		[Range(1, 10)]
+		public int Count { get; set; }
+
+		public string? Optional { get; set; }
+	}
+
+	[Fact]
+	public void GetSafeSaveName_CreatesMissingDirectoriesAndAdvancesExistingIterator()
+	{
+		string root = Path.Combine(Path.GetTempPath(), "common-net-funcs", Guid.NewGuid().ToString("N"));
+		string file = Path.Combine(root, "missing", "name?.txt");
+		try
+		{
+			string created = file.GetSafeSaveName(suppressLogging: true, createPathIfMissing: true);
+			created.ShouldBe(Path.Combine(root, "missing", "name_.txt"));
+			Directory.Exists(Path.GetDirectoryName(created)).ShouldBeTrue();
+
+			File.WriteAllText(created, "x");
+			string next = created.GetSafeSaveName(startFromZero: true, suppressLogging: true);
+			next.ShouldBe(Path.Combine(root, "missing", "name_ (0).txt"));
+
+			File.WriteAllText(next, "x");
+			string advanced = next.GetSafeSaveName(startFromZero: false, suppressLogging: true);
+			advanced.ShouldBe(Path.Combine(root, "missing", "name_ (1).txt"));
+		}
+		finally
+		{
+			if (Directory.Exists(root))
+			{
+				Directory.Delete(root, true);
+			}
+		}
+	}
+
+	[Fact]
+	public void GetSafeSaveName_MissingDirectoryHonorsSuppression()
+	{
+		string missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "file.txt");
+
+		missing.GetSafeSaveName(suppressLogging: false).ShouldBeEmpty();
+		missing.GetSafeSaveName(suppressLogging: true).ShouldBe(missing);
+	}
+
+	[Fact]
+	public async Task GetHashFromFile_ReportsOpenFailureAsEmptyHash()
+	{
+		string file = Path.GetTempFileName();
+		await File.WriteAllTextAsync(file, "locked", Current.CancellationToken);
+		await using FileStream held = new(file, FileMode.Open, FileAccess.Read, FileShare.None);
+		try
+		{
+			(await file.GetHashFromFile(EHashAlgorithm.MD5)).ShouldBeEmpty();
+		}
+		finally
+		{
+			await held.DisposeAsync();
+			File.Delete(file);
+		}
+	}
+
+	[Fact]
+	public void GetAllFilesRecursive_YieldsNestedFilesAndObservesMissingDirectories()
+	{
+		string root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+		string nested = Path.Combine(root, "nested");
+		Directory.CreateDirectory(nested);
+		string first = Path.Combine(root, "a.txt");
+		string second = Path.Combine(nested, "b.log");
+		File.WriteAllText(first, "a");
+		File.WriteAllText(second, "b");
+		try
+		{
+			FileHelpers.GetAllFilesRecursive(root, "*.txt", Current.CancellationToken).ShouldBe([first]);
+			FileHelpers.GetAllFilesRecursive(root, cancellationToken: Current.CancellationToken).ToHashSet().ShouldBe(new HashSet<string> { first, second });
+			FileHelpers.GetAllFilesRecursive(Path.Combine(root, "missing"), cancellationToken: Current.CancellationToken).ShouldBeEmpty();
+		}
+		finally
+		{
+			Directory.Delete(root, true);
+		}
+	}
+
+	[Fact]
+	public async Task ReadFileFromPipe_HandlesNonSeekableOutput()
+	{
+		Pipe pipe = new();
+		await pipe.Writer.WriteAsync(new byte[] { 1, 2, 3 }, Current.CancellationToken);
+		pipe.Writer.Complete();
+		await using GapNonSeekableWriteStream output = new();
+
+		(bool success, string? result) = await pipe.Reader.ReadFileFromPipe(output, 10L, "ok", cancellationToken: Current.CancellationToken);
+
+		success.ShouldBeTrue();
+		result.ShouldBe("ok");
+		output.Data.ShouldBe([1, 2, 3]);
+	}
+
 }

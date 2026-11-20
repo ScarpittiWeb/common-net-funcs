@@ -10,10 +10,12 @@ The package does not currently contain reflection- or serialization-based clonin
 
 ## Contents
 
-- [Installation](#installation)
-- [`DeepClone<T>`](#deepclonet)
-- [Cache](#cache)
-- [License](#license)
+- [CommonNetFuncs.DeepClone](#commonnetfuncsdeepclone)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [`DeepClone<T>`](#deepclonet)
+  - [Cache](#cache)
+  - [License](#license)
 
 ## Installation
 

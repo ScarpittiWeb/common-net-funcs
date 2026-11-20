@@ -1,11 +1,11 @@
-﻿using System.Reflection;
-using DocumentFormat.OpenXml.Spreadsheet;
+﻿using DocumentFormat.OpenXml.Spreadsheet;
+using System.Reflection;
 using static CommonNetFuncs.Core.ExceptionLocation;
 
 namespace CommonNetFuncs.Excel.OpenXml;
 
 // Forward-only indexes used by the read loops so each Row/Cell element is visited (and its reference parsed) at most once,
-// instead of rescanning SheetData / Row children for every cell.
+// instead of re-scanning SheetData / Row children for every cell.
 public static partial class Common
 {
 	/// <summary>
@@ -129,7 +129,7 @@ public static partial class Common
 		}
 	}
 
-	/// <summary>Read-only replacement for <c>GetCellFromCoordinates</c> inside a table read: same results without mutating the DOM or rescanning rows/cells.</summary>
+	/// <summary>Read-only replacement for <c>GetCellFromCoordinates</c> inside a table read: same results without mutating the DOM or re-scanning rows/cells.</summary>
 	private sealed class TableCellResolver
 	{
 		private readonly SheetData? sheetData;

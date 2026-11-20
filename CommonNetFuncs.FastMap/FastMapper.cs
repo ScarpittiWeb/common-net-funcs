@@ -1,10 +1,10 @@
-﻿using System.Collections;
+﻿using CommonNetFuncs.Core;
+using FastExpressionCompiler;
+using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using CommonNetFuncs.Core;
-using FastExpressionCompiler;
 using static CommonNetFuncs.Core.ReflectionCaches;
 
 namespace CommonNetFuncs.FastMap;
@@ -433,7 +433,7 @@ public static class FastMapper
 	}
 
 	/// <summary>
-	/// Dictionary&lt;K,V1&gt; -> Dictionary&lt;K,V2&gt; value mapping using the struct enumerator (no boxing / interface dispatch) and a destination presized to the source count.
+	/// Dictionary&lt;K,V1&gt; -> Dictionary&lt;K,V2&gt; value mapping using the struct enumerator (no boxing / interface dispatch) and a destination pre-sized to the source count.
 	/// </summary>
 	private static BlockExpression CreateDictionaryToDictionaryMappingExpression(Expression source, Type sourceType, Type destType, Type sourceKeyType, Type sourceValueType, Type destKeyType, Type destValueType)
 	{
@@ -507,11 +507,7 @@ public static class FastMapper
 
 		if (collectionType.IsGenericType)
 		{
-			Type[] genArgs = collectionType.GetGenericArguments();
-			if (genArgs.Length > 0)
-			{
-				return genArgs[0];
-			}
+			return collectionType.GetGenericArguments()[0];
 		}
 
 		Type? enumInterface = collectionType.GetInterfaces().FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEnumerable<>));

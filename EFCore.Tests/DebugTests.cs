@@ -1,5 +1,11 @@
 ﻿using CommonNetFuncs.EFCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
+using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace EFCore.Tests;
 
@@ -227,7 +233,7 @@ public sealed class DebugTests
 		List<string> names = ["a", "b"];
 		string? nul = null;
 		DateOnly? d = new DateOnly(2024, 1, 2);
-		string empty = string.Empty;		string[] emptyArr = [];
+		string empty = string.Empty; string[] emptyArr = [];
 		bool f = false;
 		List<string> weird = ["it's", "a,b", "100%"];
 		string? multi = "line1\nline2";
@@ -270,4 +276,124 @@ internal sealed class DebugTestEntity
 internal sealed class DebugTestDbContext(DbContextOptions<DebugTestDbContext> options) : DbContext(options)
 {
 	public DbSet<DebugTestEntity> Entities => Set<DebugTestEntity>();
+}
+
+public sealed class EfCoreDebugBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static (IServiceProvider Provider, CoverageContext Context) CreateProvider()
+	{
+		ServiceCollection services = new();
+		services.AddDbContextPool<CoverageContext>(options => options.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+		ServiceProvider provider = services.BuildServiceProvider();
+		return (provider, provider.GetRequiredService<CoverageContext>());
+	}
+
+	private static CoverageContext CreateContext() =>
+		new(new DbContextOptionsBuilder<CoverageContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+
+	private static IServiceProvider CreateThrowingTrackingProvider()
+	{
+		ServiceCollection services = new();
+		services.AddDbContext<ThrowOnTrackingContext>(options => options.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+		return services.BuildServiceProvider();
+	}
+
+	private static IAsyncEnumerable<CoverageEntity> InvokeStreamingHelper(Func<Func<bool, IQueryable<CoverageEntity>>> builderFactory)
+	{
+		MethodInfo method = typeof(BaseDbContextActions<CoverageEntity, CoverageContext>)
+			.GetMethod("ExecuteStreamingWithCircularRefHandling", BindingFlags.Static | BindingFlags.NonPublic)!
+			.MakeGenericMethod(typeof(CoverageEntity));
+		return (IAsyncEnumerable<CoverageEntity>)method.Invoke(null, [builderFactory(), CancellationToken.None])!;
+	}
+
+	private static ConcurrentDictionary<Type, bool> GetCircularReferenceCache() =>
+		(ConcurrentDictionary<Type, bool>)typeof(BaseDbContextActions<CoverageEntity, CoverageContext>)
+			.GetField("circularReferencingEntities", BindingFlags.Static | BindingFlags.NonPublic)!
+			.GetValue(null)!;
+
+	private static (IProperty Property, IEntityType EntityType, DbContext Context) CreateDateTimeMetadata(
+		string? providerName, string? storeType)
+	{
+		IProperty property = Substitute.For<IProperty>();
+		property.GetColumnType().Returns(storeType);
+		IEntityType entityType = Substitute.For<IEntityType>();
+		entityType.FindProperty(nameof(CoverageDateEntity.CreatedDate)).Returns(property);
+		return (property, entityType, CreateMockContext(providerName));
+	}
+
+	private static DbContext CreateMockContext(string? providerName)
+	{
+		DatabaseFacade database = Substitute.For<DatabaseFacade>(CreateContext());
+		database.ProviderName.Returns(providerName);
+		DbContext context = Substitute.For<DbContext>();
+		context.Database.Returns(database);
+		return context;
+	}
+
+	private static DateTime InvokeNormalize(
+		DateTime value,
+		IProperty property,
+		IEntityType entityType,
+		DbContext context,
+		PropertyInfo? clrProperty = null)
+	{
+		MethodInfo method = typeof(Collections).GetMethod(
+			"NormalizeDateTimeForDatabase", BindingFlags.Static | BindingFlags.NonPublic)!;
+		return (DateTime)method.Invoke(null,
+		[
+			value,
+			clrProperty ?? typeof(CoverageDateEntity).GetProperty(nameof(CoverageDateEntity.CreatedDate))!,
+			entityType,
+			context
+		])!;
+	}
+
+	[Fact]
+	public void Debug_PrivateDialectParser_HandlesBoundaryInputs()
+	{
+		typeof(CommonNetFuncs.EFCore.Debug).InvokeStatic<SqlDialect>("GetDialect", [null])
+			.ShouldBe(SqlDialect.SqlServer);
+		typeof(CommonNetFuncs.EFCore.Debug).InvokeStatic<SqlDialect>("GetDialect", string.Empty)
+			.ShouldBe(SqlDialect.SqlServer);
+		typeof(CommonNetFuncs.EFCore.Debug).InvokeStatic<SqlDialect>("GetDialect", "custom.NPGSQL.provider")
+			.ShouldBe(SqlDialect.PostgreSql);
+
+		string malformed = typeof(CommonNetFuncs.EFCore.Debug).InvokeStatic<string>(
+			"RenderPostgreSqlScript", "-- not-a-parameter\nSELECT 1")!;
+		malformed.ShouldContain("SELECT 1");
+
+		typeof(CommonNetFuncs.EFCore.Debug).InvokeStatic<string>(
+			"FormatPostgreSqlLiteral", "not-a-date", "DateTime").ShouldBe("'not-a-date'");
+		typeof(CommonNetFuncs.EFCore.Debug).InvokeStatic<string>(
+			"FormatPostgreSqlLiteral", "2024-03-02T01:02:03+02:30", "DateTime")
+			.ShouldBe("'2024-03-02 01:02:03.000000+02:30'::timestamptz");
+		typeof(CommonNetFuncs.EFCore.Debug).InvokeStatic<string>(
+			"FormatPostgreSqlArrayLiteral", " 1, 2, three ")
+			.ShouldBe("ARRAY['1', '2', 'three']");
+	}
+
 }

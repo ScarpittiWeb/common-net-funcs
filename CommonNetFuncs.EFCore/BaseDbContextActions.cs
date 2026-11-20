@@ -1,10 +1,10 @@
-﻿using System.Collections.Concurrent;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
+using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace CommonNetFuncs.EFCore;
 
@@ -71,7 +71,8 @@ public partial class BaseDbContextActions<TEntity, TContext>(IServiceProvider se
 			BinaryExpression equality = Expression.Equal(Expression.Property(parameter, keyProperty), Expression.Constant(keyValue, keyType));
 			return Expression.Lambda<Func<TEntity, bool>>(equality, parameter);
 		};
-	}
+	}
+
 }
 
 /// <summary>

@@ -8,16 +8,18 @@ ODBC implementation of `IDirectQuery` from `CommonNetFuncs.Sql.Common`. Targets 
 
 ## Contents
 
-- [Prerequisites](#prerequisites)
-- [Important behavior](#important-behavior)
-- [Construction](#construction)
-- [Complete `DirectQuery` examples](#complete-directquery-examples)
-  - [Result and failure semantics](#result-and-failure-semantics)
-  - [Streaming lifetime and retry limitation](#streaming-lifetime-and-retry-limitation)
-- [Parameterized ODBC SQL](#parameterized-odbc-sql)
-- [Transactions](#transactions)
-- [Installation](#installation)
-- [License](#license)
+- [CommonNetFuncs.Sql.Odbc](#commonnetfuncssqlodbc)
+  - [Contents](#contents)
+  - [Prerequisites](#prerequisites)
+  - [Important behavior](#important-behavior)
+  - [Construction](#construction)
+  - [Complete `DirectQuery` examples](#complete-directquery-examples)
+    - [Result and failure semantics](#result-and-failure-semantics)
+    - [Streaming lifetime and retry limitation](#streaming-lifetime-and-retry-limitation)
+  - [Parameterized ODBC SQL](#parameterized-odbc-sql)
+  - [Transactions](#transactions)
+  - [Installation](#installation)
+  - [License](#license)
 
 ## Prerequisites
 

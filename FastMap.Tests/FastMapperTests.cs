@@ -1,7 +1,7 @@
-﻿using System.Collections;
+﻿using CommonNetFuncs.FastMap;
+using System.Collections;
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
-using CommonNetFuncs.FastMap;
 
 namespace FastMap.Tests;
 
@@ -1121,4 +1121,407 @@ public sealed class FastMapperTests
 	// This is expected behavior - FastMapper intentionally does not support Queue/Stack as destination types.
 
 	#endregion
+}
+
+public sealed class FastMapperBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	public sealed class NestedSource
+	{
+		public NestedValueSource? Nested { get; set; }
+	}
+
+	public sealed class NestedDestination
+	{
+		public NestedValueDestination? Nested { get; set; }
+	}
+
+	public sealed class NestedValueSource
+	{
+		public string? Name { get; set; }
+		public int Number { get; set; }
+	}
+
+	public sealed class NestedValueDestination
+	{
+		public string? Name { get; set; }
+		public int Number { get; set; }
+	}
+
+	public sealed class CollectionPropertySource
+	{
+		public List<CollectionValueSource>? Items { get; set; }
+	}
+
+	public sealed class CollectionPropertyDestination
+	{
+		public List<CollectionValueDestination>? Items { get; set; }
+	}
+
+	public sealed class ValueCollectionPropertySource
+	{
+		public IntEnumerableStruct Values { get; set; }
+	}
+
+	public sealed class ValueCollectionPropertyDestination
+	{
+		public List<int> Values { get; set; } = [];
+	}
+
+	public sealed class DictionaryPropertySource
+	{
+		public Dictionary<string, CollectionValueSource>? Values { get; set; }
+	}
+
+	public sealed class DictionaryPropertyDestination
+	{
+		public Dictionary<string, CollectionValueDestination>? Values { get; set; }
+	}
+
+	public sealed class ValueDictionaryPropertySource
+	{
+		public DictionaryStruct<string, CollectionValueSource> Values { get; set; }
+	}
+
+	public sealed class ValueDictionaryPropertyDestination
+	{
+		public Dictionary<string, CollectionValueDestination> Values { get; set; } = [];
+	}
+
+	public sealed class CollectionValueSource
+	{
+		public int Value { get; set; }
+	}
+
+	public sealed class CollectionValueDestination
+	{
+		public int Value { get; set; }
+	}
+
+	public struct StructSource
+	{
+		public int Value { get; set; }
+	}
+
+	public struct StructDestination
+	{
+		public int Value { get; set; }
+	}
+
+	public sealed class NonGenericIntEnumerable(params int[] values) : IEnumerable<int>
+	{
+		public IEnumerator<int> GetEnumerator()
+		{
+			return ((IEnumerable<int>)values).GetEnumerator();
+		}
+
+		IEnumerator IEnumerable.GetEnumerator()
+		{
+			return GetEnumerator();
+		}
+	}
+
+	public readonly struct IntEnumerableStruct(params int[] values) : IEnumerable<int>
+	{
+		private readonly int[] values = values;
+
+		public IEnumerator<int> GetEnumerator()
+		{
+			return ((IEnumerable<int>)values).GetEnumerator();
+		}
+
+		IEnumerator IEnumerable.GetEnumerator()
+		{
+			return GetEnumerator();
+		}
+	}
+
+	public struct DictionaryStruct<TKey, TValue>(Dictionary<TKey, TValue> values) : IDictionary<TKey, TValue>, IDictionary
+		where TKey : notnull
+	{
+		private readonly Dictionary<TKey, TValue> values = values;
+
+		public TValue this[TKey key]
+		{
+			readonly get => values[key];
+			set => values[key] = value;
+		}
+
+		public readonly ICollection<TKey> Keys => values.Keys;
+		public readonly ICollection<TValue> Values => values.Values;
+		public readonly int Count => values.Count;
+		public readonly bool IsReadOnly => false;
+
+		public void Add(TKey key, TValue value) => values.Add(key, value);
+		public readonly bool ContainsKey(TKey key) => values.ContainsKey(key);
+		public bool Remove(TKey key) => values.Remove(key);
+		public readonly bool TryGetValue(TKey key, out TValue value) => values.TryGetValue(key, out value!);
+		public void Add(KeyValuePair<TKey, TValue> item) => ((ICollection<KeyValuePair<TKey, TValue>>)values).Add(item);
+		public void Clear() => values.Clear();
+		public readonly bool Contains(KeyValuePair<TKey, TValue> item) => ((ICollection<KeyValuePair<TKey, TValue>>)values).Contains(item);
+		public readonly void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) => ((ICollection<KeyValuePair<TKey, TValue>>)values).CopyTo(array, arrayIndex);
+		public bool Remove(KeyValuePair<TKey, TValue> item) => ((ICollection<KeyValuePair<TKey, TValue>>)values).Remove(item);
+		public readonly IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => values.GetEnumerator();
+		readonly IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+		object? IDictionary.this[object key]
+		{
+			readonly get => ((IDictionary)values)[key];
+			set => ((IDictionary)values)[key] = value;
+		}
+
+		readonly ICollection IDictionary.Keys => ((IDictionary)values).Keys;
+		readonly ICollection IDictionary.Values => ((IDictionary)values).Values;
+		readonly bool IDictionary.IsFixedSize => false;
+		readonly bool ICollection.IsSynchronized => false;
+		readonly object ICollection.SyncRoot => ((ICollection)values).SyncRoot;
+
+		readonly bool IDictionary.Contains(object key) => ((IDictionary)values).Contains(key);
+		void IDictionary.Add(object key, object? value) => ((IDictionary)values).Add(key, value);
+		readonly IDictionaryEnumerator IDictionary.GetEnumerator() => ((IDictionary)values).GetEnumerator();
+		void IDictionary.Remove(object key) => ((IDictionary)values).Remove(key);
+		readonly void ICollection.CopyTo(Array array, int index) => ((ICollection)values).CopyTo(array, index);
+	}
+
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public void FastMap_NestedReferenceProperty_PreservesNullAndValues(bool includeNested)
+	{
+		NestedSource source = new()
+		{
+			Nested = includeNested
+				? new NestedValueSource { Name = "value", Number = 42 }
+				: null
+		};
+
+		NestedDestination result = source.FastMap<NestedSource, NestedDestination>();
+
+		if (includeNested)
+		{
+			result.Nested.ShouldNotBeNull();
+			result.Nested.Name.ShouldBe("value");
+			result.Nested.Number.ShouldBe(42);
+		}
+		else
+		{
+			result.Nested.ShouldBeNull();
+		}
+	}
+
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public void FastMap_NestedCollectionProperty_PreservesNullAndMapsValues(bool includeItems)
+	{
+		CollectionPropertySource source = new()
+		{
+			Items = includeItems
+				? [new() { Value = 7 }, new() { Value = 9 }]
+				: null
+		};
+
+		CollectionPropertyDestination result = source.FastMap<CollectionPropertySource, CollectionPropertyDestination>();
+
+		if (includeItems)
+		{
+			result.Items.ShouldNotBeNull();
+			result.Items.Select(x => x.Value).ShouldBe([7, 9]);
+		}
+		else
+		{
+			result.Items.ShouldBeNull();
+		}
+	}
+
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public void FastMap_NestedDictionaryProperty_PreservesNullAndMapsValues(bool includeValues)
+	{
+		DictionaryPropertySource source = new()
+		{
+			Values = includeValues
+				? new() { ["first"] = new() { Value = 11 } }
+				: null
+		};
+
+		DictionaryPropertyDestination result = source.FastMap<DictionaryPropertySource, DictionaryPropertyDestination>();
+
+		if (includeValues)
+		{
+			result.Values.ShouldNotBeNull();
+			result.Values.Count.ShouldBe(1);
+			result.Values["first"].Value.ShouldBe(11);
+		}
+		else
+		{
+			result.Values.ShouldBeNull();
+		}
+	}
+
+	[Fact]
+	public void FastMap_ArrayToGenericInterface_UsesListFallback()
+	{
+		int[] source = [3, 5, 8];
+
+		ICollection<int> result = source.FastMap<int[], ICollection<int>>();
+
+		result.ShouldBeOfType<List<int>>();
+		result.ShouldBe([3, 5, 8]);
+	}
+
+	[Fact]
+	public void FastMap_ArrayToNonGenericCollectionInterface_UsesObjectElementFallback()
+	{
+		object[] source = ["first", 4];
+
+		IList result = source.FastMap<object[], IList>();
+
+		result.ShouldBeOfType<List<object>>();
+		result.Cast<object>().ShouldBe(source);
+	}
+
+	[Fact]
+	public void FastMap_MappedArrayToGenericInterface_UsesListFallback()
+	{
+		CollectionValueSource[] source = [new() { Value = 2 }, new() { Value = 6 }];
+
+		ICollection<CollectionValueDestination> result =
+			source.FastMap<CollectionValueSource[], ICollection<CollectionValueDestination>>();
+
+		result.ShouldBeOfType<List<CollectionValueDestination>>();
+		result.Select(x => x.Value).ShouldBe([2, 6]);
+	}
+
+	[Fact]
+	public void FastMap_MappedArrayToNonGenericCollectionInterface_UsesObjectDestination()
+	{
+		CollectionValueSource[] source = [new() { Value = 13 }, new() { Value = 21 }];
+
+		IList result = source.FastMap<CollectionValueSource[], IList>();
+
+		result.ShouldBeOfType<List<object>>();
+		result.Count.ShouldBe(2);
+		result.Cast<object>().ShouldAllBe(x => x.GetType() == typeof(object));
+	}
+
+	[Fact]
+	public void FastMap_NonGenericCollectionClass_DiscoversGenericEnumerableElementType()
+	{
+		NonGenericIntEnumerable source = new(1, 4, 9);
+
+		ICollection<int> result = source.FastMap<NonGenericIntEnumerable, ICollection<int>>();
+
+		result.ShouldBe([1, 4, 9]);
+	}
+
+	[Fact]
+	public void FastMap_ValueTypeCollectionProperty_ReportsUnsupportedExpression()
+	{
+		ValueCollectionPropertySource source = new()
+		{
+			Values = new(2, 5, 11)
+		};
+
+		Exception exception = Should.Throw<TypeInitializationException>(
+			() => source.FastMap<ValueCollectionPropertySource, ValueCollectionPropertyDestination>());
+
+		exception.InnerException.ShouldBeOfType<ArgumentException>()
+			.ParamName.ShouldBe("arguments[0]");
+	}
+
+	[Fact]
+	public void FastMap_SortedDictionaryWithStructValues_MapsWithoutReferenceNullCheck()
+	{
+		SortedDictionary<string, StructSource> source = new()
+		{
+			["a"] = new() { Value = 17 },
+			["b"] = new() { Value = 23 }
+		};
+
+		Dictionary<string, StructDestination> result =
+			source.FastMap<SortedDictionary<string, StructSource>, Dictionary<string, StructDestination>>();
+
+		result.Count.ShouldBe(2);
+		result["a"].Value.ShouldBe(17);
+		result["b"].Value.ShouldBe(23);
+	}
+
+	[Fact]
+	public void FastMap_DictionaryWithStructValues_UsesOptimizedMappingWithoutReferenceNullCheck()
+	{
+		Dictionary<string, StructSource> source = new()
+		{
+			["key"] = new() { Value = 31 }
+		};
+
+		Dictionary<string, StructDestination> result =
+			source.FastMap<Dictionary<string, StructSource>, Dictionary<string, StructDestination>>();
+
+		result["key"].Value.ShouldBe(31);
+	}
+
+	[Fact]
+	public void FastMap_ValueTypeDictionaryProperty_MapsWithoutNullCheck()
+	{
+		ValueDictionaryPropertySource source = new()
+		{
+			Values = new(new Dictionary<string, CollectionValueSource>
+			{
+				["key"] = new() { Value = 31 }
+			})
+		};
+
+		ValueDictionaryPropertyDestination result =
+			source.FastMap<ValueDictionaryPropertySource, ValueDictionaryPropertyDestination>();
+
+		result.Values.ShouldHaveSingleItem();
+		result.Values["key"].Value.ShouldBe(31);
+	}
+
+	[Fact]
+	public void MapperCacheKey_EqualsAndOperators_CompareBothTypeComponents()
+	{
+		FastMapper.MapperCacheKey key = new(typeof(NestedSource), typeof(NestedDestination));
+		FastMapper.MapperCacheKey equal = new(typeof(NestedSource), typeof(NestedDestination));
+		FastMapper.MapperCacheKey differentSource = new(typeof(CollectionPropertySource), typeof(NestedDestination));
+		FastMapper.MapperCacheKey differentDestination = new(typeof(NestedSource), typeof(CollectionPropertyDestination));
+
+		key.Equals(equal).ShouldBeTrue();
+		key.Equals(differentSource).ShouldBeFalse();
+		key.Equals(differentDestination).ShouldBeFalse();
+		(key == equal).ShouldBeTrue();
+		(key != differentSource).ShouldBeTrue();
+		(key == differentDestination).ShouldBeFalse();
+		(key != equal).ShouldBeFalse();
+		key.GetHashCode().ShouldBe(equal.GetHashCode());
+	}
+
+	[Fact]
+	public void MapperCacheKey_ObjectEquals_HandlesMatchingAndNonMatchingObjects()
+	{
+		FastMapper.MapperCacheKey key = new(typeof(NestedSource), typeof(NestedDestination));
+		object boxedEqual = new FastMapper.MapperCacheKey(typeof(NestedSource), typeof(NestedDestination));
+		object boxedDifferent = new FastMapper.MapperCacheKey(typeof(NestedSource), typeof(CollectionPropertyDestination));
+
+		key.Equals(boxedEqual).ShouldBeTrue();
+		key.Equals(boxedDifferent).ShouldBeFalse();
+		key.Equals(null).ShouldBeFalse();
+		key.Equals("not-a-cache-key").ShouldBeFalse();
+	}
+
 }

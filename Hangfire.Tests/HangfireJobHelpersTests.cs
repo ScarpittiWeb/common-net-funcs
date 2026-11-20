@@ -3,12 +3,18 @@ using CommonNetFuncs.Hangfire;
 using FakeItEasy;
 using Hangfire;
 using Hangfire.Common;
+using Hangfire.States;
 using Hangfire.Storage;
 using Hangfire.Storage.Monitoring;
 using System.Linq.Expressions;
 using System.Reflection;
 
 namespace Hangfire.Tests;
+
+internal interface IDefaultJobService
+{
+	void Run(int required, string text = "default");
+}
 
 [CollectionDefinition("HangfireStaticStorage", DisableParallelization = true)]
 public sealed class HangfireStaticStorageCollection;
@@ -939,4 +945,121 @@ public sealed class HangfireJobHelpersTests
 	}
 
 	#endregion
+}
+
+[Collection("HangfireStaticStorage")]
+public sealed class HangfireJobHelperBehaviorTests
+{
+
+	private static Job CreateJob(params object?[] args)
+	{
+		MethodInfo method = typeof(IDefaultJobService).GetMethod(nameof(IDefaultJobService.Run))!;
+		return new Job(typeof(IDefaultJobService), method, args);
+	}
+
+	private static (JobStorage Storage, IStorageConnection Connection) SetStorage(JobList<EnqueuedJobDto> enqueued, JobData? jobData = null)
+	{
+		JobStorage storage = A.Fake<JobStorage>();
+		IMonitoringApi monitoring = A.Fake<IMonitoringApi>();
+		IStorageConnection connection = A.Fake<IStorageConnection>();
+
+		A.CallTo(() => storage.GetMonitoringApi()).Returns(monitoring);
+		A.CallTo(() => storage.GetConnection()).Returns(connection);
+		A.CallTo(() => monitoring.EnqueuedJobs(A<string>._, A<int>._, A<int>._)).Returns(enqueued);
+		A.CallTo(() => monitoring.ProcessingJobs(A<int>._, A<int>._)).Returns(new JobList<ProcessingJobDto>([]));
+		A.CallTo(() => monitoring.ScheduledJobs(A<int>._, A<int>._)).Returns(new JobList<ScheduledJobDto>([]));
+		A.CallTo(() => connection.GetJobData(A<string>._)).Returns(jobData!);
+		if (jobData != null)
+		{
+			A.CallTo(() => connection.GetStateData(A<string>._)).Returns(new StateData
+			{
+				Name = EnqueuedState.StateName,
+				Data = new Dictionary<string, string>()
+			});
+		}
+
+		JobStorage.Current = storage;
+		return (storage, connection);
+	}
+
+
+
+
+
+	[Fact]
+	public void IsJobMatch_NullStoredArgumentDoesNotMatchConcreteValue()
+	{
+		Job job = CreateJob(42, null);
+
+		HangfireJobHelpers.IsJobMatch(job, nameof(IDefaultJobService.Run),
+			new Dictionary<string, string> { ["text"] = "value" }).ShouldBeFalse();
+	}
+
+	[Fact]
+	public void FindAndCancelJobs_DefaultExpressionIsTreatedAsWildcard()
+	{
+		JobList<EnqueuedJobDto> jobs = new([]);
+		SetStorage(jobs);
+		Expression<Action<IDefaultJobService>> expression = service => service.Run(default, "specific");
+
+		"queue".FindAndCancelJobs(expression).ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void FindAndCancelJobs_ExplicitDefaultExpressionIsTreatedAsWildcard()
+	{
+		SetStorage(new JobList<EnqueuedJobDto>([]));
+		ParameterExpression service = Expression.Parameter(typeof(IDefaultJobService), "service");
+		MethodInfo method = typeof(IDefaultJobService).GetMethod(nameof(IDefaultJobService.Run))!;
+		Expression<Action<IDefaultJobService>> expression = Expression.Lambda<Action<IDefaultJobService>>(
+			Expression.Call(service, method, Expression.Default(typeof(int)), Expression.Constant("specific")),
+			service);
+
+		"queue".FindAndCancelJobs(expression).ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void FindAndCancelJobs_DeclaredDefaultIsOmittedFromMatchParameters()
+	{
+		Job matchingJob = CreateJob(1, "default");
+		JobList<EnqueuedJobDto> jobs = new([
+			new KeyValuePair<string, EnqueuedJobDto>("job-1", new EnqueuedJobDto { Job = matchingJob })
+		]);
+		(JobStorage _, IStorageConnection connection) = SetStorage(jobs, new JobData { Job = matchingJob });
+
+		"queue".FindAndCancelJobs<IDefaultJobService>(service => service.Run(1, "default")).ShouldBeEmpty();
+
+		A.CallTo(() => connection.GetJobData("job-1")).MustHaveHappened();
+	}
+
+	[Fact]
+	public void FindAndCancelJobs_SuccessfulDeletionReturnsCancelledJobId()
+	{
+		Job matchingJob = CreateJob(7, "value");
+		JobList<EnqueuedJobDto> jobs = new([
+			new KeyValuePair<string, EnqueuedJobDto>("job-delete", new EnqueuedJobDto { Job = matchingJob })
+		]);
+		(JobStorage _, IStorageConnection connection) = SetStorage(jobs, new JobData { Job = matchingJob });
+		IWriteOnlyTransaction transaction = A.Fake<IWriteOnlyTransaction>();
+		A.CallTo(() => connection.CreateWriteTransaction()).Returns(transaction);
+		IBackgroundJobClient client = A.Fake<IBackgroundJobClient>();
+		A.CallTo(() => client.ChangeState("job-delete", A<IState>._, A<string>._)).Returns(true);
+		FieldInfo factoryField = typeof(BackgroundJob).GetField("_clientFactory", BindingFlags.NonPublic | BindingFlags.Static)!;
+		Func<IBackgroundJobClient>? originalFactory = (Func<IBackgroundJobClient>?)factoryField.GetValue(null);
+
+		try
+		{
+			factoryField.SetValue(null, new Func<IBackgroundJobClient>(() => client));
+			List<string> result = "queue".FindAndCancelJobs(nameof(IDefaultJobService.Run),
+				new Dictionary<string, string> { ["required"] = "7", ["text"] = "value" });
+
+			result.ShouldBe(["job-delete"]);
+			A.CallTo(() => connection.GetJobData("job-delete")).MustHaveHappened();
+		}
+		finally
+		{
+			factoryField.SetValue(null, originalFactory);
+		}
+	}
+
 }

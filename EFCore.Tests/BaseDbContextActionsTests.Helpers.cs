@@ -1,9 +1,9 @@
-﻿using System.Collections.Concurrent;
-using System.Reflection;
-using AutoFixture;
+﻿using AutoFixture;
 using CommonNetFuncs.EFCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Concurrent;
+using System.Reflection;
 using static Xunit.TestContext;
 
 namespace EFCore.Tests;

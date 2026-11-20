@@ -415,3 +415,147 @@ public sealed partial class CsvExportHelpersTests
 		}
 	}
 }
+
+public sealed partial class CsvExportBehaviorTests
+{
+	[CsvRecord]
+	internal sealed partial record CoverageRecord(string Name, int Count);
+
+
+
+
+
+
+
+
+	private static async Task<string> ReadToEndAsync(MemoryStream stream)
+	{
+		stream.Position = 0;
+		using StreamReader reader = new(stream, leaveOpen: true);
+		return await reader.ReadToEndAsync(Current.CancellationToken);
+	}
+
+	private static MemoryStream CsvStream(string csv) =>
+		new(System.Text.Encoding.UTF8.GetBytes(csv));
+
+	private sealed class NullStringDataColumn : DataColumn
+	{
+		public override string ToString() => null!;
+	}
+
+	private sealed class NullStringValue
+	{
+		public override string ToString() => null!;
+	}
+
+	private sealed class ControlledWriteMemoryStream : MemoryStream
+	{
+		private readonly TaskCompletionSource flushStarted =
+			new(TaskCreationOptions.RunContinuationsAsynchronously);
+		private readonly TaskCompletionSource continueFlush =
+			new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+		public Task WaitUntilFlushStartsAsync(CancellationToken cancellationToken) =>
+			flushStarted.Task.WaitAsync(cancellationToken);
+
+		public void ReleaseFlush() => continueFlush.TrySetResult();
+
+		public override async Task FlushAsync(CancellationToken cancellationToken)
+		{
+			flushStarted.TrySetResult();
+			await continueFlush.Task.WaitAsync(cancellationToken);
+			await base.FlushAsync(cancellationToken);
+		}
+	}
+
+	private sealed class ThrowOnSecondFlushMemoryStream : MemoryStream
+	{
+		public int FlushAttempts { get; private set; }
+
+		public override Task FlushAsync(CancellationToken cancellationToken)
+		{
+			FlushAttempts++;
+			if (FlushAttempts == 2)
+			{
+				throw new IOException("Cleanup flush failed.");
+			}
+
+			return base.FlushAsync(cancellationToken);
+		}
+	}
+
+	[Fact]
+	public async Task ExportToCsv_DataTable_WithNullColumnString_ShouldExportEmptyHeader()
+	{
+		using DataTable table = new();
+		table.Columns.Add(new NullStringDataColumn());
+
+		await using MemoryStream result = await table.ExportToCsv(cancellationToken: Current.CancellationToken);
+		string csv = await ReadToEndAsync(result);
+
+		csv.ShouldBe(Environment.NewLine);
+	}
+
+	[Fact]
+	public async Task ExportToCsv_DataTable_WithCellWhoseToStringReturnsNull_ShouldExportEmptyField()
+	{
+		using DataTable table = new();
+		table.Columns.Add("Value", typeof(object));
+		table.Rows.Add(new NullStringValue());
+
+		await using MemoryStream result = await table.ExportToCsv(cancellationToken: Current.CancellationToken);
+		string csv = await ReadToEndAsync(result);
+
+		csv.ShouldBe($"Value{Environment.NewLine}{Environment.NewLine}");
+	}
+
+	[Fact]
+	public async Task ExportToCsv_Generic_WithAsynchronousDestinationWrite_ShouldCompleteAfterWriteResumes()
+	{
+		await using ControlledWriteMemoryStream stream = new();
+		MemoryStream expected = stream;
+		Task<MemoryStream> export = new[] { new CoverageRecord("Alice", 1) }
+			.ExportToCsv(stream, cancellationToken: Current.CancellationToken);
+
+		await stream.WaitUntilFlushStartsAsync(Current.CancellationToken);
+		stream.ReleaseFlush();
+
+		MemoryStream result = await export;
+		result.ShouldBeSameAs(expected);
+		(await ReadToEndAsync(result)).ShouldBe(
+			$"Name,Count{Environment.NewLine}Alice,1{Environment.NewLine}");
+	}
+
+	[Fact]
+	public async Task ExportToCsv_Generic_WhenCleanupFlushFails_ShouldPropagateException()
+	{
+		await using ThrowOnSecondFlushMemoryStream stream = new();
+
+		IOException exception = await Should.ThrowAsync<IOException>(
+			() => new[] { new CoverageRecord("Alice", 1) }.ExportToCsv(stream));
+
+		exception.Message.ShouldBe("Cleanup flush failed.");
+		stream.FlushAttempts.ShouldBeGreaterThanOrEqualTo(2);
+	}
+
+	[Fact]
+	public async Task ExportToCsv_DataTable_WithAsynchronousDestinationWrite_ShouldCompleteAfterWriteResumes()
+	{
+		using DataTable table = new();
+		table.Columns.Add("Name", typeof(string));
+		table.Columns.Add("Count", typeof(int));
+		table.Rows.Add("Alice", 1);
+		await using ControlledWriteMemoryStream stream = new();
+		MemoryStream expected = stream;
+		Task<MemoryStream> export = table.ExportToCsv(stream, Current.CancellationToken);
+
+		await stream.WaitUntilFlushStartsAsync(Current.CancellationToken);
+		stream.ReleaseFlush();
+
+		MemoryStream result = await export;
+		result.ShouldBeSameAs(expected);
+		(await ReadToEndAsync(result)).ShouldBe(
+			$"Name,Count{Environment.NewLine}Alice,1{Environment.NewLine}");
+	}
+
+}

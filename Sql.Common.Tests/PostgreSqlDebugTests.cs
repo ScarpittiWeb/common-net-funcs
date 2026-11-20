@@ -1,4 +1,5 @@
 ﻿#if CORE_NATIVE_BUILD
+
 using Npgsql;
 using NpgsqlTypes;
 using PostgreSqlDebug = CommonNetFuncs.Sql.PostgreSql.Debug;
@@ -311,3 +312,86 @@ public sealed class PostgreSqlDebugTests
 	}
 }
 #endif
+
+public sealed class PostgreSqlDebugBehaviorTests
+{
+
+
+
+	public static TheoryData<object, string, string> PostgreSqlInferredValues()
+	{
+		Guid id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+		return new()
+		{
+			{ 1L, "bigint", "1" },
+			{ (short)2, "smallint", "2" },
+			{ (byte)3, "smallint", "3" },
+			{ true, "boolean", "TRUE" },
+			{ 4.5m, "numeric(18,0)", "4.5" },
+			{ 5.5d, "double", "5.5" },
+			{ 6.5f, "double", "6.5" },
+			{ new DateTime(2025, 2, 3, 4, 5, 6, DateTimeKind.Unspecified), "timestamp", "'2025-02-03 04:05:06.000000'::timestamp" },
+			{ new DateTimeOffset(2025, 2, 3, 4, 5, 6, 7, TimeSpan.FromHours(2)), "timestamptz", "'2025-02-03 04:05:06.007000+02:00'::timestamptz" },
+			{ id, "uuid", "'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'::uuid" },
+			{ new byte[] { 0xAB, 0xCD }, "bytea", "'\\xabcd'::bytea" },
+			{ new DateOnly(2025, 2, 3), "date", "'2025-02-03'::date" },
+			{ new TimeOnly(4, 5, 6, 7), "time", "'04:05:06.007000'::time" },
+			{ new TimeSpan(1, 2, 3, 4), "interval", "'1.02:03:04'::interval" },
+			{ new[] { 1, 2 }, "text[]", "ARRAY[1, 2]" }
+		};
+	}
+
+
+
+
+	[Theory]
+	[MemberData(nameof(PostgreSqlInferredValues))]
+	public void PostgreSqlDebug_WithInferredType_ShouldRenderExactLiteral(object value, string typeName, string literal)
+	{
+		using FakeDbCommand command = new() { CommandText = "SELECT @Value" };
+		command.Parameters.Add(new FakeDbParameter { ParameterName = "Value", Value = value });
+
+		string script = PostgreSqlDebug.RenderCommandAsScript(command);
+
+		script.ShouldContain($"-- @Value [{typeName}] = {literal}");
+		script.ShouldContain($"SELECT {literal}");
+	}
+
+	[Fact]
+	public void PostgreSqlDebug_WithExplicitSizedVarchar_ShouldUseSize()
+	{
+		using NpgsqlCommand command = new("SELECT @Value");
+		command.Parameters.Add(new NpgsqlParameter("Value", NpgsqlDbType.Varchar, 12) { Value = "abc" });
+
+		PostgreSqlDebug.RenderCommandAsScript(command).ShouldContain("-- @Value [varchar(12)] = 'abc'");
+	}
+
+	[Fact]
+	public void PostgreSqlDebug_WithScalarInsideArrayWrapper_ShouldWrapLiteralOnce()
+	{
+		using NpgsqlCommand command = new("SELECT ARRAY[@Value]");
+		command.Parameters.Add(new NpgsqlParameter("Value", NpgsqlDbType.Integer) { Value = 7 });
+
+		PostgreSqlDebug.RenderCommandAsScript(command).ShouldContain("SELECT ARRAY[7]");
+	}
+
+	[Fact]
+	public void PostgreSqlDebug_WithEmptyArrayInsideArrayWrapper_ShouldNotNestLiteral()
+	{
+		using NpgsqlCommand command = new("SELECT ARRAY[@Value]");
+		NpgsqlDbType textArray = (NpgsqlDbType)((int)NpgsqlDbType.Array | (int)NpgsqlDbType.Text);
+		command.Parameters.Add(new NpgsqlParameter("Value", textArray) { Value = Array.Empty<string>() });
+
+		PostgreSqlDebug.RenderCommandAsScript(command).ShouldContain("SELECT '{}'");
+	}
+
+	[Fact]
+	public void PostgreSqlDebug_WithUnknownAndOverflowingPlaceholders_ShouldPreserveText()
+	{
+		using NpgsqlCommand command = new("SELECT @Missing, $999999999999999999999");
+		command.Parameters.Add(new NpgsqlParameter("Present", NpgsqlDbType.Integer) { Value = 1 });
+
+		PostgreSqlDebug.RenderCommandAsScript(command).ShouldContain("SELECT @Missing, $999999999999999999999");
+	}
+
+}

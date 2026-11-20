@@ -1,13 +1,13 @@
-﻿using System.Collections;
-using System.Globalization;
-using System.Reflection;
-using System.Text;
-using CommonNetFuncs.ReinforcedTypings.Collections;
+﻿using CommonNetFuncs.ReinforcedTypings.Collections;
 using CommonNetFuncs.ReinforcedTypings.Constants;
 using CommonNetFuncs.ReinforcedTypings.Valibot;
 using Reinforced.Typings;
 using Reinforced.Typings.Attributes;
 using Reinforced.Typings.Fluent;
+using System.Collections;
+using System.Globalization;
+using System.Reflection;
+using System.Text;
 using ZLinq;
 
 namespace CommonNetFuncs.ReinforcedTypings;
@@ -241,7 +241,7 @@ public static class ReinforcedTypingsFluentConfig
 			{
 				declarePrefix = ExportConstPrefix;
 			}
-			else if(needsExport)
+			else if (needsExport)
 			{
 				declarePrefix = "export declare const";
 			}
@@ -740,11 +740,11 @@ public static class ReinforcedTypingsFluentConfig
 
 		string prefix;
 
-		if(rel == ".")
+		if (rel == ".")
 		{
 			prefix = string.Empty;
 		}
-		else if(rel.StartsWith("..", StringComparison.Ordinal))
+		else if (rel.StartsWith("..", StringComparison.Ordinal))
 		{
 			prefix = $"{rel}/";
 		}
@@ -794,5 +794,3 @@ public static class ReinforcedTypingsFluentConfig
 		return outputDir;
 	}
 }
-
-

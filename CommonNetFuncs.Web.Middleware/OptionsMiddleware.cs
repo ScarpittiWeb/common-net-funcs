@@ -1,6 +1,6 @@
-﻿using System.Net;
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using System.Net;
 using static CommonNetFuncs.Core.Strings;
 
 namespace CommonNetFuncs.Web.Middleware;

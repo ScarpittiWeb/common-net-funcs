@@ -1,10 +1,10 @@
-﻿using System.Data;
-using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
-using ClosedXML.Excel;
+﻿using ClosedXML.Excel;
 using ClosedXML.Excel.Drawings;
 using CommonNetFuncs.Excel.Common;
 using SkiaSharp;
+using System.Data;
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using ZLinq;
 using ZLinq.Linq;
 
@@ -937,11 +937,7 @@ public static class Common
 	/// <returns>The IXLStyle that was created</returns>
 	public static IXLStyle? GetStandardCellStyle(this IXLWorkbook wb, EStyle style, bool cellLocked = false, bool wrapText = false, ClosedXmlBorderStyles? borderStyles = null)
 	{
-		IXLStyle? cellStyle = CreateEmptyStyle();
-		if (cellStyle == null)
-		{
-			return null;
-		}
+		IXLStyle cellStyle = CreateEmptyStyle();
 
 		switch (style)
 		{
@@ -1048,11 +1044,7 @@ public static class Common
 	/// <returns>IXLStyle object containing all of the styling associated with the input EStyle option</returns>
 	public static IXLStyle? GetStyle(EStyle style, IXLWorkbook wb, bool cellLocked = false, bool wrapText = false, string? htmlColor = null, IXLFont? font = null, XLAlignmentHorizontalValues? alignment = null)
 	{
-		IXLStyle? cellStyle = CreateEmptyStyle();
-		if (cellStyle == null)
-		{
-			return null;
-		}
+		IXLStyle cellStyle = CreateEmptyStyle();
 
 		switch (style)
 		{
@@ -1141,11 +1133,11 @@ public static class Common
 	/// Private because it relies on ClosedXML internal API that may change between library versions.
 	/// </summary>
 	/// <returns>Empty IXLStyle object</returns>
-	private static IXLStyle? CreateEmptyStyle()
+	private static IXLStyle CreateEmptyStyle()
 	{
 		Type type = typeof(XLConstants).Assembly.GetType("ClosedXML.Excel.XLStyle")!;
 		MethodInfo methodInfo = type.GetMethod("CreateEmptyStyle", BindingFlags.Static | BindingFlags.NonPublic)!;
-		return methodInfo?.Invoke(null, null) as IXLStyle;
+		return (IXLStyle)methodInfo.Invoke(null, null)!;
 	}
 
 	/// <summary>

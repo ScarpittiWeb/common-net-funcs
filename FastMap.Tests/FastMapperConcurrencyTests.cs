@@ -1,5 +1,5 @@
-﻿using System.Collections.Concurrent;
-using CommonNetFuncs.FastMap;
+﻿using CommonNetFuncs.FastMap;
+using System.Collections.Concurrent;
 
 namespace FastMap.Tests;
 

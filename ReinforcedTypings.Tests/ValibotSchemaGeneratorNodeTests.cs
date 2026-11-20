@@ -1,9 +1,8 @@
-﻿using System.Reflection;
-using CommonNetFuncs.ReinforcedTypings.Valibot;
+﻿using CommonNetFuncs.ReinforcedTypings.Valibot;
 using Reinforced.Typings;
 using Reinforced.Typings.Fluent;
 using ReinforcedTypings.Tests.TestModels;
-using ReinforcedTypings.Tests.TestModels.Valibot;
+using System.Reflection;
 
 namespace ReinforcedTypings.Tests;
 

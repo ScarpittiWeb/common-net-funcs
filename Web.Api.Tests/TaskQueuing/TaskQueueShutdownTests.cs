@@ -1,8 +1,7 @@
-using System.Diagnostics;
-using System.Threading.Channels;
-using CommonNetFuncs.Web.Api.TaskQueuing;
 using CommonNetFuncs.Web.Api.TaskQueuing.ApiQueue;
 using CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
+using System.Diagnostics;
+using System.Threading.Channels;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests.TaskQueuing;

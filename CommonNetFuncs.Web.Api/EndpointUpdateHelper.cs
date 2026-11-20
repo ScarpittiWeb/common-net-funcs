@@ -1,8 +1,8 @@
-using System.ComponentModel.DataAnnotations;
-using CommonNetFuncs.EFCore;
+﻿using CommonNetFuncs.EFCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 using static CommonNetFuncs.Core.Copy;
 using static CommonNetFuncs.Core.ExceptionLocation;
 using static CommonNetFuncs.DeepClone.ExpressionTrees;

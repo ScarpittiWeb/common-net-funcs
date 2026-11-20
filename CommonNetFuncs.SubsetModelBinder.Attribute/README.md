@@ -8,14 +8,16 @@
 
 ## Contents
 
-- [Installation](#installation)
-- [Public API](#public-api)
-- [Usage](#usage)
-- [Option semantics](#option-semantics)
-- [Generator integration](#generator-integration)
-- [Limitations](#limitations)
-- [Targets](#targets)
-- [License](#license)
+- [CommonNetFuncs.SubsetModelBinder.Attribute](#commonnetfuncssubsetmodelbinderattribute)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [Public API](#public-api)
+  - [Usage](#usage)
+  - [Option semantics](#option-semantics)
+  - [Generator integration](#generator-integration)
+  - [Limitations](#limitations)
+  - [Targets](#targets)
+  - [License](#license)
 
 ## Installation
 

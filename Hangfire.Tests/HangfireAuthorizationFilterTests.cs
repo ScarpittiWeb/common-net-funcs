@@ -1,10 +1,16 @@
-﻿using System.Collections.Frozen;
-using System.Security.Claims;
-using CommonNetFuncs.Hangfire;
+﻿using CommonNetFuncs.Hangfire;
 using FakeItEasy;
+using Hangfire.Common;
 using Hangfire.Dashboard;
+using Hangfire.States;
+using Hangfire.Storage;
+using Hangfire.Storage.Monitoring;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Frozen;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Security.Claims;
 
 namespace Hangfire.Tests;
 
@@ -270,4 +276,54 @@ public sealed class HangfireAuthorizationFilterTests
 		// Assert
 		Assert.False(result);
 	}
+}
+
+[Collection("HangfireStaticStorage")]
+public sealed class HangfireAuthorizationBehaviorTests
+{
+
+	private static Job CreateJob(params object?[] args)
+	{
+		MethodInfo method = typeof(IDefaultJobService).GetMethod(nameof(IDefaultJobService.Run))!;
+		return new Job(typeof(IDefaultJobService), method, args);
+	}
+
+	private static (JobStorage Storage, IStorageConnection Connection) SetStorage(JobList<EnqueuedJobDto> enqueued, JobData? jobData = null)
+	{
+		JobStorage storage = A.Fake<JobStorage>();
+		IMonitoringApi monitoring = A.Fake<IMonitoringApi>();
+		IStorageConnection connection = A.Fake<IStorageConnection>();
+
+		A.CallTo(() => storage.GetMonitoringApi()).Returns(monitoring);
+		A.CallTo(() => storage.GetConnection()).Returns(connection);
+		A.CallTo(() => monitoring.EnqueuedJobs(A<string>._, A<int>._, A<int>._)).Returns(enqueued);
+		A.CallTo(() => monitoring.ProcessingJobs(A<int>._, A<int>._)).Returns(new JobList<ProcessingJobDto>([]));
+		A.CallTo(() => monitoring.ScheduledJobs(A<int>._, A<int>._)).Returns(new JobList<ScheduledJobDto>([]));
+		A.CallTo(() => connection.GetJobData(A<string>._)).Returns(jobData!);
+		if (jobData != null)
+		{
+			A.CallTo(() => connection.GetStateData(A<string>._)).Returns(new StateData
+			{
+				Name = EnqueuedState.StateName,
+				Data = new Dictionary<string, string>()
+			});
+		}
+
+		JobStorage.Current = storage;
+		return (storage, connection);
+	}
+
+
+
+
+
+	[Fact]
+	public void AuthorizationFilter_NullHttpContextRejectsAccess()
+	{
+		HangfireAuthorizationFilter filter = new(new HashSet<string> { "Admin" }.ToFrozenSet());
+		DashboardContext context = (DashboardContext)RuntimeHelpers.GetUninitializedObject(typeof(AspNetCoreDashboardContext));
+
+		filter.Authorize(context).ShouldBeFalse();
+	}
+
 }

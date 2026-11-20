@@ -1,7 +1,8 @@
-﻿using System.Text.Json;
-using CommonNetFuncs.Web.Api.MsgPack;
+﻿using CommonNetFuncs.Web.Api.MsgPack;
 using MessagePack;
 using MessagePack.Formatters;
+using System.Buffers;
+using System.Text.Json;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests.MsgPack;
@@ -452,4 +453,115 @@ public sealed class MsgPackSerializerConfigTests
 		string raw = MessagePackSerializer.Deserialize<string>(bytes, MessagePackSerializerOptions.Standard, Current.CancellationToken);
 		raw.ShouldContain("2026-04-14");
 	}
+}
+
+public sealed class DateTimeResolverBehaviorTests
+{
+
+
+
+
+
+
+
+	private static DateOnly Deserialize(byte[] bytes) => Deserialize(new ReadOnlySequence<byte>(bytes));
+
+	private static DateOnly Deserialize(ReadOnlySequence<byte> sequence)
+	{
+		MessagePackReader reader = new(sequence);
+		return DateOnlyAsStringFormatter.Instance.Deserialize(ref reader, MsgPackSerializerConfig.DateTimesAsStrings);
+	}
+
+	private static ReadOnlySequence<byte> Segment(byte[] bytes, int split)
+	{
+		ByteSegment first = new(bytes.AsMemory(0, split));
+		ByteSegment last = first.Append(bytes.AsMemory(split));
+		return new ReadOnlySequence<byte>(first, 0, last, last.Memory.Length);
+	}
+
+	private sealed class ByteSegment : ReadOnlySequenceSegment<byte>
+	{
+		public ByteSegment(ReadOnlyMemory<byte> memory) => Memory = memory;
+
+		public ByteSegment Append(ReadOnlyMemory<byte> memory)
+		{
+			ByteSegment next = new(memory) { RunningIndex = RunningIndex + Memory.Length };
+			Next = next;
+			return next;
+		}
+	}
+
+	[Fact]
+	public void Deserialize_NilDirectly_ThrowsSpecificMessagePackSerializationException()
+	{
+		MessagePackSerializationException exception = Should.Throw<MessagePackSerializationException>(
+			() => Deserialize([0xC0]));
+		exception.Message.ShouldContain("Cannot deserialize nil as DateOnly.");
+	}
+
+	[Fact]
+	public void Deserialize_SegmentedString_UsesFallbackReaderPath()
+	{
+		byte[] encoded = MessagePackSerializer.Serialize("2026-04-14", MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		ReadOnlySequence<byte> sequence = Segment(encoded, Math.Max(1, encoded.Length / 2));
+
+		DateOnly value = Deserialize(sequence);
+
+		value.ShouldBe(new DateOnly(2026, 4, 14));
+	}
+
+	[Fact]
+	public void Deserialize_SegmentedOverlongString_ThrowsFormatException()
+	{
+		byte[] encoded = MessagePackSerializer.Serialize(new string('1', 200), MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		ReadOnlySequence<byte> sequence = Segment(encoded, 2);
+
+		FormatException exception = Should.Throw<FormatException>(() => Deserialize(sequence));
+		exception.Message.ShouldBe("The string was not recognized as a valid DateOnly.");
+	}
+
+	[Theory]
+	[InlineData("2026-W162")]
+	[InlineData("2026W16x")]
+	[InlineData("2026-W16-")]
+	[InlineData("2026-000")]
+	[InlineData("2026-367")]
+	[InlineData("0000-001")]
+	[InlineData("10000-001")]
+	[InlineData("2026W1")]
+	[InlineData("2026-W16-x")]
+	[InlineData("2026W")]
+	[InlineData("2026-W")]
+	[InlineData("2026W12345")]
+	public void Deserialize_InvalidWeekAndOrdinalShapes_Throw(string input)
+	{
+		byte[] encoded = MessagePackSerializer.Serialize(input, MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		Should.Throw<FormatException>(() => Deserialize(encoded));
+	}
+
+	[Theory]
+	[InlineData("2026-W16-2", 2026, 4, 14)]
+	[InlineData("2026W163", 2026, 4, 15)]
+	[InlineData("9999-W52-5", 9999, 12, 31)]
+	public void Deserialize_ExtendedAndCompactIsoWeekDays_ReturnExactDate(string input, int year, int month, int day)
+	{
+		byte[] encoded = MessagePackSerializer.Serialize(input, MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		Deserialize(encoded).ShouldBe(new DateOnly(year, month, day));
+	}
+
+	[Fact]
+	public void Deserialize_IsoWeekSpillingPastDateOnlyMax_Throws()
+	{
+		byte[] encoded = MessagePackSerializer.Serialize("9999-W52-7", MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		Should.Throw<FormatException>(() => Deserialize(encoded));
+	}
+
+	[Fact]
+	public void Deserialize_DayNumberOutsideDateOnlyRange_Throws()
+	{
+		byte[] encoded = MessagePackSerializer.Serialize(int.MaxValue, MessagePackSerializerOptions.Standard, Current.CancellationToken);
+		ArgumentOutOfRangeException exception = Should.Throw<ArgumentOutOfRangeException>(() => Deserialize(encoded));
+		exception.ParamName.ShouldBe("dayNumber");
+	}
+
 }
