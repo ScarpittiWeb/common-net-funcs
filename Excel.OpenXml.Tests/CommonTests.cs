@@ -1,10 +1,11 @@
-﻿using System.Data;
-using System.Reflection;
-using CommonNetFuncs.Excel.Common;
+﻿using CommonNetFuncs.Excel.Common;
 using CommonNetFuncs.Excel.OpenXml;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using DocumentFormat.OpenXml.Validation;
+using System.Data;
+using System.Reflection;
 using xRetry.v3;
 using static CommonNetFuncs.Excel.OpenXml.Common;
 
@@ -926,7 +927,7 @@ public sealed class CommonTests : IDisposable
 		stylesheet.Fills!.Count!.Value.ShouldBe(2u);
 		stylesheet.Borders!.Count!.Value.ShouldBe(1u);
 		stylesheet.CellFormats!.Count!.Value.ShouldBe(2u);
-		worksheetPart.Worksheet.Descendants<Cell>().First().StyleIndex!.Value.ShouldBe(1u);
+		worksheetPart.Worksheet!.Descendants<Cell>().First().StyleIndex!.Value.ShouldBe(1u);
 		OpenXmlValidator validator = new(FileFormatVersions.Office2007);
 		validator.Validate(document).ShouldBeEmpty();
 	}
@@ -1329,7 +1330,7 @@ public sealed class CommonTests : IDisposable
 		WorksheetPart worksheetPart = document.WorkbookPart!.WorksheetParts.First();
 		worksheetPart.DrawingsPart.ShouldNotBeNull();
 		worksheetPart.DrawingsPart.ImageParts.Count().ShouldBe(1);
-		worksheetPart.Worksheet.Descendants<Drawing>().Single().Id.ShouldNotBeNull();
+		worksheetPart.Worksheet!.Descendants<Drawing>().Single().Id.ShouldNotBeNull();
 	}
 
 	[RetryFact(3)]

@@ -676,6 +676,36 @@ public sealed class RestHelpersStaticTests
 		results[1]!.Name.ShouldBe("b");
 	}
 
+	[Theory]
+	[InlineData(HttpStatusCode.NoContent, null)]
+	[InlineData(HttpStatusCode.NoContent, "application/x-msgpack")]
+	[InlineData(HttpStatusCode.OK, null)]
+	public async Task HandleResponseAsync_YieldsNothingForEmptyBody(HttpStatusCode statusCode, string? contentType)
+	{
+		HttpResponseMessage response = new(statusCode)
+		{
+			Content = new ByteArrayContent([])
+		};
+		if (contentType != null)
+		{
+			response.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+		}
+
+		RequestOptions<TestModel> options = new()
+		{
+			Url = "http://test",
+			HttpMethod = HttpMethod.Post
+		};
+
+		List<TestModel?> results = new();
+		await foreach (TestModel? item in response.HandleResponseAsync<TestModel, TestModel>(options, cancellationToken: Current.CancellationToken))
+		{
+			results.Add(item);
+		}
+
+		results.ShouldBeEmpty();
+	}
+
 	[Fact]
 	public async Task HandleResponseAsync_HandlesErrorResponse()
 	{

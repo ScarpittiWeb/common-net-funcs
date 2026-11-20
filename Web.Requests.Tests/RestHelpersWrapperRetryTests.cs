@@ -112,6 +112,56 @@ public sealed class RestHelpersWrapperRetryTests : IDisposable
 	}
 
 	[Fact]
+	public async Task GenericPostRequestStreaming_ShouldDisposeDiscardedResponse_WhenRetrying()
+	{
+		// Arrange
+
+		DisposeTrackingContent failedContent = new();
+		StreamingRestObject<TestModel> failedResponse = new()
+		{
+			Result = null,
+			Response = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = failedContent }
+		};
+
+		DisposeTrackingContent successContent = new();
+		StreamingRestObject<TestModel> successResponse = new()
+		{
+			Result = CreateAsyncEnumerable([new TestModel { Id = 1, Name = "Success" }]),
+			Response = new HttpResponseMessage(HttpStatusCode.OK) { Content = successContent }
+		};
+
+		A.CallTo(() => fakeRestClient.StreamingRestObjectRequest<TestModel, TestModel>(A<RequestOptions<TestModel>>._, A<CancellationToken>._))
+			.ReturnsNextFromSequence(Task.FromResult(failedResponse), Task.FromResult(successResponse));
+
+		RestHelperOptions options = new("test-endpoint", "TestApi", ResilienceOptions: new ResilienceOptions(MaxRetry: 3, RetryDelay: 10));
+
+		// Act
+
+		List<TestModel?> results = [];
+		await foreach (TestModel? item in wrapper.GenericPostRequestStreaming<TestModel, TestModel>(options, new TestModel(), Current.CancellationToken))
+		{
+			results.Add(item);
+		}
+
+		// Assert
+
+		results.Count.ShouldBe(1);
+		failedContent.IsDisposed.ShouldBeTrue();
+		successContent.IsDisposed.ShouldBeFalse();
+	}
+
+	private sealed class DisposeTrackingContent() : ByteArrayContent([])
+	{
+		public bool IsDisposed { get; private set; }
+
+		protected override void Dispose(bool disposing)
+		{
+			IsDisposed = true;
+			base.Dispose(disposing);
+		}
+	}
+
+	[Fact]
 	public async Task GetStreaming_ShouldReachMaxRetry_AndLogWarning()
 	{
 		// Arrange

@@ -109,6 +109,9 @@ public sealed class RestHelpersWrapper
 					logger.Warn("{RequestLabel} {Url} still failing after max allowed attempts ({MaxRetry}).", requestLabel, options.Url, options.ResilienceOptions.MaxRetry);
 					break;
 				}
+
+				// Streaming responses are not buffered, so a discarded attempt must be disposed to release its connection (StatusCode remains readable)
+				result.Response?.Dispose();
 				await Task.Delay(GetWaitTime(options.ResilienceOptions, attempts), cancellationToken).ConfigureAwait(false);
 			}
 		}
