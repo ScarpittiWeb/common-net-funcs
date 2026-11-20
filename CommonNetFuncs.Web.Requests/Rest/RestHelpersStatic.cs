@@ -1,5 +1,6 @@
 ﻿using System.Buffers;
 using System.Collections.Frozen;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
@@ -318,8 +319,12 @@ public static class RestHelpersStatic
 				responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 				if (response.IsSuccessStatusCode)
 				{
-					enumeratedReader = responseStream.ReadResponseStreamAsync<TResponse>(contentType, contentEncoding, requestOptions.JsonSerializerOptions, requestOptions.MessagePackSerializerOptions, cancellationToken)
-						.GetAsyncEnumerator(cancellationToken);
+					// Responses without a body (e.g. 204 No Content) may not include a Content-Type, so there is nothing to deserialize
+					if (response.StatusCode != HttpStatusCode.NoContent && response.Content.Headers.ContentLength != 0)
+					{
+						enumeratedReader = responseStream.ReadResponseStreamAsync<TResponse>(contentType, contentEncoding, requestOptions.JsonSerializerOptions, requestOptions.MessagePackSerializerOptions, cancellationToken)
+							.GetAsyncEnumerator(cancellationToken);
+					}
 				}
 				else
 				{

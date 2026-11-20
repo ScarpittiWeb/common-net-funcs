@@ -1,10 +1,11 @@
-﻿using System.Data;
-using System.Reflection;
-using CommonNetFuncs.Excel.Common;
+﻿using CommonNetFuncs.Excel.Common;
 using CommonNetFuncs.Excel.OpenXml;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using DocumentFormat.OpenXml.Validation;
+using System.Data;
+using System.Reflection;
 using xRetry.v3;
 using static CommonNetFuncs.Excel.OpenXml.Common;
 
@@ -303,7 +304,7 @@ public sealed class CommonTests : IDisposable
 		styleIndex.ShouldNotBeNull();
 		style2Index.ShouldNotBeNull();
 
-		styleIndex.Value.ShouldBe(0u);
+		styleIndex.Value.ShouldBe(1u);
 
 		if (repeatStyle)
 		{
@@ -921,6 +922,14 @@ public sealed class CommonTests : IDisposable
 		WorksheetPart worksheetPart = document.WorkbookPart!.WorksheetParts.First();
 		worksheetPart.DrawingsPart.ShouldNotBeNull();
 		worksheetPart.DrawingsPart.ImageParts.Count().ShouldBe(1);
+		Stylesheet stylesheet = document.GetStylesheet()!;
+		stylesheet.Fonts!.Count!.Value.ShouldBe((uint)stylesheet.Fonts.ChildElements.Count);
+		stylesheet.Fills!.Count!.Value.ShouldBe(2u);
+		stylesheet.Borders!.Count!.Value.ShouldBe(1u);
+		stylesheet.CellFormats!.Count!.Value.ShouldBe(2u);
+		worksheetPart.Worksheet!.Descendants<Cell>().First().StyleIndex!.Value.ShouldBe(1u);
+		OpenXmlValidator validator = new(FileFormatVersions.Office2007);
+		validator.Validate(document).ShouldBeEmpty();
 	}
 
 	[RetryFact(3)]
@@ -1307,8 +1316,6 @@ public sealed class CommonTests : IDisposable
 		using MemoryStream memoryStream = new();
 		using SpreadsheetDocument document = SpreadsheetDocument.Create(memoryStream, SpreadsheetDocumentType.Workbook);
 		document.CreateNewSheet("Test Sheet");
-		Worksheet worksheet = document.GetWorksheetByName("Test Sheet")!;
-		worksheet.InsertCell(1, 1); // Ensure cells exist
 		document.Save();
 		memoryStream.Flush();
 		byte[] imageData = File.ReadAllBytes("TestData/test.png");
@@ -1323,6 +1330,7 @@ public sealed class CommonTests : IDisposable
 		WorksheetPart worksheetPart = document.WorkbookPart!.WorksheetParts.First();
 		worksheetPart.DrawingsPart.ShouldNotBeNull();
 		worksheetPart.DrawingsPart.ImageParts.Count().ShouldBe(1);
+		worksheetPart.Worksheet!.Descendants<Drawing>().Single().Id.ShouldNotBeNull();
 	}
 
 	[RetryFact(3)]
