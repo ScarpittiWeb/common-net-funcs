@@ -107,7 +107,7 @@ public static class RestHelpersStatic
 				httpRequestMessage.AttachHeaders(requestOptions.BearerToken, requestOptions.HttpHeaders);
 				httpRequestMessage.AddContent(requestOptions.HttpMethod, requestOptions.HttpHeaders, requestOptions.BodyObject, requestOptions.PatchDocument, requestOptions.MessagePackSerializerOptions);
 
-				response = await client.SendAsync(httpRequestMessage, HttpCompletionOption.ResponseContentRead, combinedTokenSource.Token).ConfigureAwait(false) ?? new();
+				response = await client.SendAsync(httpRequestMessage, HttpCompletionOption.ResponseHeadersRead, combinedTokenSource.Token).ConfigureAwait(false) ?? new();
 				enumeratedReader = HandleResponseAsync<TResponse, TBody>(response, requestOptions, cancellationToken: cancellationToken).GetAsyncEnumerator(cancellationToken);
 			}
 			catch (TaskCanceledException tcex)
@@ -220,7 +220,7 @@ public static class RestHelpersStatic
 			httpRequestMessage.AttachHeaders(requestOptions.BearerToken, requestOptions.HttpHeaders);
 			httpRequestMessage.AddContent(requestOptions.HttpMethod, requestOptions.HttpHeaders, requestOptions.BodyObject, requestOptions.PatchDocument, requestOptions.MessagePackSerializerOptions);
 
-			restObject.Response = await client.SendAsync(httpRequestMessage, HttpCompletionOption.ResponseContentRead, combinedTokenSource.Token).ConfigureAwait(false) ?? new();
+			restObject.Response = await client.SendAsync(httpRequestMessage, HttpCompletionOption.ResponseHeadersRead, combinedTokenSource.Token).ConfigureAwait(false) ?? new();
 			restObject.Result = HandleResponseAsync<TResponse, TBody>(restObject.Response, requestOptions, cancellationToken: cancellationToken);
 		}
 		catch (TaskCanceledException tcex)
@@ -371,11 +371,11 @@ public static class RestHelpersStatic
 		}
 		finally
 		{
-			if(responseStream != null)
+			if (responseStream != null)
 			{
 				await responseStream.DisposeAsync().ConfigureAwait(false);
 			}
-			if(enumeratedReader != null)
+			if (enumeratedReader != null)
 			{
 				await enumeratedReader.DisposeAsync().ConfigureAwait(false);
 			}
@@ -700,7 +700,7 @@ public static class RestHelpersStatic
 			{
 				await using MemoryStream outputStream = new();
 				await System.Text.Json.JsonSerializer.SerializeAsync(outputStream, response, cancellationToken: cancellationToken).ConfigureAwait(false);
-				resultJson = Encoding.UTF8.GetString(outputStream.ToArray());
+				resultJson = Encoding.UTF8.GetString(outputStream.GetBuffer(), 0, (int)outputStream.Length);
 			}
 
 			if (includeHeader)
