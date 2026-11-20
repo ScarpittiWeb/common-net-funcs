@@ -1,352 +1,426 @@
 # CommonNetFuncs.Web.Middleware
 
-[![License](https://img.shields.io/github/license/NickScarpitti/common-net-funcs.svg)](http://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/github/license/ScarpittiWeb/common-net-funcs.svg)](https://opensource.org/licenses/MIT)
 [![NuGet Version](https://img.shields.io/nuget/v/CommonNetFuncs.Web.Middleware)](https://www.nuget.org/packages/CommonNetFuncs.Web.Middleware/)
-[![nuget](https://img.shields.io/nuget/dt/CommonNetFuncs.Web.Middleware)](https://www.nuget.org/packages/CommonNetFuncs.Web.Middleware/)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/CommonNetFuncs.Web.Middleware)](https://www.nuget.org/packages/CommonNetFuncs.Web.Middleware/)
 
-This project contains a collection of ASP.NET Core middleware components and endpoint filters covering response logging, caching, CORS, XSRF protection, custom headers, and JSON Patch support.
+ASP.NET Core middleware, filters, and route helpers for JSON Patch binding, opt-in in-memory response caching, CORS/`OPTIONS` handling, response headers, slow/large-response logging, and publishing antiforgery request tokens. The components do not provide authentication, authorization, or complete security policies.
 
 ## Contents
 
-- [CommonNetFuncs.Web.Middleware](#commonnetfuncswebmiddleware)
-  - [Contents](#contents)
-  - [JSON Patch Middleware](#json-patch-middleware)
-    - [JSON Patch Middleware Usage Examples](#json-patch-middleware-usage-examples)
-      - [Program.cs — registering the middleware and STJ converter](#programcs--registering-the-middleware-and-stj-converter)
-      - [Sending a JSON Patch request](#sending-a-json-patch-request)
-  - [MemoryCacheMiddleware](#memorycachemiddleware)
-    - [MemoryCacheMiddleware Usage Examples](#memorycachemiddleware-usage-examples)
-      - [UseMemoryCache](#usememorycache)
-      - [Cache query parameters](#cache-query-parameters)
-  - [OptionsMiddleware](#optionsmiddleware)
-    - [OptionsMiddleware Usage Examples](#optionsmiddleware-usage-examples)
-      - [UseOptions](#useoptions)
-  - [UseCustomHeadersMiddleware](#usecustomheadersmiddleware)
-    - [UseCustomHeadersMiddleware Usage Examples](#usecustomheadersmiddleware-usage-examples)
-      - [UseCustomHeaders](#usecustomheaders)
-  - [UseResponseLoggingEndpointFilter](#useresponseloggingendpointfilter)
-    - [UseResponseLoggingEndpointFilter Usage Examples](#useresponseloggingendpointfilter-usage-examples)
-      - [Program.cs setup](#programcs-setup)
-  - [UseResponseLoggingFilter](#useresponseloggingfilter)
-    - [UseResponseLoggingFilter Usage Examples](#useresponseloggingfilter-usage-examples)
-      - [Program.cs setup](#programcs-setup-1)
-  - [UseResponseSizeLoggingMiddleware](#useresponsesizeloggingmiddleware)
-    - [UseResponseSizeLoggingMiddleware Usage Examples](#useresponsesizeloggingmiddleware-usage-examples)
-      - [UseResponseSizeLogging](#useresponsesizelogging)
-  - [UseXsrfTokenMiddleware](#usexsrftokenmiddleware)
-    - [UseXsrfTokenMiddleware Usage Examples](#usexsrftokenmiddleware-usage-examples)
-      - [UseXsrfToken](#usexsrftoken)
-  - [Installation](#installation)
-  - [License](#license)
+- [Target framework](#target-framework)
+- [Installation](#installation)
+- [Pipeline order and trust boundaries](#pipeline-order-and-trust-boundaries)
+- [JSON Patch support](#json-patch-support)
+- [In-memory response caching](#in-memory-response-caching)
+  - [Registration and middleware](#registration-and-middleware)
+  - [Cache key and controls](#cache-key-and-controls)
+  - [Metrics and administrative endpoints](#metrics-and-administrative-endpoints)
+- [OPTIONS and CORS headers](#options-and-cors-headers)
+- [Custom response headers](#custom-response-headers)
+- [Slow-response logging](#slow-response-logging)
+  - [Minimal API endpoint filter](#minimal-api-endpoint-filter)
+  - [MVC action filter](#mvc-action-filter)
+- [Response-size logging](#response-size-logging)
+- [XSRF token cookie](#xsrf-token-cookie)
+- [Public API summary](#public-api-summary)
+- [License](#license)
 
 ---
 
-## JSON Patch Middleware
+## Target framework
 
-Bridges the gap between JSON Patch requests (`Content-Type: application/json-patch+json`) and minimal API endpoints that accept `JsonPatchDocument<T>` parameters.
+The current package targets **.NET 11.0**.
 
-The minimal API parameter-binding pipeline uses System.Text.Json, which does not natively understand the `JsonPatchDocument<T>` wire format (a JSON array of operations) defined by Newtonsoft.Json. `JsonPatchDocumentConverterFactory` and `JsonPatchDocumentConverter<T>` bridge the two serializers: STJ captures the raw JSON and hands it to Newtonsoft.Json, which correctly constructs the document and strongly-types each operation's `value` field. Without this, complex object values in patch operations are left as `JsonElement` and fail when the patch is applied.
+## Installation
 
-`JsonPatchRequestMiddleware` additionally normalizes the `Content-Type` header from `application/json-patch+json` to `application/json` as an explicit safety net, since some hosts or proxies may strip or alter structured-syntax suffixes.
+```bash
+dotnet add package CommonNetFuncs.Web.Middleware
+```
 
-### JSON Patch Middleware Usage Examples
+## Pipeline order and trust boundaries
 
-<details>
-<summary><h3>Usage Examples</h3></summary>
+Middleware order matters:
 
-#### Program.cs — registering the middleware and STJ converter
+- Put `UseJsonPatchRequestBody()` before endpoint/model binding.
+- Put `UseMemoryValueCaching()` in the desired caching scope. It can bypass all downstream middleware and endpoint execution on a cache hit.
+- Put `UseOptions()` before components that should not run for preflight `OPTIONS` requests; the middleware terminates those requests.
+- `UseCustomHeaders()` removes and adds configured headers before calling the next middleware. Later middleware or endpoint code can still add or replace a header, so place it and scope it according to the desired behavior.
+- `UseResponseSizeLogging()` must wrap the components whose response bytes it should count. It replaces `Response.Body` for the duration of downstream execution.
+- `UseXsrfToken()` must run while antiforgery services are available. It publishes a token cookie; it does not validate unsafe requests.
 
-Call `UseJsonPatchRequestBody()` early in the pipeline, before routing, so the Content-Type rewrite occurs before parameter binding reads the request body. Register `JsonPatchDocumentConverterFactory` in the JSON serializer options so that `JsonPatchDocument<T>` parameters are deserialized correctly.
+Never cache personalized, tenant-specific, credential-bearing, or otherwise sensitive responses unless the cache key and deployment model prove that sharing is safe. The current cache key does **not** include the request method, host, authenticated user, `Authorization`, or cookies.
 
-```cs
+## JSON Patch support
+
+`JsonPatchRequestMiddleware` changes an incoming `Content-Type` containing `application/json-patch+json` to `application/json; charset=utf-8`. `JsonPatchDocumentConverterFactory` and `JsonPatchDocumentConverter<T>` bridge System.Text.Json to `Microsoft.AspNetCore.JsonPatch`'s Newtonsoft.Json wire format. JSON Patch is a data-mutation format, not authorization: authorize the endpoint, validate ownership, constrain allowed patch paths, and validate the resulting model.
+
+Register the converter in every System.Text.Json options instance that binds patches. Minimal APIs use `ConfigureHttpJsonOptions`; MVC controllers use `AddJsonOptions`.
+
+```csharp
 using CommonNetFuncs.Web.Middleware;
 using Microsoft.AspNetCore.JsonPatch;
+using Microsoft.AspNetCore.Mvc;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-builder.Services.ConfigureHttpJsonOptions(o =>
+builder.Services.ConfigureHttpJsonOptions(options =>
 {
-    o.SerializerOptions.Converters.Add(new JsonPatchDocumentConverterFactory());
+    options.SerializerOptions.Converters.Add(new JsonPatchDocumentConverterFactory());
 });
 
-// Also add to MVC JSON options if using controllers
-builder.Services.AddControllers().AddJsonOptions(o =>
+builder.Services.AddControllers().AddJsonOptions(options =>
 {
-    o.JsonSerializerOptions.Converters.Add(new JsonPatchDocumentConverterFactory());
+    options.JsonSerializerOptions.Converters.Add(new JsonPatchDocumentConverterFactory());
 });
 
 WebApplication app = builder.Build();
 
-// Must be before UseRouting / MapXxx calls
+// Before endpoint/model binding.
 app.UseJsonPatchRequestBody();
 
-app.UseRouting();
-
-app.MapPatch("/api/items/{id}", (int id, JsonPatchDocument<Item> patch) =>
+app.MapPatch("/items/{id:int}", (int id, JsonPatchDocument<Item> patch) =>
 {
-    Item item = GetItemById(id); // retrieve your entity
-    patch.ApplyTo(item);
+    Item item = FindItem(id);       // Application authorization and lookup.
+    patch.ApplyTo(item);            // Validate ModelState/a resulting model in production.
     return Results.Ok(item);
 });
 
+app.MapControllers();
 app.Run();
+
+public sealed class Item
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+}
+
+static Item FindItem(int id) => new() { Id = id, Name = "old" };
 ```
 
-#### Sending a JSON Patch request
+The public converter and middleware types can also be used directly:
 
-```http
-PATCH /api/items/1 HTTP/1.1
-Content-Type: application/json-patch+json
+```csharp
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using CommonNetFuncs.Web.Middleware;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.JsonPatch;
 
-[
-  { "op": "replace", "path": "/name", "value": "Updated Name" },
-  { "op": "replace", "path": "/price", "value": 9.99 }
-]
+var factory = new JsonPatchDocumentConverterFactory();
+bool supported = factory.CanConvert(typeof(JsonPatchDocument<Item>));
+JsonConverter? genericConverter = factory.CreateConverter(
+    typeof(JsonPatchDocument<Item>),
+    new JsonSerializerOptions());
+
+var options = new JsonSerializerOptions();
+options.Converters.Add(factory);
+
+JsonPatchDocument<Item> patch = new();
+patch.Replace(x => x.Name, "new");
+string json = JsonSerializer.Serialize(patch, options); // Calls converter Write(...).
+JsonPatchDocument<Item>? read =
+    JsonSerializer.Deserialize<JsonPatchDocument<Item>>(json, options); // Calls Read(...).
+
+RequestDelegate next = context =>
+{
+    Console.WriteLine(context.Request.ContentType);
+    return Task.CompletedTask;
+};
+var middleware = new JsonPatchRequestMiddleware(next);
+var context = new DefaultHttpContext();
+context.Request.ContentType = "application/json-patch+json";
+await middleware.InvokeAsync(context);
 ```
 
-</details>
+## In-memory response caching
 
----
+The cache is process-local, opt-in, and backed by `IMemoryCache`. It caches only HTTP 200 responses. A cache hit writes cached bytes and configured response headers and skips the downstream pipeline.
 
-## MemoryCacheMiddleware
+### Registration and middleware
 
-An in-process response cache backed by `IMemoryCache`. When a request includes the `useCache=true` query parameter the response is stored after the first successful (HTTP 200) call and served from memory on subsequent requests, bypassing the rest of the pipeline entirely. Cached entries can be associated with string tags and invalidated individually or by tag via the `evict=true` query parameter. Optional gzip/deflate compression reduces the in-memory footprint of large payloads. An optional `CacheMetrics` object can be injected to track hits, misses, evictions, and total cache size.
+Use `MemoryValueCaching()` to register `IMemoryCache` (only when absent), internal cache tracking, and `CacheMetrics`. Pass `trackMetrics: true` to `UseMemoryValueCaching()` in the current implementation: its soft-size/capacity path relies on `CacheMetrics` to decide whether space is available. With `trackMetrics: false`, the current size calculation cannot establish available space and responses may be skipped rather than cached.
 
-### MemoryCacheMiddleware Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-#### UseMemoryCache
-
-```cs
+```csharp
+using System.Collections.Immutable;
 using CommonNetFuncs.Web.Common.CachingSupportClasses;
 using CommonNetFuncs.Web.Middleware.CachingMiddleware;
+using Microsoft.Extensions.Caching.Memory;
+using static CommonNetFuncs.Compression.Streams;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+builder.Services.MemoryValueCaching();
+builder.Services.Configure<MemoryCacheOptions>(options =>
+    options.SizeLimit = 512 * 1024 * 1024);
 
-builder.Services.AddMemoryCache(o => o.SizeLimit = 500 * 1024 * 1024); // 500 MB hard limit enforced by IMemoryCache
-builder.Services.AddSingleton<CacheMetrics>();   // optional metrics tracking
-builder.Services.AddSingleton<CacheTracker>();
+WebApplication app = builder.Build();
 
-CacheOptions cacheOptions = new()
+CacheOptions options = new()
 {
+    EvictionQueryParam = "evictCacheEntry",
+    UseCacheQueryParam = "useCache",
+    CacheSecondsQueryParam = "cacheSeconds",
+    CacheMinutesQueryParam = "cacheMinutes",
+    CacheHoursQueryParam = "cacheHours",
+    CacheTagHeader = "X-Cache-Tags",
+    EvictTagQueryParam = "evictTags",
     DefaultCacheDuration = TimeSpan.FromMinutes(5),
-    MaxCacheSizeInBytes = 400 * 1024 * 1024, // soft limit — evicts oldest entries when exceeded
+    MaxCacheSizeInBytes = 100 * 1024 * 1024,
+    HeadersToCache = ImmutableHashSet.Create(
+        StringComparer.OrdinalIgnoreCase,
+        "Content-Type", "Content-Encoding", "Cache-Control", "Vary"),
     UseCompression = true,
     CompressionType = ECompressionType.Gzip,
-    HeadersToCache = ["Content-Type", "Content-Encoding"],
+    SuppressLogs = true
 };
 
-WebApplication app = builder.Build();
-
-app.UseMemoryCache(cacheOptions); // register before routing
-
-app.MapGet("/data", () => Results.Ok(GetExpensiveData()));
-
+app.UseMemoryValueCaching(options, trackMetrics: true);
+app.MapGet("/catalog", () => Results.Json(GetCatalog()));
 app.Run();
+
+static object GetCatalog() => new { Updated = DateTimeOffset.UtcNow };
 ```
 
-#### Cache query parameters
+If the application needs different query/header names or behavior, every settable `CacheOptions` property shown above is available. Defaults are 5 minutes, 100 MiB soft cache size, GZip compression, `SuppressLogs = true`, and the displayed control names/header.
 
-| Parameter          | Effect                                                       |
-| ------------------ | ------------------------------------------------------------ |
-| `useCache=true`    | Serve from cache or populate cache on first call             |
-| `evict=true`       | Remove the matching cache entry before executing the request |
-| `evictTag=<tag>`   | Remove all entries associated with the given tag             |
-| `cacheSeconds=<n>` | Override default duration (seconds)                          |
-| `cacheMinutes=<n>` | Override default duration (minutes)                          |
-| `cacheHours=<n>`   | Override default duration (hours)                            |
+### Cache key and controls
 
-</details>
+The default request controls are:
 
----
+| Control | Behavior |
+| --- | --- |
+| `useCache=true` | Look up a response and populate the cache after a 200 response. |
+| `evictCacheEntry=true` | Evict the matching key before processing. The eviction control itself is excluded from the generated key. |
+| `evictTags=tag-a,tag-b` plus `evictCacheEntry=true` | Evict all tracked entries having any listed tag instead of only the matching key. |
+| `cacheSeconds=<n>` | Override expiration by the specified seconds. |
+| `cacheMinutes=<n>` | Override expiration by the specified minutes. |
+| `cacheHours=<n>` | Override expiration by the specified hours. |
+| `X-Cache-Tags: tag-a, tag-b` | Associate tags with a newly cached entry. |
 
-## OptionsMiddleware
+The three duration values are added together; invalid values are ignored. A combined value of zero uses `DefaultCacheDuration`. Query keys are sorted for key generation. The key contains the path and selected query values, plus an SHA-256 hash of the request body for `POST`, and the `Accept` header. It does not contain the method, host, user, authorization, cookies, other headers, or request body for non-`POST` methods. Do not expose cache-control or eviction query parameters to untrusted callers without an appropriate policy.
 
-Handles HTTP `OPTIONS` preflight requests for CORS and attaches `Access-Control-*` response headers to all other requests that carry an `Origin` header. Configurable allowed origins, headers, methods, credentials, and max-age.
+```http
+GET /catalog?useCache=true&cacheMinutes=10
+X-Cache-Tags: catalog,public
 
-### OptionsMiddleware Usage Examples
+GET /catalog?useCache=true&evictCacheEntry=true
+POST /search?useCache=true&cacheSeconds=30
+Accept: application/json
+```
 
-<details>
-<summary><h3>Usage Examples</h3></summary>
+Only the 200 status is retained; non-200 responses still pass through. Compression stores a compressed byte array in process and decompresses it on cache hits. `IMemoryCache` size accounting, on the other hand, is configured with the original response length. If `MaxCacheSizeInBytes` is exceeded and tracked entries cannot be freed, the new response is not cached.
 
-#### UseOptions
+The middleware suppresses `TaskCanceledException` only on the branch where no cache operation was requested and `SuppressLogs` controls only whether that swallowed cancellation is logged. Cancellation during cache population or lookup is not generally swallowed.
 
-```cs
+### Metrics and administrative endpoints
+
+`MapCacheMetrics()` adds:
+
+```text
+GET /api/memory-cache-metrics
+```
+
+The response includes hits, misses, hit ratio, skipped entries, current byte/human-readable size, entry count, tag counts, and manual/capacity eviction counts. This endpoint has no built-in authorization; protect it at an outer scope when it exposes operational data.
+
+`MapEvictionEndpoints()` adds:
+
+```text
+POST /api/memorycache/evict/key/{key}
+POST /api/memorycache/evict/tag/{tag}
+POST /api/memorycache/evict/all
+```
+
+Key/tag endpoints return the number evicted, `0` when not found, and 400 for whitespace route values. The all endpoint works only with the concrete `MemoryCache` implementation and returns the pre-clear count. Supplying an authorization policy applies it to all three endpoints:
+
+```csharp
+builder.Services.AddAuthorization(options =>
+    options.AddPolicy("cache-admin", policy =>
+        policy.RequireRole("CacheAdministrator")));
+
+WebApplication app = builder.Build();
+app.UseMemoryValueCaching(trackMetrics: true);
+app.UseAuthentication();
+app.UseAuthorization();
+
+RouteGroupBuilder cacheAdmin = app.MapGroup(string.Empty);
+cacheAdmin.RequireAuthorization("cache-admin");
+cacheAdmin.MapCacheMetrics();
+cacheAdmin.MapEvictionEndpoints("cache-admin");
+```
+
+## OPTIONS and CORS headers
+
+`UseOptions()` is a small CORS helper, not ASP.NET Core's full CORS service. It does not validate an origin against an allow-list: for `OPTIONS`, it echoes the request `Origin`, or uses `defaultAllowedOrigin` when the request has no `Origin`; for other requests with an `Origin`, it reflects that origin and the configured credentials flag. It terminates every `OPTIONS` request without calling downstream middleware.
+
+All `allowedHeaders` and `allowedMethods` items are joined with `", "`; methods are uppercased. Defaults are origin `*`, no headers/methods, credentials `true`, max-age 3600, and status 200. Reflecting arbitrary origins together with credentials can be unsafe. A literal `*` is also incompatible with credentialed browser CORS. Configure a real allow-list with ASP.NET Core CORS when that is required.
+
+Although the `maxAge` parameter is nullable in the extension signature, the concrete middleware requires an integer, so callers should provide a value rather than `null`.
+
+```csharp
+using System.Net;
 using CommonNetFuncs.Web.Middleware;
+using Microsoft.AspNetCore.Http;
 
 WebApplication app = builder.Build();
 
+// Extension overload (only one overload; all arguments are optional).
 app.UseOptions(
     defaultAllowedOrigin: "https://example.com",
     allowedHeaders: ["Content-Type", "Authorization", "X-XSRF-TOKEN"],
-    allowedMethods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allowedMethods: ["GET", "POST", "PATCH"],
     allowCredentials: true,
-    maxAge: 3600
-);
+    maxAge: 3600,
+    defaultStatusCode: HttpStatusCode.NoContent);
+
+// The public middleware itself can be constructed and invoked directly.
+RequestDelegate next = _ => Task.CompletedTask;
+var optionsMiddleware = new OptionsMiddleware(
+    next, "https://example.com", ["Content-Type"], ["GET", "OPTIONS"],
+    allowCredentials: true, maxAge: 3600, HttpStatusCode.OK);
+var context = new DefaultHttpContext();
+context.Request.Method = HttpMethods.Options;
+context.Request.Headers.Origin = "https://example.com";
+await optionsMiddleware.InvokeAsync(context);
 ```
 
-</details>
+## Custom response headers
 
----
+`UseCustomHeaders()` removes each listed header and then uses `TryAdd` for each configured addition before invoking downstream middleware. An existing header is not overwritten, and a downstream component can still modify response headers. Some server-level headers may be controlled by the host and may not be removable here.
 
-## UseCustomHeadersMiddleware
-
-Adds or removes HTTP response headers on every response. Useful for injecting security headers or stripping server-identifying headers.
-
-### UseCustomHeadersMiddleware Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-#### UseCustomHeaders
-
-```cs
+```csharp
 using CommonNetFuncs.Web.Middleware;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 
 WebApplication app = builder.Build();
-
 app.UseCustomHeaders(
     addHeaders: new Dictionary<string, string>
     {
-        { "X-Frame-Options", "DENY" },
-        { "X-Content-Type-Options", "nosniff" },
+        ["X-Content-Type-Options"] = "nosniff",
+        ["Referrer-Policy"] = "no-referrer"
     },
-    removeHeaders: ["Server", "X-Powered-By"]
-);
+    removeHeaders: ["X-Powered-By"]);
+
+RequestDelegate next = _ => Task.CompletedTask;
+var middleware = new UseCustomHeadersMiddleware(
+    next,
+    addHeaders: new Dictionary<string, string> { ["X-Frame-Options"] = "DENY" },
+    removeHeaders: ["Server"]);
+var context = new DefaultHttpContext();
+await middleware.InvokeAsync(context);
 ```
 
-</details>
+## Slow-response logging
 
----
+`IResponseLoggingConfig.ThresholdInSeconds` is read-only; `ResponseLoggingConfig` provides the settable implementation. A warning is emitted at `LogLevel.Warning` when elapsed time is greater than or equal to the threshold and warning logging is enabled.
 
-## UseResponseLoggingEndpointFilter
+### Minimal API endpoint filter
 
-An `IEndpointFilter` for minimal API endpoints that emits a `Warning` log when an endpoint's total execution time exceeds a configurable threshold. Apply it per-endpoint or to a route group.
+`UseResponseLoggingEndpointFilter` measures the call to the next endpoint filter. Its public `InvokeAsync` returns the downstream result and propagates downstream exceptions (so no warning is written if the call throws).
 
-### UseResponseLoggingEndpointFilter Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-#### Program.cs setup
-
-Register `IResponseLoggingConfig` and apply the filter to a route group or individual endpoints.
-
-```cs
+```csharp
 using CommonNetFuncs.Web.Middleware;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddSingleton<IResponseLoggingConfig>(new ResponseLoggingConfig { ThresholdInSeconds = 2.0 });
+builder.Services.AddSingleton<IResponseLoggingConfig>(
+    new ResponseLoggingConfig { ThresholdInSeconds = 2 });
 builder.Services.AddSingleton<UseResponseLoggingEndpointFilter>();
 
 WebApplication app = builder.Build();
-
-// Apply to all endpoints in a group
-RouteGroupBuilder api = app.MapGroup("/api")
-    .AddEndpointFilter<UseResponseLoggingEndpointFilter>();
-
-api.MapGet("/slow", async () =>
+app.MapGet("/slow", async () =>
 {
-    await Task.Delay(3000);
-    return Results.Ok("done");
-});
-
-app.Run();
-// Warning logged: "Endpoint GET /api/slow took 00:00:03.0123456 to complete with status code: 200"
+    await Task.Delay(TimeSpan.FromSeconds(3));
+    return Results.Ok();
+}).AddEndpointFilter<UseResponseLoggingEndpointFilter>();
 ```
 
-</details>
+### MVC action filter
 
----
+`UseResponseLoggingFilter` starts a shared `Stopwatch` in `OnActionExecuting` and checks it in `OnActionExecuted`. The filter's normal execution model is one MVC action invocation at a time. Exceptions before the executed callback can prevent the log.
 
-## UseResponseLoggingFilter
-
-An MVC `IActionFilter` that emits a `Warning` log when a controller action's execution time exceeds a configurable threshold. Register it as a global MVC filter.
-
-### UseResponseLoggingFilter Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-#### Program.cs setup
-
-```cs
+```csharp
 using CommonNetFuncs.Web.Middleware;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddSingleton<IResponseLoggingConfig>(new ResponseLoggingConfig { ThresholdInSeconds = 2.0 });
-
+builder.Services.AddSingleton<IResponseLoggingConfig>(
+    new ResponseLoggingConfig { ThresholdInSeconds = 1 });
 builder.Services.AddControllers(options =>
-{
-    options.Filters.Add<UseResponseLoggingFilter>();
-});
+    options.Filters.Add<UseResponseLoggingFilter>());
 ```
 
-</details>
+## Response-size logging
 
----
+`UseResponseSizeLogging()` wraps the downstream response body in a counting stream and writes a warning after downstream execution when bytes written exceed `logThreshold`. The message includes path, method, `Accept`, encoded `Accept-Encoding`, and a human-readable size. The default threshold is `-1`, so any completed response with zero or more bytes is eligible for a warning; pass an explicit positive threshold in normal use.
 
-## UseResponseSizeLoggingMiddleware
+The component is documented by its own source as development-oriented. It changes `Response.Body` and disposes the counting stream and the original response body in `finally`. Do not add it blindly to production pipelines.
 
-Wraps the response body stream in a counting stream to measure the number of bytes written. Emits a `Warning` log when the response exceeds a configurable byte threshold. Intended for development and staging environments to detect unexpectedly large responses.
-
-### UseResponseSizeLoggingMiddleware Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-#### UseResponseSizeLogging
-
-```cs
+```csharp
 using CommonNetFuncs.Web.Middleware;
+using Microsoft.AspNetCore.Http;
 
 WebApplication app = builder.Build();
+app.UseResponseSizeLogging(logThreshold: 1024 * 1024);
 
-// Log a warning whenever a response exceeds 1 MB
-app.UseResponseSizeLogging(logThreshold: 1 * 1024 * 1024);
+RequestDelegate next = async context =>
+    await context.Response.WriteAsync("response");
+ILogger<UseResponseSizeLoggingMiddleware> logger =
+    app.Services.GetRequiredService<ILogger<UseResponseSizeLoggingMiddleware>>();
+var middleware = new UseResponseSizeLoggingMiddleware(next, logger, 1024);
+var context = new DefaultHttpContext { Response = { Body = new MemoryStream() } };
+await middleware.InvokeAsync(context);
 ```
 
-</details>
+## XSRF token cookie
 
----
+`UseXsrfToken()` calls `IAntiforgery.GetAndStoreTokens` for every request and appends a response cookie named `XSRF-TOKEN` containing the antiforgery request token. Default cookie flags are `HttpOnly = false` and `Secure = true`.
 
-## UseXsrfTokenMiddleware
+This middleware only publishes a token. It does not validate the token on unsafe requests. Configure antiforgery validation (for example, MVC antiforgery validation or an appropriate minimal-API endpoint filter), use HTTPS, and understand that `HttpOnly = false` is required only when JavaScript must read the token and therefore exposes it to script in the origin. The package does not set a custom `SameSite` policy.
 
-Generates an anti-forgery token on every request and writes it to an `XSRF-TOKEN` cookie, enabling client-side frameworks (Angular, etc.) to read the token and send it back in a request header for CSRF protection.
-
-### UseXsrfTokenMiddleware Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-#### UseXsrfToken
-
-```cs
+```csharp
 using CommonNetFuncs.Web.Middleware;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder.Services.AddAntiforgery();
 
 WebApplication app = builder.Build();
+app.UseXsrfToken(httpOnly: false, secure: true);
 
-// httpOnly: false — the cookie must be readable by JavaScript (required for SPA frameworks)
-app.UseXsrfToken(httpOnly: false);
+var directMiddleware = new UseXsrfTokenMiddleware(
+    next: _ => Task.CompletedTask,
+    antiforgery: app.Services.GetRequiredService<IAntiforgery>(),
+    httpOnly: false,
+    secure: true);
+await directMiddleware.InvokeAsync(new DefaultHttpContext
+{
+    RequestServices = app.Services
+});
 ```
 
-</details>
+## Public API summary
 
-## Installation
+| Type | Public members |
+| --- | --- |
+| `JsonPatchRequestMiddleware` | Constructor; `InvokeAsync(HttpContext)` |
+| `JsonPatchDocumentConverterFactory` | `CanConvert(Type)`; `CreateConverter(Type, JsonSerializerOptions)` |
+| `JsonPatchDocumentConverter<T>` | `Read(...)`; `Write(...)` |
+| `JsonPatchEndpointSupportExtensions` | `UseJsonPatchRequestBody()` |
+| `MemoryCacheEvictionMiddlewareExtensions` | `MemoryValueCaching()`; `UseMemoryValueCaching(CacheOptions?, bool)`; `MapCacheMetrics()`; `MapEvictionEndpoints(string?)` |
+| `OptionsMiddlewareExtensions` | `UseOptions(...)` with optional CORS arguments |
+| `OptionsMiddleware` | Constructor; `InvokeAsync(HttpContext)` |
+| `UseCustomHeadersMiddlewareExtension` | `UseCustomHeaders(IDictionary<string,string>?, IEnumerable<string>?)` |
+| `UseCustomHeadersMiddleware` | Constructor; `InvokeAsync(HttpContext)` |
+| `UseResponseLoggingEndpointFilter` | Constructor; `InvokeAsync(...)` |
+| `UseResponseLoggingFilter` | Constructor; `OnActionExecuting(...)`; `OnActionExecuted(...)` |
+| `ResponseSizeLoggingMiddlewareExtension` | `UseResponseSizeLogging(long)` |
+| `UseResponseSizeLoggingMiddleware` | Constructor; `InvokeAsync(HttpContext)` |
+| `UseXsrfTokenMiddlewareExtension` | `UseXsrfToken(bool, bool)` |
+| `UseXsrfTokenMiddleware` | Constructor; `InvokeAsync(HttpContext)` |
+| `IResponseLoggingConfig` | `ThresholdInSeconds` |
+| `ResponseLoggingConfig` | Settable `ThresholdInSeconds` |
 
-Install via NuGet:
-
-```bash
-dotnet add package CommonNetFuncs.Web.Middleware
-```
+The cache options, cache entry, and metrics types used by the caching extensions are public types from the package dependency `CommonNetFuncs.Web.Common`.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/NickScarpitti/common-net-funcs/blob/main/LICENSE) file for details.
+Licensed under MIT. See [LICENSE](https://github.com/ScarpittiWeb/common-net-funcs/blob/main/LICENSE).

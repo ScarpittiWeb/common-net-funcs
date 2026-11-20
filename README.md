@@ -1,10 +1,15 @@
 # CommonNetFuncs
 
-[![License](https://img.shields.io/github/license/NickScarpitti/common-net-funcs.svg)](http://opensource.org/licenses/MIT)
-[![Coverage Status](https://coveralls.io/repos/github/NickScarpitti/common-net-funcs/badge.svg?branch=main)](https://coveralls.io/github/NickScarpitti/common-net-funcs?branch=main)
-[![All Tests](https://github.com/NickScarpitti/common-net-funcs/actions/workflows/all-tests.yml/badge.svg)](https://github.com/NickScarpitti/common-net-funcs/actions/workflows/all-tests.yml)
+[![License](https://img.shields.io/github/license/ScarpittiWeb/common-net-funcs.svg)](http://opensource.org/licenses/MIT)
+[![Coverage Status](https://coveralls.io/repos/github/ScarpittiWeb/common-net-funcs/badge.svg?branch=main)](https://coveralls.io/github/ScarpittiWeb/common-net-funcs?branch=main)
+[![All Tests](https://github.com/ScarpittiWeb/common-net-funcs/actions/workflows/all-tests.yml/badge.svg)](https://github.com/ScarpittiWeb/common-net-funcs/actions/workflows/all-tests.yml)
 
 #### CommonNetFuncs is a collection of helper classes and methods that aim to make coding in C# easier with less boilerplate code
+
+## Contents
+
+- [Agent skills](#agent-skills)
+- [Included Packages](#included-packages)
 
 ## Agent skills
 
@@ -14,38 +19,42 @@ Each package has its own discoverable `SKILL.md`.
 
 ## Included Packages
 
-1. [Compression](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Compression)
-2. [Core](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Core)
-3. [Csv](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Csv)
-4. [DeepClone](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.DeepClone)
-5. [EFCore](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.EFCore)
-6. [Email](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Email)
+1. [Compression](CommonNetFuncs.Compression)
+2. [Core](CommonNetFuncs.Core)
+3. [Csv](CommonNetFuncs.Csv)
+4. [DeepClone](CommonNetFuncs.DeepClone)
+5. [EFCore](CommonNetFuncs.EFCore)
+6. [Email](CommonNetFuncs.Email)
 7. Excel
-   1. [ClosedXml](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Excel.ClosedXml)
-   2. [Common](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Excel.Common)
-   3. [Npoi](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Excel.Npoi)
-   4. [OpenXML](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Excel.OpenXml)
-8. [FastMap](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.FastMap)
-9. [Ffmpeg](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Ffmpeg)
-10. [Hangfire](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Hangfire)
-11. [Images](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Images)
+   1. [ClosedXml](CommonNetFuncs.Excel.ClosedXml)
+   2. [Common](CommonNetFuncs.Excel.Common)
+   3. [Npoi](CommonNetFuncs.Excel.Npoi)
+   4. [OpenXML](CommonNetFuncs.Excel.OpenXml)
+8. [FastMap](CommonNetFuncs.FastMap)
+9. [Ffmpeg](CommonNetFuncs.Ffmpeg)
+10. [Hangfire](CommonNetFuncs.Hangfire)
+11. [Images](CommonNetFuncs.Images)
 12. Office
-    1. [Common](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Office.Common)
-13. Sql
-    1. [Common](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Sql.Common)
-    2. [Odbc](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Sql.Odbc)
-    3. [PostgreSql](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Sql.PostgreSql)
-    4. [SqlServer](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Sql.SqlServer)
-14. [SubsetModelBinder](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.SubsetModelBinder)
-15. Web
-    1. [Api](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Web.Api)
+    1. [Common](CommonNetFuncs.Office.Common)
+13. [ReinforcedTypings](CommonNetFuncs.ReinforcedTypings)
+14. Sql
+    1. [Common](CommonNetFuncs.Sql.Common)
+    2. [Odbc](CommonNetFuncs.Sql.Odbc)
+    3. [PostgreSql](CommonNetFuncs.Sql.PostgreSql)
+    4. [SqlServer](CommonNetFuncs.Sql.SqlServer)
+15. SubsetModelBinder
+    1. [Core](CommonNetFuncs.SubsetModelBinder)
+    2. [Attribute](CommonNetFuncs.SubsetModelBinder.Attribute)
+    3. [Generator](CommonNetFuncs.SubsetModelBinder.Generator)
+16. Web
+    1. [Api](CommonNetFuncs.Web.Api)
     2. Aws
-       1. [S3](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Web.S3)
-    3. [Common](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Web.Common)
-    4. [Ftp](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Web.Ftp)
-    5. [Interface](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Web.Interface)
-    6. [Jwt](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Web.Jwt)
-    7. [Middleware](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Web.Middleware)
-    8. [Requests](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Web.Requests)
-16. Word
-    1. [OpenXML](https://github.com/NickScarpitti/common-net-funcs/tree/main/CommonNetFuncs.Word.OpenXml)
+       1. [S3](CommonNetFuncs.Web.Aws.S3)
+    3. [Common](CommonNetFuncs.Web.Common)
+    4. [Ftp](CommonNetFuncs.Web.Ftp)
+    5. [Interface](CommonNetFuncs.Web.Interface)
+    6. [Jwt](CommonNetFuncs.Web.Jwt)
+    7. [Middleware](CommonNetFuncs.Web.Middleware)
+    8. [Requests](CommonNetFuncs.Web.Requests)
+17. Word
+    1. [OpenXML](CommonNetFuncs.Word.OpenXml)

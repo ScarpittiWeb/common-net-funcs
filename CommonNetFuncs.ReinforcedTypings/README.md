@@ -1,268 +1,212 @@
 # CommonNetFuncs.ReinforcedTypings
 
-[![License](https://img.shields.io/github/license/NickScarpitti/common-net-funcs.svg)](http://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/github/license/ScarpittiWeb/common-net-funcs.svg)](https://opensource.org/licenses/MIT)
 [![NuGet Version](https://img.shields.io/nuget/v/CommonNetFuncs.ReinforcedTypings)](https://www.nuget.org/packages/CommonNetFuncs.ReinforcedTypings/)
-[![nuget](https://img.shields.io/nuget/dt/CommonNetFuncs.ReinforcedTypings)](https://www.nuget.org/packages/CommonNetFuncs.ReinforcedTypings/)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/CommonNetFuncs.ReinforcedTypings)](https://www.nuget.org/packages/CommonNetFuncs.ReinforcedTypings/)
 
-This project extends [Reinforced.Typings](https://github.com/reinforced/Reinforced.Typings) with a fluent configuration hook that adds three capabilities on top of RT's normal attribute-based interface/class/enum export:
+Build-time extensions for [Reinforced.Typings](https://github.com/reinforced/Reinforced.Typings):
 
-- **TsConst**: Generates `as const` TypeScript object literals from `public const`/`public static readonly` fields on a static C# class - of any field type.
-- **TsCollection**: Generates `as const` TypeScript array-literal collections from `public const`/`public static readonly` array/collection fields on a static C# class, cross-referencing the real generated TypeScript type for any element type that is itself exported via `[TsInterface]`/`[TsClass]`/`[TsEnum]`.
-- **Valibot schema generation**: Generates a companion [Valibot](https://valibot.dev/) validation schema (`.schema.ts`) next to the interface RT generates for any class decorated with both `[TsInterface]` and `[GenerateValibotSchema]`, derived from the class's `System.ComponentModel.DataAnnotations` validation attributes.
+- `[TsConst]` exports selected public static fields to TypeScript object literals.
+- `[TsCollection]` exports selected public static collection fields to TypeScript array literals.
+- `[GenerateValibotSchema]` configures a Reinforced.Typings interface generator that writes a companion Valibot schema file.
 
-All of the above honor the resolved `[TsGlobal]`/fluent `Global(...)` settings (`WriteWarningComment`, `TabSymbol`, `NewLine`, `CamelCaseForProperties`, `UnresolvedToUnknown`, `UseModules`, `DiscardNamespacesWhenUsingModules`, `RootNamespace`, `ExportPureTypings`) so the hand-written output matches the same conventions Reinforced.Typings itself would use for the rest of the project.
+The package targets `net11.0`. It is not a runtime mapping or validation service.
 
 ## Contents
 
-- [CommonNetFuncs.ReinforcedTypings](#commonnetfuncsreinforcedtypings)
-  - [Contents](#contents)
-  - [Setup](#setup)
-  - [TsConst](#tsconst)
-    - [TsConst Usage Examples](#tsconst-usage-examples)
-      - [Export all fields, suppress one](#export-all-fields-suppress-one)
-      - [Export only selected fields](#export-only-selected-fields)
-      - [Non-string field types](#non-string-field-types)
-  - [TsCollection](#tscollection)
-    - [TsCollection Usage Examples](#tscollection-usage-examples)
-      - [Export all fields, suppress one](#export-all-fields-suppress-one-1)
-      - [Export only selected fields](#export-only-selected-fields-1)
-      - [Collections of exported types](#collections-of-exported-types)
-  - [Valibot Schema Generation](#valibot-schema-generation)
-    - [Valibot Usage Examples](#valibot-usage-examples)
-      - [Basic form model](#basic-form-model)
-      - [SubsetOf-bound input models](#subsetof-bound-input-models)
-  - [Installation](#installation)
-  - [License](#license)
+- [Installation](#installation)
+- [Setup](#setup)
+- [`TsConst`](#tsconst)
+- [`TsCollection`](#tscollection)
+- [Valibot schemas](#valibot-schemas)
+- [License](#license)
 
----
+## Installation
+
+```bash
+dotnet add package CommonNetFuncs.ReinforcedTypings
+```
 
 ## Setup
 
-Reinforced.Typings runs an `RtConfigurationMethod` (configured in your consuming project's `Reinforced.Typings.settings.xml`) once per build, right before it exports every `[TsInterface]`/`[TsClass]`/`[TsEnum]` type it discovers. Point that setting at `ReinforcedTypingsFluentConfig.Configure` to enable everything in this package:
+Point the consuming project's Reinforced.Typings configuration at the public `Configure` hook:
 
 ```xml
 <!-- Reinforced.Typings.settings.xml -->
-<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="4.0" DefaultTargets="Build"
+         xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <!--
-      RT also only looks for this type inside its "source assemblies", i.e. this project's own
-      compiled output plus anything listed in the RtAdditionalAssembly item group below - it does
-      NOT search every referenced package. Since Configure lives in the CommonNetFuncs.ReinforcedTypings
-      package assembly rather than this project's assembly, that DLL is fed in as an RtAdditionalAssembly
-      (see AddReinforcedTypingsFluentConfigAssembly target) so RT can actually find it.
-    -->
-    <RtConfigurationMethod>CommonNetFuncs.ReinforcedTypings.ReinforcedTypingsFluentConfig.Configure</RtConfigurationMethod>
+    <RtConfigurationMethod>
+      CommonNetFuncs.ReinforcedTypings.ReinforcedTypingsFluentConfig.Configure
+    </RtConfigurationMethod>
     <RtTargetDirectory>$(ProjectDir)TypeScriptModels</RtTargetDirectory>
-    <!-- ...your project's other RT settings (RtAssemblies, RtDivideTypesAmongFiles, etc.)... -->
+    <!-- Keep the consuming project's normal RtAssemblies, RtTargetFile,
+         RtDivideTypesAmongFiles, and other RT settings here. -->
   </PropertyGroup>
-  <Target Name="AddReinforcedTypingsFluentConfigAssembly" BeforeTargets="ReinforcedTypingsGenerate">
-    <!--
-      RT only scans the assemblies listed as its "source assemblies" (this project's own build
-      output, plus whatever is added to RtAdditionalAssembly) when resolving RtConfigurationMethod.
-      CommonNetFuncs.ReinforcedTypings.ReinforcedTypingsFluentConfig lives in the package's own
-      assembly, so it has to be added explicitly here. @(ReferencePath) is only populated once assembly resolution has
-      run, so this must happen in a target rather than a plain top-level ItemGroup.
-    -->
+
+  <Target Name="AddReinforcedTypingsFluentConfigAssembly"
+          BeforeTargets="ReinforcedTypingsGenerate">
     <ItemGroup>
-      <RtAdditionalAssembly Include="@(ReferencePath)" Condition="'%(ReferencePath.FileName)' == 'CommonNetFuncs.ReinforcedTypings'" />
+      <RtAdditionalAssembly Include="@(ReferencePath)"
+        Condition="'%(ReferencePath.FileName)' == 'CommonNetFuncs.ReinforcedTypings'" />
     </ItemGroup>
   </Target>
 </Project>
 ```
 
-`Configure` scans whichever assemblies your own RT settings are configured to export from (falling back to the assembly this package lives in if none are configured), so it behaves correctly whether it's referenced by one project or shared as a library across several. Hand-written `TsConst`/`TsCollection` output is written to the same target directory RT itself would use (`RtTargetDirectory` when dividing types among files, otherwise the directory portion of `RtTargetFile`), nested into namespace-mirroring subfolders using the same rules RT applies to its own generated files.
+`ReferencePath` is normally populated during reference resolution, so the additional assembly should be added inside a target as above. Reinforced.Typings looks for the configured method in source/added assemblies, not by searching every package reference.
 
----
+The public entry point is intended to be called by Reinforced.Typings, but its signature is directly available:
 
-## TsConst
+```csharp
+using CommonNetFuncs.ReinforcedTypings;
+using Reinforced.Typings.Fluent;
 
-Marks a static C# class whose `public const`/`public static readonly` fields - of any type (strings, numbers, booleans, `Guid`/date types, enums, arrays/collections, or class/record instances) - should be exported as a TypeScript `as const` object literal, along with a `Key`/`Value` type alias pair (`keyof typeof X` / union of value types).
+void ConfigureReinforcedTypings(ConfigurationBuilder builder) =>
+    ReinforcedTypingsFluentConfig.Configure(builder);
+```
 
-By default (`TsConstExportMode.All`) every eligible field is exported unless it's decorated with `[TsIgnoreConst]`. Use `[TsConst(TsConstExportMode.Selected)]` to instead opt fields in individually via `[TsExportConst]`.
+`Configure` scans `builder.Context.SourceAssemblies`, falling back to its own assembly only when no source assemblies are present. It discovers `[GenerateValibotSchema]` + `[TsInterface]` types, then writes `[TsConst]`/`[TsCollection]` files synchronously. A successful build alone does not prove output was written—inspect the configured target area and treat generated files as build products.
 
-### TsConst Usage Examples
+For hand-written constant/collection output, hierarchical `RtTargetDirectory` or the directory portion of `RtTargetFile` is used. Namespace folders, modules, warning comments, tabs/newlines, property casing, unresolved types, and pure-typings mode follow the resolved RT global settings.
 
-<details>
-<summary><h3>Usage Examples</h3></summary>
+## `TsConst`
 
-#### Export all fields, suppress one
+The class-only attribute has an optional `Mode`:
 
-```cs
+```csharp
 using CommonNetFuncs.ReinforcedTypings.Constants;
 
-[TsConst]
-public static class RoleConstants
-{
-    public const string NmPkgPlAdminName = "NM Pkg PL Admin"; // exported
-
-    [TsIgnoreConst]
-    public const string InternalOnly = "internal"; // skipped
-}
-```
-
-Generates `RoleConstants.ts`:
-
-```ts
-export const RoleConstants = {
-  NmPkgPlAdminName: "NM Pkg PL Admin",
-} as const;
-
-export type RoleConstantsKey = keyof typeof RoleConstants;
-export type RoleConstantsValue = (typeof RoleConstants)[RoleConstantsKey];
-```
-
-#### Export only selected fields
-
-```cs
-[TsConst(TsConstExportMode.Selected)]
-public static class PolicyNames
-{
-    public const string InternalPolicy = "InternalPolicy"; // skipped - no [TsExportConst]
-
-    [TsExportConst]
-    public const string EditUsersPolicy = "EditUsersPolicy"; // exported
-}
-```
-
-#### Non-string field types
-
-`TsConst` isn't limited to strings - `Guid`/date types serialize as ISO strings, enums serialize as numbers (or strings when the enum carries `[TsEnum(UseString = true)]`), and nested arrays/collections and class/record instances serialize recursively as array/object literals (honoring `[TsIgnore]` on nested properties):
-
-```cs
-[TsConst]
+[TsConst] // TsConstExportMode.All
 public static class AppDefaults
 {
-    public static readonly Guid TenantId = new("11111111-1111-1111-1111-111111111111");
-    public static readonly DateOnly LaunchDate = new(2024, 1, 2);
+    public const string Title = "Portal";
     public static readonly int[] AllowedPageSizes = [10, 25, 50];
+
+    [TsIgnoreConst]
+    public const string ServerOnlySecret = "do-not-export";
+}
+
+[TsConst(TsConstExportMode.Selected)]
+public static class SelectedPolicy
+{
+    public const string Hidden = "hidden";
+
+    [TsExportConst]
+    public const string EditUsers = "EditUsers";
 }
 ```
+
+`TsConstAttribute.Mode` is readable, and enum values are `All` (default, zero) and `Selected`:
+
+```csharp
+TsConstAttribute mode = new(TsConstExportMode.Selected);
+Console.WriteLine(mode.Mode);
+TsExportConstAttribute include = new();
+TsIgnoreConstAttribute ignore = new();
+```
+
+In `All` mode, every public static field is included unless marked `[TsIgnoreConst]`; in `Selected`, only fields marked `[TsExportConst]` are included. `const` fields and `static readonly` fields are both discoverable, but the implementation scans public static fields generally and does not restrict the decorated class at runtime to `static`. The field attributes apply to fields and are not inherited.
+
+Normal output resembles:
 
 ```ts
 export const AppDefaults = {
-  TenantId: "11111111-1111-1111-1111-111111111111",
-  LaunchDate: "2024-01-02",
+  Title: 'Portal',
   AllowedPageSizes: [10, 25, 50],
 } as const;
+
+export type AppDefaultsKey = keyof typeof AppDefaults;
+export type AppDefaultsValue = (typeof AppDefaults)[AppDefaultsKey];
 ```
 
-</details>
+Values are serialized at generation time from live static-field values. Strings, booleans, `byte`, `sbyte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `float`, `double`, `decimal`, `Guid`, `DateTime`, `DateTimeOffset`, `DateOnly`, and `TimeOnly` have explicit literal handling. Enums are numeric unless `[TsEnum(UseString = true)]` applies. Arrays/enumerables are recursive; class/record/other object values become object literals from public readable instance properties, skipping indexers and `[TsIgnore]`. `null` becomes `null`.
 
----
+```csharp
+using Reinforced.Typings.Attributes;
 
-## TsCollection
+public sealed class PublicDefaults
+{
+    public string Name { get; init; } = "Ada";
 
-Marks a static C# class whose `public const`/`public static readonly` array/collection fields (`List<T>`, `T[]`, `ICollection<T>`, `IEnumerable<T>`, etc. - excluding `string` and dictionaries) should be exported as a TypeScript array-literal collections object, along with a `CollectionsKey`/`CollectionsValue` type alias pair.
+    [TsIgnore]
+    public string ServerOnly { get; init; } = "secret";
+}
 
-By default (`TsCollectionExportMode.All`) every eligible field is exported unless it's decorated with `[TsIgnoreCollection]`. Use `[TsCollection(TsCollectionExportMode.Selected)]` to instead opt fields in individually via `[TsExportCollection]`. If a class has no eligible collection fields, no file is written for it.
+[TsConst]
+public static class RichDefaults
+{
+    public static readonly Guid Tenant = new("11111111-1111-1111-1111-111111111111");
+    public static readonly DateOnly LaunchDate = new(2024, 1, 2);
+    public static readonly PublicDefaults User = new();
+}
+```
 
-Element types that are themselves exported via `[TsInterface]`/`[TsClass]`/`[TsEnum]` are cross-referenced using their _real_ generated TypeScript name (honoring `[TsInterface(AutoI = ...)]`'s `I`-prefix convention) - imported from the sibling generated file when `UseModules` is enabled, or fully namespace-qualified otherwise. Anything else falls back to `any` (or `unknown` when `UnresolvedToUnknown` is set).
+Date/time output is ISO-shaped; unsupported structs fall through to property-object serialization (for example, `TimeSpan` becomes an object containing public `TimeSpan` properties). There is no cycle detector for constant object serialization and no deep security redaction: never decorate constants containing credentials, signing material, or client-inappropriate values.
 
-### TsCollection Usage Examples
+## `TsCollection`
 
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-#### Export all fields, suppress one
-
-```cs
+```csharp
 using CommonNetFuncs.ReinforcedTypings.Collections;
 
-[TsCollection]
-public static class RoleConstants
+[TsCollection] // All
+public static class Lists
 {
-    public static readonly string[] AllRoleNames = ["Admin", "Editor", "Viewer"]; // exported
+    public static readonly string[] Names = ["Admin", "Editor"];
 
     [TsIgnoreCollection]
-    public static readonly string[] Deprecated = ["LegacyRole"]; // skipped
+    public static readonly string[] Deprecated = ["Legacy"];
+
+    public static readonly Dictionary<string, int> NotEligible = [];
+    public const string NotACollection = "text";
 }
-```
 
-Generates `RoleConstants.ts`:
-
-```ts
-export const RoleConstantsCollections = {
-  AllRoleNames: ["Admin", "Editor", "Viewer"] as string[],
-} as const;
-
-export type RoleConstantsCollectionsKey = keyof typeof RoleConstantsCollections;
-export type RoleConstantsCollectionsValue =
-  (typeof RoleConstantsCollections)[RoleConstantsCollectionsKey];
-```
-
-#### Export only selected fields
-
-```cs
 [TsCollection(TsCollectionExportMode.Selected)]
-public static class PolicyNames
+public static class SelectedLists
 {
-    public static readonly string[] NotExported = ["InternalPolicy"];
+    public static readonly int[] Hidden = [1];
 
     [TsExportCollection]
-    public static readonly string[] Exported = ["EditUsersPolicy", "ViewReportsPolicy"];
+    public static readonly int[] Exported = [2, 3];
 }
+
+TsCollectionAttribute collectionMode = new(TsCollectionExportMode.Selected);
+TsExportCollectionAttribute collectionInclude = new();
+TsIgnoreCollectionAttribute collectionIgnore = new();
+Console.WriteLine(collectionMode.Mode);
 ```
 
-#### Collections of exported types
+Eligibility means an array or a type that implements `IEnumerable<T>` with one element type. Strings and dictionaries are excluded. In `Selected`, only `[TsExportCollection]` fields are considered; in `All`, `[TsIgnoreCollection]` fields are skipped. An eligible `TsCollection` class with no resulting fields writes no file. The output object is named `<ClassName>Collections`, is asserted `as const`, and gets `<ClassName>CollectionsKey`/`Value` type aliases.
 
-```cs
-[TsEnum]
-public enum Role { Admin, Editor, Viewer }
+Basic TypeScript element types map to `string`, `number`, or `boolean`. Elements whose .NET types are decorated with `[TsEnum]`, `[TsInterface]`, or `[TsClass]` use that generated type (including `[TsInterface(AutoI = true)]`'s `I` prefix). ES-module output adds `import type`; namespace output qualifies the name. Other element types become `any`, or `unknown` when RT's `UnresolvedToUnknown` is enabled.
 
-[TsInterface] // AutoI defaults to true -> generated as IUserSummary
+```csharp
+[Reinforced.Typings.Attributes.TsEnum]
+public enum Role { Admin, Editor }
+
+[Reinforced.Typings.Attributes.TsInterface]
 public sealed class UserSummary
 {
     public string Name { get; set; } = string.Empty;
 }
 
 [TsCollection]
-public static class Seed
+public static class SeedData
 {
-    public static readonly List<Role> DefaultRoles = [Role.Admin, Role.Viewer];
-    public static readonly List<UserSummary> SampleUsers = [new() { Name = "Ada" }];
+    public static readonly List<Role> Roles = [Role.Admin];
+    public static readonly List<UserSummary> Users = [new() { Name = "Ada" }];
 }
 ```
 
-With `UseModules` enabled, `Seed.ts` imports the real generated types instead of falling back to `any`:
+If a type has both `[TsConst]` and `[TsCollection]`, both sections are written to one file. If it also has a normal `[TsInterface]`, `[TsClass]`, or `[TsEnum]`, this package writes to `<TypeName>Constants.ts` to avoid Reinforced.Typings overwriting `<TypeName>.ts`.
 
-```ts
-import type { Role } from "./Role";
-import type { IUserSummary } from "./UserSummary";
+The const/collection writer honors `WriteWarningComment`, `TabSymbol`, `NewLine`, `CamelCaseForProperties`, `UnresolvedToUnknown`, `UseModules`, `DiscardNamespacesWhenUsingModules`, `RootNamespace`, and `ExportPureTypings`. With pure typings, it emits ambient readonly declarations and omits runtime literals/type aliases. With modules disabled, it mirrors RT's namespace style instead of emitting top-level module syntax.
 
-export const SeedCollections = {
-  DefaultRoles: [0, 2] as Role[],
-  SampleUsers: [{ Name: "Ada" }] as IUserSummary[],
-} as const;
+## Valibot schemas
 
-export type SeedCollectionsKey = keyof typeof SeedCollections;
-export type SeedCollectionsValue = (typeof SeedCollections)[SeedCollectionsKey];
-```
+Apply both `[TsInterface]` and `[GenerateValibotSchema]`:
 
-</details>
-
----
-
-## Valibot Schema Generation
-
-Apply `[GenerateValibotSchema]` alongside `[TsInterface]` on classes that represent form-submission models (i.e. classes with `System.ComponentModel.DataAnnotations` validation attributes that are used as inputs on the frontend). Read-only response/query models that don't need client-side validation should omit this attribute.
-
-`ReinforcedTypingsFluentConfig.Configure` finds every type carrying both attributes and configures RT to run them through `ValibotSchemaGenerator`, a custom RT code generator that produces the standard interface _and_ writes a companion `<TypeName>.schema.ts` file (next to the generated interface) containing:
-
-- `export const <TypeName>Schema = v.object({ ... })` - a Valibot schema derived from the class's properties and their validation attributes.
-- `export type <TypeName>Input = v.InferInput<typeof <TypeName>Schema>;`
-- `export const <TypeName>Labels: Record<string, string> = { ... }` - a display-label map, using `[DisplayName]` where present and falling back to a space-split version of the property name (e.g. `PhoneNumber` -> `"Phone Number"`).
-
-Recognized `System.ComponentModel.DataAnnotations` attributes: `[Required]`, `[MaxLength]`, `[MinLength]`, `[StringLength]`, `[Range]`, `[RegularExpression]`, `[EmailAddress]`, `[Url]`, `[Phone]`, `[CreditCard]`. Properties marked `[TsIgnore]` are skipped in both the schema and the labels map. Nested complex properties recurse into an inline `v.object({...})` schema (with cycle detection falling back to `v.any()`), and array/list properties emit `v.array(...)`.
-
-### Valibot Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-#### Basic form model
-
-```cs
+```csharp
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using CommonNetFuncs.ReinforcedTypings.Valibot;
@@ -281,38 +225,77 @@ public sealed class CreateUserModel
     public string Email { get; set; } = string.Empty;
 
     [Range(18, 120)]
-    public int? Age { get; set; }
+    public int Age { get; set; }
 }
+
+GenerateValibotSchemaAttribute marker = new();
 ```
 
-Generates `CreateUserModel.schema.ts`:
+`GenerateValibotSchemaAttribute` can decorate one class or struct, is not inherited, and is not multiply allowed. `Configure` registers `ValibotSchemaGenerator` only for types with both attributes. Reinforced.Typings invokes its public `GenerateNode` override while generating the interface:
 
-```ts
-import * as v from "valibot";
+```csharp
+using Reinforced.Typings;
+using Reinforced.Typings.Fluent;
 
-export const CreateUserModelSchema = v.object({
-  Name: v.pipe(v.string(), v.maxLength(50)),
-  Email: v.pipe(v.string(), v.email()),
-  Age: v.optional(
-    v.nullable(v.pipe(v.number(), v.minValue(18), v.maxValue(120))),
-  ),
-});
-
-export type CreateUserModelInput = v.InferInput<typeof CreateUserModelSchema>;
-
-export const CreateUserModelLabels: Record<string, string> = {
-  Name: "Full Name",
-  Email: "Email",
-  Age: "Age",
+// A real RT export invokes ValibotSchemaGenerator.GenerateNode internally.
+ExportContext context = new(
+    [typeof(CreateUserModel).Assembly], new FilesOperations())
+{
+    Hierarchical = true,
+    TargetDirectory = Path.Combine(AppContext.BaseDirectory, "TypeScriptModels"),
+    ConfigurationMethod = builder => builder.ExportAsInterfaces(
+        [typeof(CreateUserModel)],
+        configuration =>
+            configuration.WithCodeGenerator<ValibotSchemaGenerator>())
 };
+
+new TsExporter(context).Export();
 ```
 
-#### SubsetOf-bound input models
+`GenerateNode` first produces the normal interface node. For opted-in types it writes a companion `<TypeName>.schema.ts`. **The current schema writer does not use the RT target directory directly.** It starts from the type assembly location, walks upward for a directory containing `TypeScriptModels` or a `.csproj`, and caches the resolved `<project>/TypeScriptModels` directory in a process-wide static field. Verify this location. It is not guaranteed to be beside an interface when the consuming RT target differs from that convention.
 
-Types decorated with `[SubsetOf(typeof(SourceModel))]` (e.g. via `CommonNetFuncs.SubsetModelBinder`) inherit their validation attributes from the source type when generating the schema, so a trimmed-down "bound" model doesn't need to redeclare them:
+Generated schema code includes:
 
-```cs
-public sealed class User
+- `import * as v from 'valibot'`
+- `<TypeName>Schema = v.object({...})`
+- `<TypeName>Input = v.InferInput<typeof ...>`
+- `<TypeName>Labels: Record<string,string>` with `[DisplayName]` or split-Pascal-case names.
+
+Properties marked `[TsIgnore]` are omitted from schema and labels. The schema uses original C# property names, not `CamelCaseForProperties`.
+
+Supported built-in shapes:
+
+- `string` → `v.string()`
+- `int`, `long`, `short`, `byte`, `uint`, `ulong`, `float`, `double`, `decimal` → `v.number()`
+- `bool` → `v.boolean()`
+- `Guid`, `DateTime`, `DateTimeOffset`, `DateOnly` → `v.string()` (they are JSON representations, not Valibot format validators)
+- enums → `v.number()`
+- arrays, `List<T>`, `IList<T>`, `IEnumerable<T>`, `ICollection<T>` → `v.array(...)`
+- non-System/non-Microsoft complex classes → inline `v.object(...)`
+- cycles and unrecognized types → `v.any()`.
+
+Supported validation attributes are `[Required]`, `[MaxLength]`, `[MinLength]`, `[StringLength]`, `[Range]`, `[RegularExpression]`, `[EmailAddress]`, `[Url]`, `[Phone]`, and `[CreditCard]`. Error messages are copied into the matching Valibot call when present. Required/nullable handling follows reflected C# nullability: nullable references and nullable value types may be `optional(nullable(...))`; required nullable values become `nullable(...)`; nonnullable value types without `[Required]` can still be optional. A nonnullable `string` without `[Required]` is not wrapped in `optional`.
+
+The generator additionally recognizes attributes from other assemblies by type name:
+
+```csharp
+// CommonNetFuncs.Web.Common-style attributes are recognized if present:
+[DenyCharacters("<>")]
+[DenyRegularExpression("bad")]
+[AllowedNullableValues("A", "B")]
+public string? SafeChoice { get; set; }
+
+public string[]? Tags { get; set; } // List* attributes below become item validators
+```
+
+It supports `ListMaxLength`, `ListStringLength`, `ListRange`, `ListRegularExpression`, `ListDenyCharacters`, `ListDenyRegularExpression`, `DenyCharacters`, `DenyRegularExpression`, and `AllowedNullableValues`. This is name/reflection based, so the class name and expected properties still have to match. Unsupported member types or attributes can result in permissive `v.any()` or no extra pipe.
+
+Types carrying an attribute named `SubsetOfAttribute` inherit validation attributes from the matching property on the source type. The source `Type` can come from a `SourceType` property or the attribute's first constructor argument:
+
+```csharp
+using CommonNetFuncs.SubsetModelBinder.Attribute;
+
+public sealed class UserSource
 {
     [Required]
     [MaxLength(50)]
@@ -321,23 +304,15 @@ public sealed class User
 
 [TsInterface]
 [GenerateValibotSchema]
-[SubsetOf(typeof(User))]
-public sealed class BoundUser
+[SubsetOf(typeof(UserSource))]
+public sealed class UserInput
 {
-    public string Name { get; set; } = string.Empty; // pulls [Required]/[MaxLength(50)] from User.Name
+    public string Name { get; set; } = string.Empty;
 }
 ```
 
-</details>
-
-## Installation
-
-Install via NuGet:
-
-```bash
-dotnet add package CommonNetFuncs.ReinforcedTypings
-```
+Always inspect generated TypeScript and exercise `v.parse`/`v.safeParse` with valid and invalid values. Client-generated rules are not a replacement for server-side validation, and not every .NET type, nullability shape, custom validator, or regular-expression dialect has an exact Valibot/JavaScript equivalent.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/NickScarpitti/common-net-funcs/blob/main/LICENSE) file for details.
+MIT. See [LICENSE](https://github.com/ScarpittiWeb/common-net-funcs/blob/main/LICENSE).

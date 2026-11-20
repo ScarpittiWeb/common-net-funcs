@@ -1,526 +1,748 @@
 # CommonNetFuncs.Web.Requests
 
-[![License](https://img.shields.io/github/license/NickScarpitti/common-net-funcs.svg)](http://opensource.org/licenses/MIT)
-[![NuGet Version](https://img.shields.io/nuget/v/CommonNetFuncs.Web.Requests)](https://www.nuget.org/packages/CommonNetFuncs.Web.Requests)
-[![nuget](https://img.shields.io/nuget/dt/CommonNetFuncs.Web.Requests)](https://www.nuget.org/packages/CommonNetFuncs.Web.Requests/)
+[![License](https://img.shields.io/github/license/ScarpittiWeb/common-net-funcs.svg)](https://opensource.org/licenses/MIT)
+[![NuGet Version](https://img.shields.io/nuget/v/CommonNetFuncs.Web.Requests)](https://www.nuget.org/packages/CommonNetFuncs.Web.Requests/)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/CommonNetFuncs.Web.Requests)](https://www.nuget.org/packages/CommonNetFuncs.Web.Requests/)
 
-This lightweight project contains helper methods for several common functions required by applications.
+HTTP request, response, retry, streaming, JSON Patch, cache, and MessagePack helpers for ASP.NET Core applications. The package targets **.NET 11.0**.
 
 ## Contents
 
-- [CommonNetFuncs.Web.Requests](#commonnetfuncswebrequests)
-  - [Contents](#contents)
-  - [RestHelpers](#resthelpers)
-    - [RestHelpers Usage Examples](#resthelpers-usage-examples)
-      - [RestRequest](#restrequest)
-      - [StreamingRestRequest](#streamingrestrequest)
-      - [RestRequestObject](#restrequestobject)
-  - [RestHelpersWrapper](#resthelperswrapper)
-    - [RestHelpersWrapper Usage Examples](#resthelperswrapper-usage-examples)
-      - [Basic Usage](#basic-usage)
-      - [RestHelperOptionsDefaultConfig](#resthelperoptionsdefaultconfig)
-      - [Dependency Injection Setup](#dependency-injection-setup)
-  - [MessagePack Streaming](#messagepack-streaming)
-    - [Overview](#overview)
-    - [MessagePack Streaming Usage Examples](#messagepack-streaming-usage-examples)
-      - [Server-Side Controller](#server-side-controller)
-      - [Minimal API Usage](#minimal-api-usage)
-      - [Client-Side Usage](#client-side-usage)
-  - [PatchCreator](#patchcreator)
-    - [PatchCreator Usage Examples](#patchcreator-usage-examples)
-      - [CreatePatch](#createpatch)
-  - [DistributedCacheExtensions](#distributedcacheextensions)
-    - [DistributedCacheExtensions Usage Examples](#distributedcacheextensions-usage-examples)
-  - [JsonPatchFormatter](#jsonpatchformatter)
-    - [JsonPatchFormatter Usage Examples](#jsonpatchformatter-usage-examples)
-  - [Installation](#installation)
-  - [License](#license)
-
----
-
-## RestHelpers
-
-A generic HTTP client wrapper that sends typed REST requests and deserializes responses. Built on a long-lived `SocketsHttpHandler`-backed `HttpClient` with configurable keep-alive, per-request bearer tokens, custom headers, timeouts, and optional MessagePack serialization. All requests are made via a `RequestOptions<TBody>` configuration object so callers never construct `HttpRequestMessage` by hand.
-
-### RestHelpers Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-#### RestRequest
-
-Sends a request and returns a deserialized response, or `null` on failure.
-
-```cs
-using CommonNetFuncs.Web.Requests.Rest;
-
-RestHelpers rest = new();
-
-MyResponse? response = await rest.RestRequest<MyResponse, MyBody>(
-    new RequestOptions<MyBody>
-    {
-        Url = "https://api.example.com/items",
-        HttpMethod = HttpMethod.Post,
-        BodyObject = new MyBody { Name = "Widget" },
-        BearerToken = "my-token",
-        Timeout = 30, // seconds
-    }
-);
-```
-
-#### StreamingRestRequest
-
-Streams a newline-delimited JSON (NDJSON) response as an `IAsyncEnumerable<T>`, useful for large or server-sent data sets.
-
-```cs
-await foreach (MyItem? item in rest.StreamingRestRequest<MyItem, object?>(
-    new RequestOptions<object?> { Url = "https://api.example.com/stream", HttpMethod = HttpMethod.Get }))
-{
-    if (item is not null) Process(item);
-}
-```
-
-#### RestRequestObject
-
-Returns a `RestObject<TResponse>` wrapping both the deserialized response and the raw `HttpResponseMessage`, giving access to status codes and headers.
-
-```cs
-RestObject<MyResponse> result = await rest.RestRequestObject<MyResponse, object?>(
-    new RequestOptions<object?> { Url = "https://api.example.com/items/1", HttpMethod = HttpMethod.Get }
-);
-
-if (result.Response?.IsSuccessStatusCode == true)
-{
-    MyResponse? data = result.Result;
-}
-```
-
-</details>
-
----
-
-## RestHelpersWrapper
-
-A higher-level HTTP client facade built on top of `RestHelpers`. It adds automatic retry/resilience logic, bearer token management (including automatic refresh on 401/403), and support for a shared `RestHelperOptionsDefaultConfig` that applies common settings across all calls made through the same wrapper instance.
-
-### RestHelpersWrapper Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-#### Basic Usage
-
-Make typed HTTP calls with built-in retry and resilience without manually constructing `HttpRequestMessage`.
-
-```cs
-using CommonNetFuncs.Web.Requests.Rest.Options;
-using CommonNetFuncs.Web.Requests.Rest.RestHelperWrapper;
-
-RestHelpersWrapper wrapper = new(restClientFactory);
-
-// GET
-MyResponse? item = await wrapper.Get<MyResponse>(
-    new RestHelperOptions("api/items/1", "MyApi",
-        ResilienceOptions: new ResilienceOptions(MaxRetry: 3, RetryDelay: 500)));
-
-// POST
-MyResponse? created = await wrapper.PostRequest(
-    new RestHelperOptions("api/items", "MyApi"),
-    new MyRequest { Name = "Widget" });
-
-// PATCH (diffs old vs new and sends only changed fields)
-MyResponse? updated = await wrapper.PatchRequest(
-    new RestHelperOptions("api/items/1", "MyApi"), newModel, oldModel);
-
-// DELETE
-MyResponse? deleted = await wrapper.DeleteRequest<MyResponse>(
-    new RestHelperOptions("api/items/1", "MyApi"));
-```
-
-#### RestHelperOptionsDefaultConfig
-
-`RestHelperOptionsDefaultConfig` lets you define fallback values applied to every call made through a `RestHelpersWrapper` instance. Per-call options always take precedence; defaults only fill in what is `null` on the per-call `RestHelperOptions` (except `UseBearerToken`, which always overrides when non-`null`).
-
-| Property                               | Behavior                                                     |
-| -------------------------------------- | ------------------------------------------------------------ |
-| `UseBearerToken`                       | When non-`null`, always overrides the per-call value         |
-| `ResilienceOptions.GetBearerTokenFunc` | Fills in if the per-call options has no `GetBearerTokenFunc` |
-| `JsonSerializerOptions`                | Fills in if `null` on the per-call options                   |
-| `MsgPackOptions`                       | Fills in if `null` on the per-call options                   |
-| `CompressionOptions`                   | Fills in if `null` on the per-call options                   |
-
-```cs
-using CommonNetFuncs.Web.Requests;
-using CommonNetFuncs.Web.Requests.Rest.Options;
-using CommonNetFuncs.Web.Requests.Rest.RestHelperWrapper;
-
-RestHelperOptionsDefaultConfig defaultConfig = new()
-{
-    // Always enforce bearer token auth for every call through this wrapper.
-    // When non-null, overrides the per-call UseBearerToken value.
-    UseBearerToken = true,
-
-    // Token retrieval function. Receives the API name and a flag indicating whether
-    // a forced refresh is required (set automatically after a 401/403 response).
-    ResilienceOptions = new ResilienceOptions(
-        MaxRetry: 3,
-        RetryDelay: 500,
-        GetBearerTokenFunc: async (apiName, forceRefresh) =>
-            await tokenProvider.GetTokenAsync(apiName, forceRefresh)
-    ),
-
-    // Default JSON options applied when not specified per call
-    JsonSerializerOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
-
-    // Default compression applied when not specified per call
-    CompressionOptions = new CompressionOptions(UseCompression: true, CompressionType: ECompressionType.Gzip)
-};
-
-RestHelpersWrapper wrapper = new(restClientFactory, defaultConfig);
-
-// Auth, serializer, and compression settings are applied automatically -
-// no need to repeat them on every call.
-MyResponse? result = await wrapper.Get<MyResponse>(new RestHelperOptions("api/items", "MyApi"));
-```
-
-#### Dependency Injection Setup
-
-Register `RestHelperOptionsDefaultConfig` as a singleton. The DI container automatically injects it into `RestHelpersWrapper` via its two-parameter constructor when present; without it, the single-parameter constructor is used and no defaults are applied.
-
-```cs
-using CommonNetFuncs.Web.Requests.Rest.Options;
-using CommonNetFuncs.Web.Requests.Rest.RestHelperWrapper;
-
-// In Program.cs / Startup.cs
-
-// 1. Register your token provider (if using bearer token auth)
-builder.Services.AddSingleton<ITokenProvider, MyTokenProvider>();
-
-// 2. Register the default config, resolving dependencies from the container
-builder.Services.AddSingleton(sp =>
-{
-    ITokenProvider tokenProvider = sp.GetRequiredService<ITokenProvider>();
-    return new RestHelperOptionsDefaultConfig
-    {
-        UseBearerToken = true,
-        ResilienceOptions = new ResilienceOptions(
-            MaxRetry: 3,
-            RetryDelay: 500,
-            GetBearerTokenFunc: (apiName, forceRefresh) =>
-                tokenProvider.GetTokenAsync(apiName, forceRefresh)
-        ),
-        JsonSerializerOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-    };
-});
-
-// 3. Register the named HttpClient, IRestClientFactory, and RestHelpersWrapper
-builder.Services.AddRestClient("MyApi", client =>
-    client.BaseAddress = new Uri("https://api.example.com/"));
-
-// 4. Inject RestHelpersWrapper wherever needed
-public class MyService(RestHelpersWrapper wrapper)
-{
-    public async Task<MyResponse?> GetItemAsync(int id) =>
-        await wrapper.Get<MyResponse>(new RestHelperOptions($"api/items/{id}", "MyApi"));
-
-    public async Task<MyResponse?> CreateItemAsync(MyRequest request) =>
-        await wrapper.PostRequest(new RestHelperOptions("api/items", "MyApi"), request);
-}
-```
-
-> **Tip:** When only sharing serializer or compression defaults without authentication, omit `UseBearerToken` (or leave it `null`) and no bearer token logic is applied.
-
-</details>
-
----
-
-## MessagePack Streaming
-
-True streaming support for MessagePack serialization in ASP.NET Core APIs. While MessagePack cannot directly serialize `IAsyncEnumerable<T>`, this infrastructure writes individual MessagePack-serialized items to the response stream, allowing clients to reconstruct the stream on their end.
-
-<a name="messagepack-streaming-overview"></a>
-
-### Overview
-
-**How It Works:**
-
-**Server Side:**
-
-1. Returns `IActionResult` via `this.StreamMessagePack()` extension method (Controller pattern) or `MessagePackStreaming.Stream()` (Minimal API pattern)
-2. `MessagePackStreamingResult` iterates through the `IAsyncEnumerable<T>`
-3. Each item is serialized individually with MessagePack
-4. Serialized bytes are written directly to response stream and flushed
-5. Creates a concatenated sequence of MessagePack structures
-
-**Client Side:**
-
-- The existing `ReadResponseStreamAsync` method in `RestHelpersStatic.cs` already handles this!
-- Uses `MessagePackStreamReader` to read MessagePack structures one at a time
-- Reconstructs them back into `IAsyncEnumerable<T>`
-- **No client-side changes needed** - existing `StreamingRestRequest()` calls work as-is with `MsgPackHeaders`
-
-**Benefits:**
-
-- ✅ True streaming: Data flows item-by-item, not loaded entirely into memory
-- ✅ Memory efficient: Both server and client process items as they arrive
-- ✅ Binary efficiency: MessagePack provides compact serialization
-- ✅ No breaking changes: Existing client code continues to work
-- ✅ Transparent: Clients don't need to know about the chunking mechanism
-- ✅ Works with both Controllers and Minimal APIs
-
-> **⚠️ MemoryPack Limitation:** Unlike MessagePack, **MemoryPack.Streaming does NOT support true server-side streaming** of `IAsyncEnumerable<T>` because its wire format requires knowing the total item count up-front. For true streaming scenarios, use MessagePack.
-
-### MessagePack Streaming Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-#### Server-Side Controller
-
-```cs
-using CommonNetFuncs.Web.Requests.MessagePack;
-using Microsoft.AspNetCore.Mvc;
-
-[ApiController]
-[Route("api/[controller]")]
-public class DataController : ControllerBase
-{
-    private readonly IDataService _dataService;
-
-    public DataController(IDataService dataService)
-    {
-        _dataService = dataService;
-    }
-
-    // Basic usage with defaults (200 OK when data, 204 No Content when empty)
-    [HttpGet]
-    public IActionResult GetStreamingData()
-    {
-        // When MessagePack MVC formatters are registered, their configured SerializerOptions are used automatically.
-        return this.StreamMessagePack(_dataService.GetDataAsyncEnumerable());
-    }
-
-    // With custom MessagePack options
-    [HttpGet("compressed")]
-    public IActionResult GetStreamingDataCompressed()
-    {
-        var options = MessagePackSerializerOptions.Standard
-            .WithCompression(MessagePackCompression.Lz4BlockArray);
-
-        return this.StreamMessagePack(_dataService.GetDataAsyncEnumerable(), options);
-    }
-
-    // With custom status codes
-    [HttpGet("custom-status")]
-    public IActionResult GetStreamingDataCustomStatus()
-    {
-        return this.StreamMessagePack(
-            _dataService.GetDataAsyncEnumerable(),
-            successStatusCode: 200,  // Custom success code
-            emptyStatusCode: 204     // Custom empty code
-        );
-    }
-}
-```
-
-#### Minimal API Usage
-
-For Minimal APIs, use the static `MessagePackStreaming.Stream` helper instead of the controller extension:
-
-```cs
-using CommonNetFuncs.Web.Requests.MessagePack;
-using MessagePack;
-
-var builder = WebApplication.CreateBuilder(args);
-var app = builder.Build();
-
-// Basic usage with defaults
-app.MapGet("/api/data", (IDataService dataService) =>
-{
-    return MessagePackStreaming.Stream(dataService.GetDataAsyncEnumerable());
-});
-
-// With custom MessagePack options (compression)
-app.MapGet("/api/data/compressed", (IDataService dataService) =>
-{
-    var options = MessagePackSerializerOptions.Standard
-        .WithCompression(MessagePackCompression.Lz4BlockArray);
-
-    return MessagePackStreaming.Stream(dataService.GetDataAsyncEnumerable(), options);
-});
-
-// With custom status codes
-app.MapGet("/api/data/custom-status", (IDataService dataService) =>
-{
-    return MessagePackStreaming.Stream(
-        dataService.GetDataAsyncEnumerable(),
-        successStatusCode: 202,  // Accepted instead of OK
-        emptyStatusCode: 404     // Not Found instead of No Content
-    );
-});
-
-app.Run();
-```
-
-**Both the controller extension (`this.StreamMessagePack`) and the Minimal API helper (`MessagePackStreaming.Stream`) use the same underlying `MessagePackStreamingResult<T>` implementation, ensuring consistent behavior across both patterns.**
-
-When `messagePackOptions` is omitted, the result uses the options configured on a
-registered MVC `MessagePackOutputFormatter` if one is available. This applies the
-MVC formatter's compression, security, and resolver settings without repeating
-them at each call site. Explicitly supplied options continue to take precedence.
-If no MVC MessagePack formatter is registered, `MessagePackSerializerOptions.Standard`
-is used.
-
-#### Client-Side Usage
-
-No changes needed! Use existing `StreamingRestRequest` with MessagePack headers:
-
-```cs
-using CommonNetFuncs.Web.Requests.Rest;
-using static CommonNetFuncs.Web.Requests.Rest.RestHelperConstants;
-
-RestHelpers rest = new();
-
-// Stream data with MessagePack
-List<MyModel> results = [];
-await foreach (MyModel? item in rest.StreamingRestRequest<MyModel, object?>(
-    new RequestOptions<object?>
-    {
-        Url = "https://api.example.com/api/Data",
-        HttpMethod = HttpMethod.Get,
-        HttpHeaders = MsgPackHeaders  // This triggers MessagePack streaming
-    }))
-{
-    if (item != null)
-    {
-        results.Add(item);
-    }
-}
-```
-
-Or use LINQ to materialize directly:
-
-```cs
-List<MyModel> model = await rest.StreamingRestRequest<MyModel, object?>(
-    new RequestOptions<object?>
-    {
-        Url = "https://api.example.com/api/Data",
-        HttpMethod = HttpMethod.Get,
-        HttpHeaders = MsgPackHeaders
-    })
-    .Where(x => x != null)
-    .Select(x => x!)
-    .ToListAsync();
-```
-
-**Comparison with Other Serializers:**
-
-| Serializer  | Supports IAsyncEnumerable | Native Streaming | Binary Format |
-| ----------- | ------------------------- | ---------------- | ------------- |
-| JSON        | ✅ Yes (array)            | ✅ Yes           | ❌ No         |
-| MemoryPack  | ✅ Yes (native)           | ✅ Yes           | ✅ Yes        |
-| MessagePack | ✅ Yes (via extension)    | ✅ Yes (custom)  | ✅ Yes        |
-
-</details>
-
----
-
-## PatchCreator
-
-Creates a Newtonsoft.Json `JsonPatchDocument` by diffing two objects of the same type. Compares property values and generates `add`, `remove`, and `replace` operations for every changed field, including nested objects.
-
-### PatchCreator Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-#### CreatePatch
-
-```cs
-using CommonNetFuncs.Web.Requests;
-using Microsoft.AspNetCore.JsonPatch;
-
-MyEntity original = await GetFromDb(id);
-MyEntity modified = original with { Name = "New Name", Price = 9.99m };
-
-JsonPatchDocument patch = PatchCreator.CreatePatch(original, modified);
-// patch.Operations => [ { op: "replace", path: "/Name", value: "New Name" }, { op: "replace", path: "/Price", value: 9.99 } ]
-
-// Send via REST
-await rest.RestRequest<MyEntity, HttpContent>(
-    new RequestOptions<HttpContent>
-    {
-        Url = $"https://api.example.com/items/{id}",
-        HttpMethod = HttpMethod.Patch,
-        PatchDocument = patch.ToStringContent(),
-    }
-);
-```
-
-</details>
-
----
-
-## DistributedCacheExtensions
-
-Generic `IDistributedCache` extension methods for storing and retrieving strongly-typed objects serialized with System.Text.Json.
-
-### DistributedCacheExtensions Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-```cs
-using CommonNetFuncs.Web.Requests;
-
-// Store
-await cache.SetAsync("user:42", myUser, new DistributedCacheEntryOptions
-{
-    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
-});
-
-// Retrieve synchronously
-if (cache.TryGetValue("user:42", out MyUser? user))
-{
-    // cache hit
-}
-
-// Retrieve asynchronously
-MyUser? user = await cache.TryGetValueAsync<MyUser>("user:42");
-```
-
-</details>
-
----
-
-## JsonPatchFormatter
-
-Provides a pre-configured `NewtonsoftJsonPatchInputFormatter` for use with MVC controller-based APIs that accept `JsonPatchDocument<T>` as a request body. Insert it as the first input formatter so Newtonsoft.Json handles JSON Patch deserialization while the rest of the pipeline uses System.Text.Json.
-
-### JsonPatchFormatter Usage Examples
-
-<details>
-<summary><h3>Usage Examples</h3></summary>
-
-```cs
-using CommonNetFuncs.Web.Requests;
-
-builder.Services.AddControllers(options =>
-{
-    options.InputFormatters.Insert(0, JsonPatchFormatter.JsonPatchInputFormatter());
-});
-```
-
-</details>
+- [Installation](#installation)
+- [Direct REST helpers](#direct-rest-helpers)
+- [Request and response contracts](#request-and-response-contracts)
+- [Dependency-injected REST wrapper](#dependency-injected-rest-wrapper)
+- [Response stream readers and chunking](#response-stream-readers-and-chunking)
+- [MessagePack/NDJSON server streaming](#messagepackndjson-server-streaming)
+- [JSON Patch](#json-patch)
+- [Distributed cache extensions](#distributed-cache-extensions)
+- [Other public models](#other-public-models)
+- [License](#license)
 
 ## Installation
-
-Install via NuGet:
 
 ```bash
 dotnet add package CommonNetFuncs.Web.Requests
 ```
 
+## Direct REST helpers
+
+The direct APIs are:
+
+- `RestHelpersStatic` extension methods on `HttpClient`
+- `IRestHelpersCommon`, `RestHelpersCommon`, and `RestHelpersCommonFactory`
+- `RestHelpers`, a convenience instance backed by one shared `SocketsHttpHandler`
+
+`RestHelpers` shares one static `HttpClient` for all instances. Its handler has `MaxConnectionsPerServer = 100`, keep-alive pings every 15 seconds, and a 60-second ping timeout. That connection count is not an application-level concurrency or rate limit. The client's own timeout is infinite; every helper request is guarded by the linked per-request timeout in `RequestOptions.Timeout`.
+
+The public `RestHelpersStatic.defaultJsonSerializerOptions` field ignores reference cycles and matches JSON property names case-insensitively.
+
+For `Timeout is null` or `<= 0`, the helper uses **100 seconds**. A caller cancellation token is linked to that timeout. The convenience `RestHelpers` methods catch/log request and cancellation failures and generally return `default`, an empty object, or an empty stream instead of propagating them.
+
+For a complete request, that timer covers reading the response body because it uses `ResponseContentRead`. Streaming methods use `ResponseHeadersRead`; the linked timeout source is disposed after headers arrive, so the body enumeration itself is governed by the caller's cancellation token rather than by the original `RequestOptions.Timeout`.
+
+### Call all direct helper overloads
+
+```csharp
+using CommonNetFuncs.Web.Requests.Rest;
+
+HttpClient client = new();
+RestHelpers rest = new();
+using CancellationTokenSource cts = new();
+
+RequestOptions<CreateItem> create = new()
+{
+    Url = "https://api.example.test/items",
+    HttpMethod = HttpMethod.Post,
+    BodyObject = new CreateItem("new item"),
+    Timeout = 30,
+    BearerToken = "access-token"
+};
+
+// HttpClient extension
+Item? extensionResult =
+    await client.RestRequest<Item, CreateItem>(create, cts.Token);
+
+// Shared-client convenience methods, through RestHelpersCommon
+Item? sharedResult =
+    await rest.RestRequest<Item, CreateItem>(create, cts.Token);
+
+await foreach (Item? item in client.StreamingRestRequest<Item, CreateItem>(
+    new()
+    {
+        Url = "https://api.example.test/items/stream",
+        HttpMethod = HttpMethod.Get
+    }, cts.Token))
+{
+    if (item is not null)
+    {
+        Console.WriteLine(item.Name);
+    }
+}
+
+await foreach (Item? item in rest.StreamingRestRequest<Item, CreateItem>(
+    new()
+    {
+        Url = "https://api.example.test/items/stream",
+        HttpMethod = HttpMethod.Get
+    }, cts.Token))
+{
+    Console.WriteLine(item?.Name);
+}
+```
+
+`RestRequest` uses `ResponseContentRead`. POST and PUT serialize `BodyObject`; PATCH uses `PatchDocument`; other methods do not add a body. JSON is the default body format. Explicit `Content-Type: application/x-memorypack` or `application/x-msgpack` switches body serialization. A PATCH content's media type is forced to `application/json-patch+json`.
+
+### Inspect status, headers, and result
+
+Use the object APIs when the HTTP response matters. `RestObject<T>` contains `Result`, `Response`, and `Error`; the current REST implementation populates `Result` and `Response` and does not assign `Error` from HTTP failures.
+
+```csharp
+using CommonNetFuncs.Web.Requests.Rest;
+
+RequestOptions<object?> getOne = new()
+{
+    Url = "https://api.example.test/items/1",
+    HttpMethod = HttpMethod.Get,
+    Timeout = 30
+};
+
+RestObject<Item> raw = await client.RestObjectRequest<Item, object?>(
+    getOne, cancellationToken);
+try
+{
+    if (raw.Response?.IsSuccessStatusCode == true)
+    {
+        Item? item = raw.Result;
+    }
+    else
+    {
+        Console.WriteLine(raw.Response?.StatusCode);
+    }
+}
+finally
+{
+    raw.Response?.Dispose();
+}
+
+RestObject<Item> convenience = await rest.RestRequestObject<Item, object?>(
+    getOne, cancellationToken);
+convenience.Response?.Dispose();
+
+StreamingRestObject<Item> streaming =
+    await client.StreamingRestObjectRequest<Item, object?>(
+        new()
+        {
+            Url = "https://api.example.test/items/stream",
+            HttpMethod = HttpMethod.Get
+        }, cancellationToken);
+try
+{
+    if (streaming.Result is not null)
+    {
+        await foreach (Item? item in streaming.Result.WithCancellation(cancellationToken))
+        {
+            Console.WriteLine(item?.Name);
+        }
+    }
+}
+finally
+{
+    // Streaming object requests transfer response lifetime to the caller.
+    streaming.Response?.Dispose();
+}
+
+StreamingRestObject<Item> convenienceStreaming =
+    await rest.StreamingRestRequestObject<Item, object?>(
+        new()
+        {
+            Url = "https://api.example.test/items/stream",
+            HttpMethod = HttpMethod.Get
+        }, cancellationToken);
+try
+{
+    // consume convenienceStreaming.Result
+}
+finally
+{
+    convenienceStreaming.Response?.Dispose();
+}
+```
+
+`RestHelpersCommonFactory` creates either the factory's default `HttpClient` or a named client and delegates all four common methods. It implements `IDisposable` and disposes that created client; dispose the factory wrapper when it is no longer needed. Do not dispose factory-managed shared clients per request.
+
+```csharp
+using CommonNetFuncs.Web.Requests.Rest;
+using Microsoft.Extensions.DependencyInjection;
+
+ServiceCollection services = new();
+services.AddHttpClient("catalog");
+using ServiceProvider provider = services.BuildServiceProvider();
+IHttpClientFactory factory = provider.GetRequiredService<IHttpClientFactory>();
+
+using RestHelpersCommonFactory catalog = new(factory, "catalog");
+Item? item = await catalog.RestRequest<Item, object?>(
+    new() { Url = "items/1" }, cancellationToken);
+
+await foreach (Item? streamed in catalog.StreamingRestRequest<Item, object?>(
+    new() { Url = "items/stream" }, cancellationToken))
+{
+    Console.WriteLine(streamed?.Name);
+}
+
+RestObject<Item> factoryObject =
+    await catalog.RestRequestObject<Item, object?>(
+        new() { Url = "items/1" }, cancellationToken);
+factoryObject.Response?.Dispose();
+
+StreamingRestObject<Item> factoryStream =
+    await catalog.StreamingRestRequestObject<Item, object?>(
+        new() { Url = "items/stream" }, cancellationToken);
+factoryStream.Response?.Dispose();
+```
+
+## Request and response contracts
+
+### `RequestOptions<TBody>`
+
+| Property | Meaning |
+| --- | --- |
+| `Url` | Absolute or relative request URL; nullability is suppressed, so validate it before sending. |
+| `RedactedUrl` | Read-only URL with every query value replaced by `<REDACTED>`; malformed URLs produce `<Error Redacting URL>`. |
+| `HttpMethod` | Defaults to GET. |
+| `BodyObject` | POST/PUT body. |
+| `PatchDocument` | PATCH `HttpContent`. |
+| `BearerToken` | Adds an `Authorization: Bearer ...` header. |
+| `HttpHeaders` | Custom request headers. |
+| `Timeout` | Per-request seconds; null/nonpositive uses 100 seconds. |
+| `JsonSerializerOptions` | System.Text.Json response/options and JSON request-body configuration where supported. |
+| `UseNewtonsoftDeserializer` | Uses Newtonsoft.Json for JSON responses instead of System.Text.Json. |
+| `MessagePackSerializerOptions` | MessagePack request/response options. |
+| `LogRequest`, `LogBody`, `LogQuery`, `LogResponse` | Opt-in logging controls. Query redaction is used unless `LogQuery` is true. |
+| `ExpectTaskCancellation` | Logs cancellation as expected instead of as an error. |
+
+Logging a body, query, response, or custom header can expose secrets. Keep these flags disabled in production unless the logged data is known to be safe.
+
+```csharp
+using System.Text.Json;
+using CommonNetFuncs.Web.Requests.Rest;
+
+RequestOptions<CreateItem> options = new()
+{
+    Url = "https://api.example.test/items?tenant=42",
+    HttpMethod = HttpMethod.Post,
+    BodyObject = new("new item"),
+    BearerToken = token,
+    Timeout = 15,
+    HttpHeaders = new Dictionary<string, string>
+    {
+        ["Content-Type"] = "application/json",
+        ["Accept"] = "application/json"
+    },
+    JsonSerializerOptions = new(JsonSerializerDefaults.Web),
+    UseNewtonsoftDeserializer = false,
+    ExpectTaskCancellation = false,
+    LogRequest = true,
+    LogBody = false,
+    LogQuery = false,
+    LogResponse = false
+};
+
+string displayUrl = options.RedactedUrl;
+```
+
+### Response types
+
+`RestObject<T>` is mutable and carries `Result`, `Response`, and `Error`. `StreamingRestObject<T>` carries `Result` and `Response`. A caller must keep the response alive while consuming a stream and dispose it afterward. The direct convenience `StreamingRestRequest` manages/disposes its own response; object-returning calls do not.
+
+```csharp
+RestObject<Item> one = new()
+{
+    Result = new Item("cached"),
+    Response = null,
+    Error = null
+};
+
+StreamingRestObject<Item> many = new()
+{
+    Result = GetItemsAsync(),
+    Response = null
+};
+```
+
+### Header constants
+
+`RestHelperConstants` exposes:
+
+- `EDelayBackoffType`: `Constant`, `Linear`, `Exponential`
+- header names `ContentTypeHeader`, `AcceptEncodingHeader`, `AcceptHeader`
+- individual `KeyValuePair` headers `NoEncodingHeader`, `BrotliEncodingHeader`, `GzipEncodingHeader`, `MemPackContentHeader`, `MsgPackContentHeader`, `JsonContentHeader`, `MemPackAcceptHeader`, `MsgPackAcceptHeader`, and `JsonAcceptHeader`
+- immutable dictionaries `JsonHeaders`, `JsonNoEncodeHeaders`, `MemPackHeaders`, and `MsgPackHeaders`
+
+```csharp
+using static CommonNetFuncs.Web.Requests.Rest.RestHelperConstants;
+
+RequestOptions<object?> binaryRequest = new()
+{
+    Url = "https://api.example.test/items/stream",
+    HttpHeaders = MsgPackHeaders,
+    MessagePackSerializerOptions = MessagePackSerializerOptions.Standard
+};
+
+EDelayBackoffType backoff = EDelayBackoffType.Exponential;
+```
+
+## Dependency-injected REST wrapper
+
+`RestHelpersWrapper` provides convenience methods plus response-based retry and bearer-token refresh. It requires an `IRestClientFactory`; the normal implementation wraps `IHttpClientFactory`.
+
+The public constructors are:
+
+```csharp
+RestHelpersWrapper basic = new(restClientFactory);
+RestHelpersWrapper configured = new(restClientFactory, defaultConfig);
+```
+
+### Register services
+
+All three `AddRestClient` overloads in `ServiceCollectionExtensions` also call `AddRestClientFactory` and `AddRestHelpersWrapper`; `AddRestClientFactory` and `AddRestHelpersWrapper` can be called independently when configuring the named client elsewhere.
+
+```csharp
+using CommonNetFuncs.Web.Requests.Rest.RestHelperWrapper;
+
+builder.Services.AddRestClientFactory();
+builder.Services.AddRestHelpersWrapper();
+
+builder.Services.AddRestClient("catalog");
+builder.Services.AddRestClient("with-base",
+    client => client.BaseAddress = new Uri("https://api.example.test/"));
+builder.Services.AddRestClient("with-services", (sp, client) =>
+{
+    client.BaseAddress = sp.GetRequiredService<ApiConfiguration>().BaseUri;
+});
+```
+
+`AddRestClientFactory` and `AddRestHelpersWrapper` use `TryAddSingleton`, so they do not replace an existing registration. The wrapper is mutable only in that it may fill missing fields on a passed `RestHelperOptions`; register it at an appropriate lifetime for the app.
+
+The lower-level interfaces can be implemented for tests:
+
+```csharp
+IRestClient namedClient = restClientFactory.CreateClient("catalog");
+Uri? baseAddress = namedClient.BaseAddress;
+RestObject<Item> objectResult = await namedClient.RestObjectRequest<Item, object?>(
+    new() { Url = "items/1" }, cancellationToken);
+StreamingRestObject<Item> streamResult =
+    await namedClient.StreamingRestObjectRequest<Item, object?>(
+        new() { Url = "items" }, cancellationToken);
+```
+
+The package's concrete implementations are `RestClient`, which wraps one `HttpClient`, and `RestClientFactory`, which creates one `RestClient` from a named `IHttpClientFactory` client:
+
+```csharp
+using CommonNetFuncs.Web.Requests.Rest.RestHelperWrapper;
+
+RestClient directClient = new(client);
+RestClientFactory concreteFactory = new(httpClientFactory);
+IRestClient created = concreteFactory.CreateClient("catalog");
+```
+
+### Wrapper options
+
+`RestHelperOptions` validates `ApiName` and `Url` as nonempty. If `UseBearerToken` is true, the constructor also requires either a token or `ResilienceOptions.GetBearerTokenFunc`.
+
+```csharp
+using CommonNetFuncs.Web.Requests.Rest.Options;
+using static CommonNetFuncs.Compression.Streams;
+
+RestHelperOptions getOptions = new(
+    Url: "items/1",
+    ApiName: "catalog",
+    HttpHeaders: new Dictionary<string, string> { ["X-Correlation-Id"] = "abc" },
+    UseBearerToken: true,
+    BearerToken: "access-token",
+    UseNewtonsoftDeserializer: false,
+    LogQuery: false,
+    LogBody: false,
+    CompressionOptions: new(UseCompression: true, CompressionType: ECompressionType.Gzip),
+    MessagePackSerializerOptions: null,
+    JsonSerializerOptions: new JsonSerializerOptions(JsonSerializerDefaults.Web),
+    ResilienceOptions: new(MaxRetry: 3));
+```
+
+`RestHelperOptionsDefaultConfig` has `UseBearerToken`, `CompressionOptions`, `MessagePackSerializerOptions`, `JsonSerializerOptions`, and `ResilienceOptions`. The wrapper:
+
+- always overrides per-call `UseBearerToken` when the default is non-null;
+- fills null JSON, MessagePack, and compression options;
+- when it creates or receives `ResilienceOptions`, fills only a missing `GetBearerTokenFunc` from the default.
+
+It does **not** merge default retry count, delay, timeout, backoff, or retry predicates into a per-call resilience object.
+
+```csharp
+RestHelperOptionsDefaultConfig defaults = new()
+{
+    UseBearerToken = true,
+    JsonSerializerOptions = new(JsonSerializerDefaults.Web),
+    ResilienceOptions = new(
+        GetBearerTokenFunc: (api, forceRefresh) =>
+            ValueTask.FromResult(tokenProvider.Get(api, forceRefresh)))
+};
+builder.Services.AddSingleton(defaults);
+```
+
+`CompressionOptions` has `UseCompression`, nullable `CompressionType`, `UseMemPack`, and `UseMsgPack`. It controls generated `Content-Type`, `Accept`, and `Accept-Encoding` headers. Compression request bodies are **not** compressed by these options: the headers select response/media behavior, while `ReadResponseStream` handles GZip/Brotli responses.
+
+```csharp
+using static CommonNetFuncs.Compression.Streams;
+
+CompressionOptions ordinary = new();
+CompressionOptions msgpackBrotli = new(
+    UseCompression: true,
+    CompressionType: ECompressionType.Brotli,
+    UseMemPack: false,
+    UseMsgPack: true);
+```
+
+### Retry configuration and exact semantics
+
+`ResilienceOptions` defaults:
+
+| Setting | Default |
+| --- | --- |
+| `MaxRetry` | 10 (implemented as maximum total attempts) |
+| `RetryDelay` | 1000 ms |
+| `TimeoutValue` | 100 seconds; null/negative also becomes 100 seconds; zero remains zero |
+| `DelayBackoffType` | Constant |
+| `UseJitter` | true |
+| `RunOnce`, `NullOk` | false |
+
+`ShouldRetryByStatusFunc` can explicitly decide by status. Despite its name, `ShouldRetryFunc` is used as a stop condition: a `true` result stops retries. Default retries apply to 401, 403, 408, 429, and selected 5xx/network-authentication statuses. 400/404/405/406/409/410/422 and other statuses do not retry. A response with no status because the underlying helper failed is not retried by the wrapper.
+
+Constant, linear, and exponential delays are calculated from `RetryDelay`; jitter can adjust each delay by about ±25% (the current helper also applies jitter while constructing the constant delay, so constant+jitter has two jitter adjustments).
+
+The exponential formula is `RetryDelay.TotalMilliseconds ^ attemptNumber`, rather than a conventional doubling sequence, so verify the resulting durations before enabling it. The wrapper converts exceptions it catches—including cancellation during its retry delay—to `HttpRequestException`.
+
+Bearer token retrieval receives `(ApiName, forceRefresh)`. Force refresh becomes true on a retry. The current token is reused unless a 401/403 was received.
+
+```csharp
+ResilienceOptions retries = new(
+    MaxRetry: 3,
+    RetryDelay: 250,
+    TimeoutValue: 20,
+    RunOnce: false,
+    NullOk: false,
+    ShouldRetryByStatusFunc: status =>
+        status is HttpStatusCode.RequestTimeout
+            or HttpStatusCode.TooManyRequests
+            or HttpStatusCode.ServiceUnavailable,
+    DelayBackoffType: EDelayBackoffType.Exponential,
+    UseJitter: true,
+    ShouldRetryFunc: (response, options) =>
+        response?.StatusCode == HttpStatusCode.NotImplemented,
+    GetBearerTokenFunc: async (api, refresh) =>
+        await tokenStore.GetAsync(api, refresh));
+```
+
+Retries can duplicate non-idempotent POST requests. Retry only idempotent operations or operations protected by an idempotency key/strategy.
+
+### Every wrapper method
+
+`PostRequest<TBody>` expects the response to have the same type as the body. Use `GenericPostRequest<TResponse,TBody>` for different types. Patch first creates a diff and returns the new model without sending a request when there are no operations.
+
+```csharp
+RestHelpersWrapper wrapper = new(restClientFactory, defaults);
+RestHelperOptions items = new("items", "catalog");
+RestHelperOptions one = new("items/1", "catalog");
+
+Item? get = await wrapper.Get<Item>(one, cancellationToken);
+
+await foreach (Item? row in wrapper.GetStreaming<Item>(
+    new("items/stream", "catalog"), cancellationToken))
+{
+    Console.WriteLine(row?.Name);
+}
+
+Item? createdSameType = await wrapper.PostRequest(items, new Item("one"), cancellationToken);
+
+await foreach (Item? row in wrapper.PostRequestStreaming(
+    new("items/search-stream", "catalog"), new Item("filter"), cancellationToken))
+{
+    Console.WriteLine(row?.Name);
+}
+
+CreateResult? result = await wrapper.GenericPostRequest<CreateResult, CreateItem>(
+    items, new CreateItem("one"), cancellationToken);
+
+await foreach (Item? row in wrapper.GenericPostRequestStreaming<Item, CreateItem>(
+    new("items/search-stream", "catalog"), new CreateItem("filter"), cancellationToken))
+{
+    Console.WriteLine(row?.Name);
+}
+
+string? text = await wrapper.StringPostRequest(
+    new("items/echo", "catalog"), new CreateItem("one"), cancellationToken);
+
+Item? patched = await wrapper.PatchRequest(
+    one, currentItem, originalItem, cancellationToken);
+
+Item? replaced = await wrapper.PutRequest(
+    one, replacementItem, cancellationToken);
+
+Item? deleted = await wrapper.DeleteRequest<Item>(
+    one, cancellationToken);
+```
+
+The wrapper methods return only `Result`, so callers do not receive status or headers; choose `IRestClient` or `HttpClient`/`RestObject` when those are required. Streaming wrapper methods do not expose their `HttpResponseMessage` to the caller, so consume the enumerator promptly and do not retain it past the request operation. The retry loop also does not explicitly dispose the `HttpResponseMessage` objects held by `RestObject`/`StreamingRestObject`, including failed-attempt responses; this matters for long-lived callers and is a current ownership limitation of the wrapper.
+
+## Response stream readers and chunking
+
+### Read a complete response
+
+`ReadResponseStream<TResponse>` recognizes:
+
+- exact MessagePack content type `application/x-msgpack`;
+- exact MemoryPack `application/x-memorypack`;
+- content types containing `json`;
+- content types containing `text`;
+
+GZip and Brotli response encodings are decompressed for JSON, MemoryPack, and text. MessagePack is assumed to have its own serializer compression. Deserialization/parsing exceptions are logged and result in `default`; the method does not throw most content errors. A seekable stream with length at most one returns default.
+
+```csharp
+await using Stream complete = File.OpenRead("item.bin");
+Item? decoded = await complete.ReadResponseStream<Item>(
+    contentType: "application/x-msgpack",
+    contentEncoding: null,
+    useNewtonsoftDeserializer: false,
+    jsonSerializerOptions: null,
+    messagePackSerializerOptions: MessagePackSerializerOptions.Standard,
+    cancellationToken: cancellationToken);
+```
+
+For JSON this can instead use Newtonsoft:
+
+```csharp
+Item? fromJson = await jsonStream.ReadResponseStream<Item>(
+    "application/json; charset=utf-8",
+    "gzip",
+    useNewtonsoftDeserializer: true,
+    cancellationToken: cancellationToken);
+```
+
+The complete-reader caller retains ownership of the input stream except where a `StreamReader` is used for text (that reader disposes its source); do not reuse the stream after calling it with text. Dispose decompressed/request streams when the helper no longer needs them.
+
+### Read an asynchronous stream
+
+`ReadResponseStreamAsync` supports MessagePack as a concatenated sequence of top-level values, MemoryPack streaming, and System.Text.Json async-enumerable JSON. It yields non-null items and disposes its active input/decompression stream in `finally`; the caller owns the original response/HTTP transport, and must enumerate or dispose the async enumerator promptly.
+
+```csharp
+await using Stream messagePackSequence = File.OpenRead("items.msgpack");
+await foreach (Item? item in messagePackSequence.ReadResponseStreamAsync<Item>(
+    "application/x-msgpack",
+    contentEncoding: null,
+    jsonSerializerOptions: null,
+    messagePackSerializerOptions: MessagePackSerializerOptions.Standard,
+    cancellationToken))
+{
+    Console.WriteLine(item?.Name);
+}
+```
+
+JSON call example:
+
+```csharp
+await foreach (Item? item in jsonArrayStream.ReadResponseStreamAsync<Item>(
+    "application/json",
+    contentEncoding: "br",
+    jsonSerializerOptions: new(JsonSerializerDefaults.Web),
+    cancellationToken: cancellationToken))
+{
+    Console.WriteLine(item?.Name);
+}
+```
+
+### Compute chunk sizes
+
+`GetChunkingParameters` increases `itemsPerChunk` in steps of 1000 until the number of chunks is below `bufferLimit`.
+
+```csharp
+(int perChunk, int chunks) =
+    RestHelpersStatic.GetChunkingParameters(
+        itemCount: 1_000_000,
+        startingItemsPerChunk: 10_000,
+        bufferLimit: 8192);
+```
+
+## MessagePack/NDJSON server streaming
+
+`MessagePackStreaming.Stream` and the `StreamMessagePack` extension supplied by `MessagePackStreamingExtensions` for `ControllerBase` both create the same public `MessagePackStreamingResult<T>` for an `IAsyncEnumerable<T>`.
+
+Content negotiation is:
+
+- `application/x-msgpack` or `application/msgpack` → concatenated MessagePack values;
+- `application/json`, `application/x-ndjson`, `application/*`, or `*/*` → NDJSON;
+- missing `Accept` → NDJSON;
+- anything else → 400 text response.
+
+JSON responses use `application/x-ndjson`, with each serialized item followed by `\n`. MessagePack responses use `application/x-msgpack`, and one complete MessagePack value is written/flushed per item. The result sets the success status before iteration, and uses the empty status when iteration produces no item. Client disconnect cancellation maps to status 499 when the response permits; other exceptions remain exceptions and become 500 only if the response has not started.
+
+```csharp
+using CommonNetFuncs.Web.Requests.MessagePack;
+using MessagePack;
+
+IAsyncEnumerable<Item> source = LoadItemsAsync(cancellationToken);
+
+MessagePackStreamingResult<Item> minimal =
+    MessagePackStreaming.Stream(
+        source,
+        MessagePackSerializerOptions.Standard.WithCompression(MessagePackCompression.Lz4BlockArray),
+        new JsonSerializerOptions(JsonSerializerDefaults.Web),
+        successStatusCode: StatusCodes.Status202Accepted,
+        emptyStatusCode: StatusCodes.Status204NoContent);
+
+MessagePackStreamingResult<Item> controllerResult =
+    this.StreamMessagePack(
+        source,
+        messagePackOptions: null,
+        jsonOptions: null,
+        successStatusCode: StatusCodes.Status200OK,
+        emptyStatusCode: StatusCodes.Status404NotFound);
+```
+
+Both execution entry points are public:
+
+```csharp
+MessagePackStreamingResult<Item> result =
+    MessagePackStreaming.Stream(source);
+
+await result.ExecuteAsync(httpContext);
+await result.ExecuteResultAsync(actionContext);
+```
+
+When MessagePack options are omitted, the implementation looks for an MVC `MessagePackOutputFormatter`, reflects an options field, and otherwise uses `MessagePackSerializerOptions.Standard`. Explicit options take precedence. This reflection-based lookup depends on the formatter having a field of exactly `MessagePackSerializerOptions`.
+
+Consume a MessagePack stream with the client stream API:
+
+```csharp
+RequestOptions<object?> request = new()
+{
+    Url = "https://api.example.test/items/stream",
+    HttpMethod = HttpMethod.Get,
+    HttpHeaders = RestHelperConstants.MsgPackHeaders
+};
+
+await foreach (Item? item in client.StreamingRestRequest<Item, object?>(
+    request, cancellationToken))
+{
+    Console.WriteLine(item?.Name);
+}
+```
+
+The helper does not buffer a complete stream, but MessagePack streaming and NDJSON streaming use different wire framing. Ensure the client protocol matches `application/x-msgpack` or `application/x-ndjson`; do not assume every arbitrary JSON stream is a top-level JSON array.
+
+## JSON Patch
+
+### Generate a patch
+
+`PatchCreator.CreatePatch` serializes both objects with Newtonsoft.Json, recursively compares object properties, and emits add/remove/replace operations. It accepts an optional serializer; its default settings ignore reference loops.
+
+```csharp
+using CommonNetFuncs.Web.Requests;
+using Microsoft.AspNetCore.JsonPatch;
+using Newtonsoft.Json;
+
+Item original = new("before") { Count = 1 };
+Item modified = original with { Name = "after", Count = 2 };
+
+JsonPatchDocument defaultPatch =
+    PatchCreator.CreatePatch(original, modified);
+
+JsonSerializer customSerializer = JsonSerializer.Create(
+    new JsonSerializerSettings
+    {
+        NullValueHandling = NullValueHandling.Include
+    });
+JsonPatchDocument customPatch =
+    PatchCreator.CreatePatch(original, modified, customSerializer);
+```
+
+Nested `JObject` properties are compared recursively. Arrays are compared as serialized token values and therefore generally become one `replace` operation, not element-level JSON Patch operations. Paths use serializer property names and are not JSON Pointer-escaped here; validate unusual property names and resulting paths if user-supplied serializer mappings contain `/` or `~`.
+
+### Install the MVC input formatter
+
+```csharp
+using CommonNetFuncs.Web.Requests;
+
+builder.Services.AddControllers(options =>
+    options.InputFormatters.Insert(
+        0, JsonPatchFormatter.JsonPatchInputFormatter()));
+```
+
+The formatter is backed by a newly created service provider and uses Newtonsoft's `DefaultContractResolver`, ignores reference loops, and ignores null values. Insert it ahead of competing patch formatters.
+
+## Distributed cache extensions
+
+`DistributedCacheExtensions` serializes with fixed System.Text.Json settings: Pascal/property names are unchanged, JSON is indented, trailing commas are allowed on read, and null properties are omitted when written.
+
+```csharp
+using CommonNetFuncs.Web.Requests;
+using Microsoft.Extensions.Caching.Distributed;
+
+Item cached = new("cached");
+
+await cache.SetAsync("item:1", cached);
+await cache.SetAsync(
+    "item:2",
+    cached,
+    new DistributedCacheEntryOptions
+    {
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+    });
+bool syncHit = cache.TryGetValue("item:1", out Item? syncValue);
+Item? asyncValue = await cache.TryGetValueAsync<Item>("item:2");
+```
+
+These extension signatures do not expose cancellation tokens, despite the underlying `IDistributedCache` API.
+
+`TryGetValueAsync` strips one leading UTF-8 BOM before deserialization. The synchronous method does not perform that explicit strip. Both return `false`/null for a missing key; malformed JSON propagates a JSON deserialization exception.
+
+## Other public models
+
+### MessagePack/MemoryPack data sample
+
+`CommonNetFuncs.Web.Requests.AsyncIntString` inherits `AsyncIntString` from CommonNetFuncs.Core and adds MemoryPack and MessagePack metadata. It exposes `AsyncInt`, `AsyncDecimal`, `AsyncFloat`, and `AsyncString`.
+
+```csharp
+using CommonNetFuncs.Web.Requests;
+using MessagePack;
+using MemoryPack;
+
+AsyncIntString value = new()
+{
+    AsyncInt = 1,
+    AsyncDecimal = 2.5m,
+    AsyncFloat = 3.5f,
+    AsyncString = "value"
+};
+
+byte[] messagePack = MessagePackSerializer.Serialize(value);
+byte[] memoryPack = MemoryPackSerializer.Serialize(value);
+```
+
+### Problem details with errors
+
+```csharp
+using CommonNetFuncs.Web.Requests;
+
+ProblemDetailsWithErrors problem = new()
+{
+    Title = "Validation failed",
+    Status = StatusCodes.Status400BadRequest,
+    Errors =
+    {
+        ["Name"] = ["Name is required."]
+    }
+};
+```
+
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/NickScarpitti/common-net-funcs/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License. See [LICENSE](https://github.com/ScarpittiWeb/common-net-funcs/blob/main/LICENSE).
