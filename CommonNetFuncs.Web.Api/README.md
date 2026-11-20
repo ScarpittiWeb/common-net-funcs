@@ -31,6 +31,7 @@ This project contains helper methods for several common functions required by AP
     - [FlexibleDecimalResolver](#flexibledecimalresolver)
       - [Registering with a CompositeResolver](#registering-with-a-compositeresolver)
       - [Registering with AddMvc / AddControllers](#registering-with-addmvc--addcontrollers)
+  - [Task queues](#task-queues)
   - [Installation](#installation)
   - [License](#license)
 
@@ -269,6 +270,19 @@ builder.Services.AddControllers()
 </details>
 
 ---
+
+## Task queues
+
+The API queue processors and endpoint queues shut down without synchronously blocking the
+disposing caller. `SequentialTaskProcessor` and `PrioritizedSequentialTaskProcessor` allow the task
+that is already executing to complete, cancel tasks that are still waiting to run, and release their
+background-service resources after the execution loop stops. A caller whose work was not started
+observes cancellation rather than remaining unresolved.
+
+`EndpointQueue` and `PrioritizedEndpointQueue` request cancellation for the active task and cancel
+pending endpoint tasks during disposal. Their cancellation token sources and synchronization objects
+are released after the processing task exits. Callers should treat `OperationCanceledException` as the
+normal shutdown signal and avoid ignoring the cancellation token passed to queued work.
 
 ## Installation
 

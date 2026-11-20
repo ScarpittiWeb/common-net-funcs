@@ -204,6 +204,9 @@ public sealed class SendEmailConfig(SmtpSettings? smtpSettings = null, EmailAddr
 
 public sealed class SmtpSettings
 {
+	private TimeSpan retryDelay = TimeSpan.FromMilliseconds(500);
+	private int maxAttempts = 8;
+
 	public SmtpSettings()
 	{
 		ConnectionTimeout = TimeSpan.FromSeconds(5);
@@ -218,6 +221,23 @@ public sealed class SmtpSettings
 		ConnectionTimeout = connectionTimeout ?? TimeSpan.FromSeconds(5);
 	}
 
+	/// <summary>
+	/// Initializes SMTP connection, retry, and delay settings.
+	/// </summary>
+	/// <param name="smtpServer">The SMTP server address.</param>
+	/// <param name="smtpPort">The SMTP server port.</param>
+	/// <param name="smtpUser">The optional SMTP username.</param>
+	/// <param name="smtpPassword">The optional SMTP password.</param>
+	/// <param name="connectionTimeout">The timeout for each SMTP connection attempt, or <see langword="null"/> to use five seconds.</param>
+	/// <param name="maxAttempts">The positive total number of SMTP send attempts.</param>
+	/// <param name="retryDelay">The non-negative delay between failed attempts.</param>
+	/// <exception cref="ArgumentOutOfRangeException"><paramref name="maxAttempts"/> is less than one or <paramref name="retryDelay"/> is negative.</exception>
+	public SmtpSettings(string? smtpServer, int smtpPort, string? smtpUser, string? smtpPassword, TimeSpan? connectionTimeout, int maxAttempts, TimeSpan retryDelay)
+		: this(smtpServer, smtpPort, smtpUser, smtpPassword, connectionTimeout)
+	{
+		MaxAttempts = maxAttempts;
+		RetryDelay = retryDelay;
+	}
 
 	/// <summary>
 	/// Gets or sets the SMTP server address used for sending emails.
@@ -244,6 +264,40 @@ public sealed class SmtpSettings
 	/// Gets or sets the duration to wait before a connection attempt times out.
 	/// </summary>
 	public TimeSpan ConnectionTimeout { get; set; }
+
+	/// <summary>
+	/// Gets or sets the total number of SMTP send attempts. The default is 8.
+	/// </summary>
+	/// <exception cref="ArgumentOutOfRangeException">The assigned value is less than one.</exception>
+	public int MaxAttempts
+	{
+		get => maxAttempts;
+		set
+		{
+			if (value < 1)
+			{
+				throw new ArgumentOutOfRangeException(nameof(value), value, "MaxAttempts must be at least 1.");
+			}
+			maxAttempts = value;
+		}
+	}
+
+	/// <summary>
+	/// Gets or sets the delay between failed SMTP send attempts. The default is 500 milliseconds.
+	/// </summary>
+	/// <exception cref="ArgumentOutOfRangeException">The assigned delay is negative.</exception>
+	public TimeSpan RetryDelay
+	{
+		get => retryDelay;
+		set
+		{
+			if (value < TimeSpan.Zero)
+			{
+				throw new ArgumentOutOfRangeException(nameof(value), value, "RetryDelay cannot be negative.");
+			}
+			retryDelay = value;
+		}
+	}
 
 	/// <summary>
 	/// Gets or sets the SecureSocketOptions to use with the SMTP connection.
@@ -432,6 +486,11 @@ public static class Email
 	/// <summary>
 	/// Sends an email using the SMTP server specified in the parameters.
 	/// </summary>
+	/// <remarks>
+	/// Failed SMTP sends are retried according to <see cref="SmtpSettings.MaxAttempts"/> and
+	/// <see cref="SmtpSettings.RetryDelay"/>. The backward-compatible defaults are eight total attempts
+	/// and a 500 millisecond delay between attempts.
+	/// </remarks>
 	/// <param name="sendEmailConfig">Configuration options for sending the email.</param>
 	/// <param name="cancellationToken">Cancellation token for this operation.</param>
 	/// <returns><see langword="true"/> if email was sent successfully, otherwise <see langword="false"/></returns>
@@ -512,7 +571,7 @@ public static class Email
 					email.Headers[HeaderId.DispositionNotificationTo] = sendEmailConfig.ReadReceiptEmail;
 				}
 
-				for (int i = 0; i < 8; i++)
+				for (int i = 0; i < sendEmailConfig.SmtpSettings.MaxAttempts; i++)
 				{
 					try
 					{
@@ -564,7 +623,7 @@ public static class Email
 					catch (Exception ex)
 					{
 						logger.Warn(ex, "{ErrorLocation} Error On Email Send Attempt {Attempt}", ex.GetLocationOfException(), i + 1);
-						if (i == 7)
+						if (i == sendEmailConfig.SmtpSettings.MaxAttempts - 1)
 						{
 							string configText = GetConfigurationString(sendEmailConfig);
 							logger.Error(ex, "{ErrorLocation} Error\nFailed to send email.\nSMTP Server: {SmtpServer} | SMTP Port: {SmtpPort} | SMTP User: {SmtpUser}\n\tConfiguration: {ConfigText}", ex.GetLocationOfException(),
@@ -573,7 +632,7 @@ public static class Email
 							break; //No need to delay after the final failed attempt
 						}
 					}
-					await Task.Delay(500, cancellationToken).ConfigureAwait(false);
+					await Task.Delay(sendEmailConfig.SmtpSettings.RetryDelay, cancellationToken).ConfigureAwait(false);
 				}
 			}
 		}
@@ -607,6 +666,10 @@ public static class Email
 	/// <summary>
 	/// Sends an email using the SMTP server specified in the parameters. This overload uses MailAttachmentBytes for serialization-friendly scenarios (e.g., Hangfire background jobs).
 	/// </summary>
+	/// <remarks>
+	/// Uses the retry count and delay configured by <see cref="SmtpSettings.MaxAttempts"/> and
+	/// <see cref="SmtpSettings.RetryDelay"/>.
+	/// </remarks>
 	/// <param name="sendEmailConfig">Configuration options for sending the email with byte-based attachments.</param>
 	/// <param name="cancellationToken">Cancellation token for this operation.</param>
 	/// <returns><see langword="true"/> if email was sent successfully, otherwise <see langword="false"/></returns>
@@ -655,6 +718,8 @@ public static class Email
 					sendEmailConfig.SmtpSettings.SmtpUser,
 					SmtpPassword = sendEmailConfig.SmtpSettings.SmtpPassword.IsNullOrWhiteSpace() ? sendEmailConfig.SmtpSettings.SmtpPassword : "REDACTED",
 					sendEmailConfig.SmtpSettings.ConnectionTimeout,
+					sendEmailConfig.SmtpSettings.MaxAttempts,
+					sendEmailConfig.SmtpSettings.RetryDelay,
 					sendEmailConfig.SmtpSettings.RequireTLS,
 					SecureSocketOptions = sendEmailConfig.SmtpSettings.SecureSocketOptions?.ToString(),
 					sendEmailConfig.SmtpSettings.LocalDomain,

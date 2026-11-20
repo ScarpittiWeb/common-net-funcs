@@ -109,7 +109,7 @@ public sealed class EmailTests
 		};
 
 		// Act
-		bool result = await SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent }, Current.CancellationToken);
+		bool result = await SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings.WithFastSmtpFailure(), EmailAddresses = emailAddresses, EmailContent = emailContent }, Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -139,7 +139,7 @@ public sealed class EmailTests
 		};
 
 		// Act
-		bool result = await SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent }, Current.CancellationToken);
+		bool result = await SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings.WithFastSmtpFailure(), EmailAddresses = emailAddresses, EmailContent = emailContent }, Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -217,7 +217,7 @@ public sealed class EmailTests
 		// Act
 		bool result = await SendEmail(new SendEmailConfig()
 		{
-			SmtpSettings = smtpSettings,
+			SmtpSettings = smtpSettings.WithFastSmtpFailure(),
 			EmailAddresses = emailAddresses,
 			EmailContent = emailContent,
 			ReadReceipt = true,
@@ -254,7 +254,7 @@ public sealed class EmailTests
 		};
 
 		// Act
-		bool result = await SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent }, Current.CancellationToken);
+		bool result = await SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings.WithFastSmtpFailure(), EmailAddresses = emailAddresses, EmailContent = emailContent }, Current.CancellationToken);
 
 		// Note: Similar to above, we can't directly verify the content type
 		// but the method should complete without throwing

@@ -32,7 +32,12 @@ Helper class for sending emails
 Sends an email with the specified parameters. Can be consumed as a service using the IEmailService interface and EmailService implementation of that service.
 
 ```cs
-SmtpSettings smtpSettings = new("smtp.server.address", 25);
+SmtpSettings smtpSettings = new("smtp.server.address", 25)
+{
+    ConnectionTimeout = TimeSpan.FromSeconds(5),
+    MaxAttempts = 8,
+    RetryDelay = TimeSpan.FromMilliseconds(500)
+};
 
 EmailAddresses emailAddresses = new(
     fromAddress: new MailAddress("Nick", "NickEmail@test.com"),
@@ -51,6 +56,11 @@ EmailContent emailContent = new(
 
 bool success = await SendEmail(new SendEmailConfig(smtpSettings, emailAddresses, emailContent));
 ```
+
+`ConnectionTimeout` applies to each SMTP connection attempt. `MaxAttempts` is the total number of
+send attempts and must be at least 1; `RetryDelay` is the non-negative delay between failed attempts.
+Their defaults are `8` attempts and `500` milliseconds, preserving the original retry behavior. The
+constructor overload ending in `maxAttempts, retryDelay` can also configure both values in one call.
 
 `MailAttachment` and `MailAttachmentBytes` both accept an optional `CompressionLevel` parameter to control how the attachment is compressed while held in memory (defaults to `CompressionLevel.Optimal`). `MailAttachmentBytes` stores the attachment as a `byte[]` instead of a `Stream`, making it serialization-friendly for scenarios such as Hangfire background jobs - use it along with `EmailContentBytes`/`SendEmailConfigBytes` in those cases.
 

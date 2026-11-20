@@ -214,7 +214,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -247,7 +247,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -276,7 +276,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -305,7 +305,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -333,7 +333,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -362,7 +362,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -387,7 +387,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -419,7 +419,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -444,7 +444,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -468,7 +468,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, cts.Token);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), cts.Token);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -495,7 +495,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -521,7 +521,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -544,7 +544,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -567,7 +567,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -589,7 +589,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -611,7 +611,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -633,7 +633,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -661,7 +661,7 @@ public sealed class AttachmentsEdgeCasesTests1
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();

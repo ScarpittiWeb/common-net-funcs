@@ -107,7 +107,7 @@ public sealed class EmailConfigBytesTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -136,7 +136,7 @@ public sealed class EmailConfigBytesTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		// Should fail because SMTP server is invalid, but should not throw
@@ -170,7 +170,7 @@ public sealed class EmailConfigBytesTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		// Should fail because SMTP server is invalid, but should not throw
@@ -199,7 +199,7 @@ public sealed class EmailConfigBytesTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBe(false);
@@ -224,7 +224,7 @@ public sealed class EmailConfigBytesTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBe(false);
@@ -247,7 +247,7 @@ public sealed class EmailConfigBytesTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();

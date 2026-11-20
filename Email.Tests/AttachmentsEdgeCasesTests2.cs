@@ -116,7 +116,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -214,7 +214,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server but should process CC addresses
@@ -237,7 +237,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server but should process BCC addresses
@@ -261,7 +261,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -330,7 +330,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -358,7 +358,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -447,7 +447,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -477,7 +477,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -512,7 +512,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -543,7 +543,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert - Should fail after all retries
 		result.ShouldBeFalse();
@@ -571,7 +571,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert - Should fail after all retries
 		result.ShouldBeFalse();
@@ -599,7 +599,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert - Should fail but will exercise the auth path
 		result.ShouldBeFalse();
@@ -627,7 +627,7 @@ public sealed class AttachmentsEdgeCasesTests2
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert - Should fail but will exercise the non-auth path
 		result.ShouldBeFalse();
