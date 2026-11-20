@@ -232,7 +232,14 @@ public static partial class Common
 	/// <returns>The WorksheetPart containing the CellReference, or null if not found</returns>
 	public static WorksheetPart? GetWorksheetPartByCellReference(WorkbookPart workbookPart, CellReference cellReference)
 	{
-		return workbookPart.WorksheetParts.FirstOrDefault(wp => wp.Worksheet?.Descendants<Cell>().Any(c => c.CellReference == cellReference.ToString()) ?? false);
+		WorksheetPart? matchingPart = workbookPart.WorksheetParts.FirstOrDefault(wp => wp.Worksheet?.Descendants<Cell>().Any(c => c.CellReference == cellReference.ToString()) ?? false);
+		if (matchingPart != null)
+		{
+			return matchingPart;
+		}
+
+		WorksheetPart[] worksheetParts = [.. workbookPart.WorksheetParts];
+		return worksheetParts.Length == 1 ? worksheetParts[0] : null;
 	}
 
 	/// <summary>
@@ -1154,6 +1161,12 @@ public static partial class Common
 		// GetStylesheet with default createIfMissing=true always returns non-null
 		Stylesheet stylesheet = document.GetStylesheet()!;
 
+		// Excel expects a complete baseline style table, even when the caller only supplies a font.
+		stylesheet.GetFonts();
+		stylesheet.GetFills();
+		stylesheet.GetBorders();
+		stylesheet.GetCellFormats();
+
 		WorkbookStyleCache cache = CustomCacheTable.GetOrCreateValue(document);
 
 		uint fontId = GetOrAddFont(stylesheet, cache, font);
@@ -1200,12 +1213,7 @@ public static partial class Common
 			cellFormat.ApplyProtection = true;
 		}
 
-		CellFormats? cellFormats = stylesheet.Elements<CellFormats>().FirstOrDefault();
-		if (cellFormats == null)
-		{
-			stylesheet.AddChild(new CellFormats());
-			cellFormats = stylesheet.Elements<CellFormats>().First();
-		}
+		CellFormats cellFormats = stylesheet.GetCellFormats()!;
 		cellFormats.AppendChild(cellFormat);
 #pragma warning disable S2971 // LINQ expressions should be simplified
 		cellFormats.Count = (uint)cellFormats.Count();
@@ -1227,20 +1235,16 @@ public static partial class Common
 	{
 		if (font == null)
 		{
+			stylesheet.GetFonts();
 			return 0; // Default font
 		}
 
-		int fontHash = font.GetHashCode();
+		int fontHash = GetHashCode(font);
 		if (cache.FontCache.TryGetValue(fontHash, out uint existingFontId))
 		{
 			return existingFontId;
 		}
-		Fonts? fonts = stylesheet.Elements<Fonts>().FirstOrDefault();
-		if (fonts == null)
-		{
-			stylesheet.AddChild(new Fonts());
-			fonts = stylesheet.Elements<Fonts>().First();
-		}
+		Fonts fonts = stylesheet.GetFonts()!;
 		fonts.AppendChild(font);
 		fonts.Count = (uint)fonts.ChildElements.Count;
 		uint newFontId = ((uint)fonts.ChildElements.Count) - 1;
@@ -1259,21 +1263,17 @@ public static partial class Common
 	{
 		if (fill == null)
 		{
+			stylesheet.GetFills();
 			return 0; // Default fill
 		}
 
-		int fillHash = fill.GetHashCode();
+		int fillHash = GetHashCode(fill);
 		if (cache.FillCache.TryGetValue(fillHash, out uint existingFillId))
 		{
 			return existingFillId;
 		}
 
-		Fills? fills = stylesheet.Elements<Fills>().FirstOrDefault();
-		if (fills == null)
-		{
-			stylesheet.AddChild(new Fills());
-			fills = stylesheet.Elements<Fills>().First();
-		}
+		Fills fills = stylesheet.GetFills()!;
 		fills.AppendChild(fill);
 		fills.Count = (uint)fills.ChildElements.Count;
 		uint newFillId = ((uint)fills.ChildElements.Count) - 1;
@@ -1292,21 +1292,17 @@ public static partial class Common
 	{
 		if (border == null)
 		{
+			stylesheet.GetBorders();
 			return 0; // Default border
 		}
 
-		int borderHash = border.GetHashCode();
+		int borderHash = GetHashCode(border);
 		if (cache.BorderCache.TryGetValue(borderHash, out uint existingBorderId))
 		{
 			return existingBorderId;
 		}
 
-		Borders? borders = stylesheet.Elements<Borders>().FirstOrDefault();
-		if (borders == null)
-		{
-			stylesheet.AddChild(new Borders());
-			borders = stylesheet.Elements<Borders>().First();
-		}
+		Borders borders = stylesheet.GetBorders()!;
 		borders.AppendChild(border);
 		borders.Count = (uint)borders.ChildElements.Count;
 		uint newBorderId = ((uint)borders.ChildElements.Count) - 1;
