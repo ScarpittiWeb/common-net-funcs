@@ -1,4 +1,5 @@
-﻿using CommonNetFuncs.Web.Api.MsgPack;
+﻿using System.Buffers;
+using CommonNetFuncs.Web.Api.MsgPack;
 using CommonNetFuncs.Web.Requests.MessagePack;
 using MessagePack;
 using MessagePack.AspNetCoreMvcFormatter;
@@ -41,10 +42,21 @@ public sealed class MessagePackStreamingController : ControllerBase
 	[HttpGet("standard-options")]
 	public IActionResult GetWithStandardOptions() => this.StreamMessagePack(GetItems());
 
+	[HttpGet("multiple-default-options")]
+	public IActionResult GetMultipleWithDefaultOptions() => this.StreamMessagePack(GetMultipleItems());
+
 	private static async IAsyncEnumerable<MessagePackStreamingItem> GetItems()
 	{
 		await Task.Yield();
 		yield return new MessagePackStreamingItem { Timestamp = Timestamp, TimestampOffset = Timestamp };
+	}
+
+	private static async IAsyncEnumerable<MessagePackStreamingItem> GetMultipleItems()
+	{
+		await Task.Yield();
+		yield return new MessagePackStreamingItem { Timestamp = Timestamp, TimestampOffset = Timestamp };
+		await Task.Yield();
+		yield return new MessagePackStreamingItem { Timestamp = Timestamp.AddDays(1), TimestampOffset = Timestamp.AddDays(1) };
 	}
 }
 
@@ -66,6 +78,28 @@ public sealed class MessagePackStreamingTests
 			Current.CancellationToken);
 		item.Timestamp.ShouldBe(new DateTime(2026, 11, 19, 15, 30, 0, DateTimeKind.Utc));
 		item.TimestampOffset.ShouldBe(new DateTimeOffset(2026, 11, 19, 15, 30, 0, TimeSpan.Zero));
+	}
+
+	[Fact]
+	public async Task StreamMessagePack_WithMultipleItems_UsesMvcOptionsForEveryItem()
+	{
+		MessagePackSerializerOptions mvcOptions = MsgPackSerializerConfig.DateTimesAsStrings
+			.WithCompression(MessagePackCompression.Lz4BlockArray);
+		await using WebApplication app = await CreateApp(mvcOptions);
+
+		using HttpClient client = app.GetTestClient();
+		byte[] response = await GetMessagePackAsync(client, "multiple-default-options");
+		using MessagePackStreamReader reader = new(new MemoryStream(response));
+		List<MessagePackStreamingItem> items = [];
+
+		while (await reader.ReadAsync(Current.CancellationToken) is ReadOnlySequence<byte> data)
+		{
+			items.Add(MessagePackSerializer.Deserialize<MessagePackStreamingItem>(data, mvcOptions, Current.CancellationToken));
+		}
+
+		items.Count.ShouldBe(2);
+		items[1].Timestamp.ShouldBe(new DateTime(2026, 11, 20, 15, 30, 0, DateTimeKind.Utc));
+		items[1].TimestampOffset.ShouldBe(new DateTimeOffset(2026, 11, 20, 15, 30, 0, TimeSpan.Zero));
 	}
 
 	[Fact]

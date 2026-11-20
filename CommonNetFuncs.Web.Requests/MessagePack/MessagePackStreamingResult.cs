@@ -1,4 +1,5 @@
 ﻿using System.Buffers;
+using System.Reflection;
 using System.Text.Json;
 using MessagePack;
 using Microsoft.AspNetCore.Http;
@@ -75,9 +76,9 @@ public class MessagePackStreamingResult<T>(
 		response.StatusCode = successStatusCode;
 
 		bool hasData = false;
-		IOutputFormatter? mvcMessagePackFormatter = format == StreamingFormat.MessagePack && messagePackOptions is null
-			? GetMvcMessagePackFormatter(httpContext)
-			: null;
+		MessagePackSerializerOptions resolvedMessagePackOptions = messagePackOptions ??
+			(format == StreamingFormat.MessagePack ? GetMvcMessagePackOptions(httpContext) : null) ??
+			MessagePackSerializerOptions.Standard;
 
 		// One serialization buffer per response (never shared between concurrent executions), reused for every MessagePack item
 		ArrayBufferWriter<byte>? messagePackBuffer = null;
@@ -90,15 +91,8 @@ public class MessagePackStreamingResult<T>(
 
 				if (format == StreamingFormat.MessagePack)
 				{
-					if (mvcMessagePackFormatter is not null)
-					{
-						await WriteMvcMessagePackItemAsync(httpContext, mvcMessagePackFormatter, item).ConfigureAwait(false);
-					}
-					else
-					{
-						messagePackBuffer ??= new ArrayBufferWriter<byte>();
-						await WriteMessagePackItemAsync(response, messagePackBuffer, item, cancellationToken).ConfigureAwait(false);
-					}
+					messagePackBuffer ??= new ArrayBufferWriter<byte>();
+					await WriteMessagePackItemAsync(response, messagePackBuffer, item, resolvedMessagePackOptions, cancellationToken).ConfigureAwait(false);
 				}
 				else // JSON
 				{
@@ -154,7 +148,7 @@ public class MessagePackStreamingResult<T>(
 		return StreamingFormat.Unsupported;
 	}
 
-	private static IOutputFormatter? GetMvcMessagePackFormatter(HttpContext httpContext)
+	private static MessagePackSerializerOptions? GetMvcMessagePackOptions(HttpContext httpContext)
 	{
 		IServiceProvidersFeature? serviceProviders = httpContext.Features.Get<IServiceProvidersFeature>();
 		if (serviceProviders?.RequestServices is not { } requestServices ||
@@ -163,33 +157,31 @@ public class MessagePackStreamingResult<T>(
 			return null;
 		}
 
-		return mvcOptions.Value.OutputFormatters.FirstOrDefault(formatter =>
+		IOutputFormatter? formatter = mvcOptions.Value.OutputFormatters.FirstOrDefault(formatter =>
 			formatter is OutputFormatter outputFormatter &&
 			outputFormatter.SupportedMediaTypes.Any(mediaType =>
 				mediaType.Equals("application/x-msgpack", StringComparison.OrdinalIgnoreCase)));
+
+		if (formatter is null)
+		{
+			return null;
+		}
+
+		// The formatter's options are reused directly because invoking OutputFormatter.WriteAsync after the response starts retries header negotiation for every item.
+		FieldInfo? optionsField = formatter.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+			.FirstOrDefault(field => field.FieldType == typeof(MessagePackSerializerOptions));
+
+		return optionsField?.GetValue(formatter) as MessagePackSerializerOptions;
 	}
 
-	private async Task WriteMessagePackItemAsync(HttpResponse response, ArrayBufferWriter<byte> bufferWriter, T item, CancellationToken cancellationToken)
+	private static async Task WriteMessagePackItemAsync(HttpResponse response, ArrayBufferWriter<byte> bufferWriter, T item,
+		MessagePackSerializerOptions serializerOptions, CancellationToken cancellationToken)
 	{
-		// Serialize each item into the reused buffer
 		bufferWriter.ResetWrittenCount();
-		MessagePackSerializer.Serialize(bufferWriter, item, messagePackOptions ?? MessagePackSerializerOptions.Standard, cancellationToken);
+		MessagePackSerializer.Serialize(bufferWriter, item, serializerOptions, cancellationToken);
 
-		// Write the serialized bytes to the response stream
 		await response.Body.WriteAsync(bufferWriter.WrittenMemory, cancellationToken).ConfigureAwait(false);
 		await response.Body.FlushAsync(cancellationToken).ConfigureAwait(false);
-	}
-
-	private static async Task WriteMvcMessagePackItemAsync(HttpContext httpContext, IOutputFormatter formatter, T item)
-	{
-		OutputFormatterWriteContext context = new(
-			httpContext,
-			static (stream, encoding) => new StreamWriter(stream, encoding, leaveOpen: true),
-			typeof(T),
-			item);
-
-		await formatter.WriteAsync(context).ConfigureAwait(false);
-		await httpContext.Response.Body.FlushAsync(httpContext.RequestAborted).ConfigureAwait(false);
 	}
 
 	private async Task WriteJsonItemAsync(HttpResponse response, T item, CancellationToken cancellationToken)

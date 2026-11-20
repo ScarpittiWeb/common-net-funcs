@@ -381,6 +381,24 @@ public sealed class RestHelpersStaticTests
 		result.Response.ShouldNotBeNull();
 	}
 
+	[Fact]
+	public async Task StreamingRestObjectRequest_ReturnsAfterReceivingHeadersWithoutBufferingContent()
+	{
+		FakeHttpMessageHandler handler = new();
+		HttpClient client = new(handler);
+		RequestOptions<string> options = new() { Url = "http://test", HttpMethod = HttpMethod.Get };
+		handler.Response = new HttpResponseMessage(HttpStatusCode.OK)
+		{
+			Content = new FakeContent(throwOnRead: true)
+		};
+		handler.Response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+		StreamingRestObject<string> result = await client.StreamingRestObjectRequest<string, string>(options, Current.CancellationToken);
+
+		result.Response.ShouldBeSameAs(handler.Response);
+		result.Result.ShouldNotBeNull();
+	}
+
 	[Theory]
 	[InlineData(ExceptionType.TaskCanceledExpected)]
 	[InlineData(ExceptionType.TaskCanceledUnexpected)]
