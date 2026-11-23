@@ -1,13 +1,13 @@
-﻿using System.Collections;
-using System.Globalization;
-using System.Reflection;
-using System.Text;
-using CommonNetFuncs.ReinforcedTypings.Collections;
+﻿using CommonNetFuncs.ReinforcedTypings.Collections;
 using CommonNetFuncs.ReinforcedTypings.Constants;
 using CommonNetFuncs.ReinforcedTypings.Valibot;
 using Reinforced.Typings;
 using Reinforced.Typings.Attributes;
 using Reinforced.Typings.Fluent;
+using System.Collections;
+using System.Globalization;
+using System.Reflection;
+using System.Text;
 using ZLinq;
 
 namespace CommonNetFuncs.ReinforcedTypings;
@@ -241,7 +241,7 @@ public static class ReinforcedTypingsFluentConfig
 			{
 				declarePrefix = ExportConstPrefix;
 			}
-			else if(needsExport)
+			else if (needsExport)
 			{
 				declarePrefix = "export declare const";
 			}
@@ -734,17 +734,22 @@ public static class ReinforcedTypingsFluentConfig
 			return $"./{to.Name}";
 		}
 
+		if (fromDir.Equals(toDir, StringComparison.OrdinalIgnoreCase))
+		{
+			return to.Name;
+		}
+
 		string rel = Path.GetRelativePath(
 			string.IsNullOrEmpty(fromDir) ? "." : fromDir,
 			string.IsNullOrEmpty(toDir) ? "." : toDir).Replace('\\', '/');
 
 		string prefix;
 
-		if(rel == ".")
+		if (rel == ".")
 		{
 			prefix = string.Empty;
 		}
-		else if(rel.StartsWith("..", StringComparison.Ordinal))
+		else if (rel.StartsWith("..", StringComparison.Ordinal))
 		{
 			prefix = $"{rel}/";
 		}
@@ -794,5 +799,3 @@ public static class ReinforcedTypingsFluentConfig
 		return outputDir;
 	}
 }
-
-

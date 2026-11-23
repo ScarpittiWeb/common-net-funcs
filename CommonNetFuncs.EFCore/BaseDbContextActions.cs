@@ -1,8 +1,10 @@
-﻿using System.Collections.Concurrent;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
+using System.Collections.Concurrent;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.EntityFrameworkCore;
 
 namespace CommonNetFuncs.EFCore;
 
@@ -25,6 +27,52 @@ public partial class BaseDbContextActions<TEntity, TContext>(IServiceProvider se
 	private const string Error1LocationTemplate = "{ExceptionLocation} Error1";
 	private const string Error2LocationTemplate = "{ExceptionLocation} Error2";
 	private const string AddCircularRefTemplate = "Adding {Type} to circularReferencingEntities";
+
+	/// <summary>
+	/// Gets (or creates and caches) the function that builds the single-field primary key equality expression for <typeparamref name="TEntity"/>.
+	/// The key value is embedded in the resulting expression as a constant.
+	/// </summary>
+	/// <param name="context">Context used to read the entity's primary key metadata on first use.</param>
+	private static Func<object, Expression<Func<TEntity, bool>>> GetSingleKeyExpressionBuilder(DbContext context)
+	{
+		// Static factory + context argument: no closure / delegate allocation per call
+		return singleKeyExpressionBuilder.GetOrAdd(typeof(TEntity), static (type, ctx) => CreateSingleKeyExpressionBuilder(type, ctx), context);
+	}
+
+	private static Func<object, Expression<Func<TEntity, bool>>> CreateSingleKeyExpressionBuilder(Type type, DbContext context)
+	{
+		// Get cached entity metadata or retrieve and cache it
+		EntityKeyMetadata keyMetadata = entityKeyCache.GetOrAdd(type, static (t, ctx) =>
+		{
+			IEntityType? entityType = ctx.Model.FindEntityType(t);
+			IKey? primaryKey_Property = entityType?.FindPrimaryKey();
+
+			if (primaryKey_Property == null || primaryKey_Property.Properties.Count != 1)
+			{
+				throw new InvalidOperationException($"Entity {t.Name} does not have a single-field primary key. Use the array overload instead.");
+			}
+
+			return new EntityKeyMetadata
+			{
+				KeyPropertyName = primaryKey_Property.Properties[0].Name,
+				KeyPropertyType = primaryKey_Property.Properties[0].ClrType
+			};
+		}, context);
+
+		Type keyType = keyMetadata.KeyPropertyType!;
+		// Resolved once through the same Expression.Property(Expression, string) lookup that was previously performed on every call
+		PropertyInfo keyProperty = (PropertyInfo)Expression.Property(Expression.Parameter(typeof(TEntity), "x"), keyMetadata.KeyPropertyName!).Member;
+
+		// Return a function that builds an expression tree with the actual key value
+		// This function is cached, but the expression it creates includes the specific key value
+		return keyValue =>
+		{
+			ParameterExpression parameter = Expression.Parameter(typeof(TEntity), "x");
+			BinaryExpression equality = Expression.Equal(Expression.Property(parameter, keyProperty), Expression.Constant(keyValue, keyType));
+			return Expression.Lambda<Func<TEntity, bool>>(equality, parameter);
+		};
+	}
+
 }
 
 /// <summary>

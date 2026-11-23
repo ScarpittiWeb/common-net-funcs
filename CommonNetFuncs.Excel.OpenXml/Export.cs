@@ -1,11 +1,12 @@
-﻿using System.Data;
-using System.IO.Packaging;
-using System.Reflection;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
 using CommonNetFuncs.Excel.Common;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using System.Data;
+using System.Globalization;
+using System.IO.Packaging;
+using System.Reflection;
 using static CommonNetFuncs.Core.ExceptionLocation;
 using static CommonNetFuncs.Core.ReflectionCaches;
 using static CommonNetFuncs.Excel.OpenXml.Common;
@@ -289,15 +290,11 @@ public static class Export
 				// Set up shared-string table with O(1) dictionary lookup
 				SharedStringTable sharedStringTable = LoadSharedStringTable(document, out Dictionary<string, int> sharedStringCache, out int ssCount);
 
-				// Build skip set using 0-based column indices (HashSet for O(1) lookup vs the
-				// original List<uint> which was O(n) per Contains call)
-				HashSet<int> skipColumnIndices = [];
+				// Build skip mask using 0-based column indices
+				bool[] skipColumns = new bool[totalCols];
 				for (int i = 0; i < totalCols; i++)
 				{
-					if (exportSettings.SkipColumnNames?.Contains(data.Columns[i].ColumnName, StringComparer.InvariantCultureIgnoreCase) == true)
-					{
-						skipColumnIndices.Add(i);
-					}
+					skipColumns[i] = exportSettings.SkipColumnNames?.Contains(data.Columns[i].ColumnName, StringComparer.InvariantCultureIgnoreCase) == true;
 				}
 
 				// Track maximum column widths inline
@@ -309,7 +306,7 @@ public static class Export
 				Row headerRow = new() { RowIndex = y };
 				for (int i = 0; i < totalCols; i++)
 				{
-					if (skipColumnIndices.Contains(i))
+					if (skipColumns[i])
 					{
 						continue;
 					}
@@ -325,14 +322,15 @@ public static class Export
 				{
 					cancellationToken.ThrowIfCancellationRequested();
 					Row dataRow = new() { RowIndex = y };
-					object?[] items = row.ItemArray;
-					for (int i = 0; i < items.Length; i++)
+					for (int i = 0; i < totalCols; i++)
 					{
-						if (items[i] == null || skipColumnIndices.Contains(i))
+						if (skipColumns[i])
 						{
 							continue;
 						}
-						string text = items[i]!.ToString() ?? string.Empty;
+
+						object value = row[i]; // Same default-version read ItemArray performs, without copying the whole row
+						string text = value.ToString() ?? string.Empty;
 						AppendSharedStringCell(dataRow, colLetters[i] + y, text, bodyStyleId, sharedStringCache, sharedStringTable, ref ssCount, colWidths, i);
 					}
 					sheetData.AppendChild(dataRow);
@@ -471,12 +469,14 @@ public static class Export
 				int totalCols = data.Columns.Count;
 				string[] colLetters = CreateColumnLetters(totalCols);
 
-				HashSet<int> skipColumnIndices = [];
+				bool[] skipColumns = new bool[totalCols];
+				int skippedCount = 0;
 				for (int i = 0; i < totalCols; i++)
 				{
 					if (exportSettings.SkipColumnNames?.Contains(data.Columns[i].ColumnName, StringComparer.InvariantCultureIgnoreCase) == true)
 					{
-						skipColumnIndices.Add(i);
+						skipColumns[i] = true;
+						skippedCount++;
 					}
 				}
 
@@ -498,7 +498,7 @@ public static class Export
 					writer.WriteStartElement(new Columns());
 					for (int i = 0; i < totalCols; i++)
 					{
-						if (skipColumnIndices.Contains(i))
+						if (skipColumns[i])
 						{
 							continue;
 						}
@@ -514,15 +514,18 @@ public static class Export
 
 					writer.WriteStartElement(new SheetData());
 
+					SaxCellElements elements = new();
+
 					// Header row
-					writer.WriteStartElement(new Row { RowIndex = y });
+					string rowText = y.ToString(CultureInfo.InvariantCulture);
+					writer.WriteStartElement(elements.GetRow(y));
 					for (int i = 0; i < totalCols; i++)
 					{
-						if (skipColumnIndices.Contains(i))
+						if (skipColumns[i])
 						{
 							continue;
 						}
-						WriteSaxInlineStringCell(writer, colLetters[i] + y, data.Columns[i].ColumnName, headerStyleId);
+						WriteSaxInlineStringCell(writer, elements, colLetters[i] + rowText, data.Columns[i].ColumnName, headerStyleId);
 					}
 					writer.WriteEndElement(); // Row
 					y++;
@@ -531,15 +534,15 @@ public static class Export
 					foreach (DataRow row in data.Rows)
 					{
 						cancellationToken.ThrowIfCancellationRequested();
-						writer.WriteStartElement(new Row { RowIndex = y });
-						object?[] items = row.ItemArray;
-						for (int i = 0; i < items.Length; i++)
+						writer.WriteStartElement(elements.GetRow(y));
+						rowText = y.ToString(CultureInfo.InvariantCulture);
+						for (int i = 0; i < totalCols; i++)
 						{
-							if (skipColumnIndices.Contains(i))
+							if (skipColumns[i])
 							{
 								continue;
 							}
-							WriteSaxInlineStringCell(writer, colLetters[i] + y, items[i]?.ToString() ?? string.Empty, bodyStyleId);
+							WriteSaxInlineStringCell(writer, elements, colLetters[i] + rowText, row[i]?.ToString() ?? string.Empty, bodyStyleId);
 						}
 						writer.WriteEndElement(); // Row
 						y++;
@@ -565,12 +568,12 @@ public static class Export
 				// Populate the table definition after the SAX writer is flushed
 				if (exportSettings.CreateTable && tableDefPart != null)
 				{
-					uint visibleCount = (uint)(totalCols - skipColumnIndices.Count);
+					uint visibleCount = (uint)(totalCols - skippedCount);
 					TableColumns tableColumns = new() { Count = visibleCount };
 					uint colId = 1;
 					for (int i = 0; i < totalCols; i++)
 					{
-						if (skipColumnIndices.Contains(i))
+						if (skipColumns[i])
 						{
 							continue;
 						}
@@ -670,11 +673,14 @@ public static class Export
 
 			if (colCount > 0)
 			{
+				SaxCellElements elements = new();
+
 				// Header row
-				await writer.WriteStartElementAsync(new Row { RowIndex = y }).ConfigureAwait(false);
+				string rowText = y.ToString(CultureInfo.InvariantCulture);
+				await writer.WriteStartElementAsync(elements.GetRow(y)).ConfigureAwait(false);
 				for (int i = 0; i < colCount; i++)
 				{
-					await WriteSaxInlineStringCellAsync(writer, colLetters[i] + y, properties[i].Name, headerStyleId).ConfigureAwait(false);
+					await WriteSaxInlineStringCellAsync(writer, elements, colLetters[i] + rowText, properties[i].Name, headerStyleId).ConfigureAwait(false);
 				}
 				await writer.WriteEndElementAsync().ConfigureAwait(false); // Row
 				y++;
@@ -689,10 +695,11 @@ public static class Export
 							continue;
 						}
 
-						await writer.WriteStartElementAsync(new Row { RowIndex = y }).ConfigureAwait(false);
+						await writer.WriteStartElementAsync(elements.GetRow(y)).ConfigureAwait(false);
+						rowText = y.ToString(CultureInfo.InvariantCulture);
 						for (int i = 0; i < colCount; i++)
 						{
-							await WriteSaxInlineStringCellAsync(writer, colLetters[i] + y, properties[i].GetValue(item)?.ToString() ?? string.Empty, bodyStyleId).ConfigureAwait(false);
+							await WriteSaxInlineStringCellAsync(writer, elements, colLetters[i] + rowText, properties[i].GetValue(item)?.ToString() ?? string.Empty, bodyStyleId).ConfigureAwait(false);
 						}
 						await writer.WriteEndElementAsync().ConfigureAwait(false); // Row
 						y++;
@@ -703,10 +710,11 @@ public static class Export
 					foreach (T item in syncData.Where(x => !x.ToNString().IsNullOrEmpty()))
 					{
 						cancellationToken.ThrowIfCancellationRequested();
-						await writer.WriteStartElementAsync(new Row { RowIndex = y }).ConfigureAwait(false);
+						await writer.WriteStartElementAsync(elements.GetRow(y)).ConfigureAwait(false);
+						rowText = y.ToString(CultureInfo.InvariantCulture);
 						for (int i = 0; i < colCount; i++)
 						{
-							await WriteSaxInlineStringCellAsync(writer, colLetters[i] + y, properties[i].GetValue(item)?.ToString() ?? string.Empty, bodyStyleId).ConfigureAwait(false);
+							await WriteSaxInlineStringCellAsync(writer, elements, colLetters[i] + rowText, properties[i].GetValue(item)?.ToString() ?? string.Empty, bodyStyleId).ConfigureAwait(false);
 						}
 						await writer.WriteEndElementAsync().ConfigureAwait(false); // Row
 						y++;
@@ -795,11 +803,11 @@ public static class Export
 	/// Writes a single inline-string cell via the SAX writer. Uses <see cref="CellValues.InlineString"/> to avoid
 	/// shared-string table allocations, keeping memory overhead at O(1) per cell.
 	/// </summary>
-	private static void WriteSaxInlineStringCell(OpenXmlWriter writer, string cellRef, string text, uint styleId)
+	private static void WriteSaxInlineStringCell(OpenXmlWriter writer, SaxCellElements elements, string cellRef, string text, uint styleId)
 	{
-		writer.WriteStartElement(new Cell { CellReference = cellRef, StyleIndex = styleId, DataType = CellValues.InlineString });
-		writer.WriteStartElement(new InlineString());
-		writer.WriteElement(new Text(text));
+		writer.WriteStartElement(elements.GetCell(cellRef, styleId));
+		writer.WriteStartElement(elements.InlineString);
+		writer.WriteElement(elements.GetText(text));
 		writer.WriteEndElement(); // InlineString
 		writer.WriteEndElement(); // Cell
 	}
@@ -807,15 +815,55 @@ public static class Export
 	/// <summary>
 	/// Async counterpart of <see cref="WriteSaxInlineStringCell"/>. Writes the text explicitly because <c>WriteElementAsync</c> drops child content.
 	/// </summary>
-	private static async Task WriteSaxInlineStringCellAsync(OpenXmlWriter writer, string cellRef, string text, uint styleId)
+	private static async Task WriteSaxInlineStringCellAsync(OpenXmlWriter writer, SaxCellElements elements, string cellRef, string text, uint styleId)
 	{
-		await writer.WriteStartElementAsync(new Cell { CellReference = cellRef, StyleIndex = styleId, DataType = CellValues.InlineString }).ConfigureAwait(false);
-		await writer.WriteStartElementAsync(new InlineString()).ConfigureAwait(false);
-		await writer.WriteStartElementAsync(new Text()).ConfigureAwait(false);
+		await writer.WriteStartElementAsync(elements.GetCell(cellRef, styleId)).ConfigureAwait(false);
+		await writer.WriteStartElementAsync(elements.InlineString).ConfigureAwait(false);
+		await writer.WriteStartElementAsync(elements.EmptyText).ConfigureAwait(false);
 		await writer.WriteStringAsync(text).ConfigureAwait(false);
 		await writer.WriteEndElementAsync().ConfigureAwait(false); // Text
 		await writer.WriteEndElementAsync().ConfigureAwait(false); // InlineString
 		await writer.WriteEndElementAsync().ConfigureAwait(false); // Cell
+	}
+
+	/// <summary>
+	/// Reusable SAX element instances for one export. The SAX writer serializes the tag + attributes (or the whole leaf element)
+	/// immediately and keeps no reference, so one instance per element type can be reused instead of allocating per row / cell.
+	/// </summary>
+	private sealed class SaxCellElements
+	{
+		private readonly Row row = new();
+		private readonly Cell cell = new() { DataType = CellValues.InlineString };
+		private readonly Text text = new();
+		private uint? currentStyleId;
+
+		public InlineString InlineString { get; } = new();
+
+		/// <summary>Always empty; used by the async path, which writes the text content separately.</summary>
+		public Text EmptyText { get; } = new();
+
+		public Row GetRow(uint rowIndex)
+		{
+			row.RowIndex = rowIndex;
+			return row;
+		}
+
+		public Cell GetCell(string cellRef, uint styleId)
+		{
+			cell.CellReference = cellRef;
+			if (currentStyleId != styleId)
+			{
+				cell.StyleIndex = styleId;
+				currentStyleId = styleId;
+			}
+			return cell;
+		}
+
+		public Text GetText(string value)
+		{
+			text.Text = value;
+			return text;
+		}
 	}
 
 	private static string[] CreateColumnLetters(int columnCount)

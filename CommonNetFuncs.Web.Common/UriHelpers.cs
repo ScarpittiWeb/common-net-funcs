@@ -1,10 +1,11 @@
-﻿using System.Collections.Specialized;
+﻿using Microsoft.AspNetCore.Http;
+using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
-using Microsoft.AspNetCore.Http;
-using static System.Web.HttpUtility;
 using static CommonNetFuncs.Core.Strings;
+using static System.Web.HttpUtility;
 
 namespace CommonNetFuncs.Web.Common;
 
@@ -33,10 +34,77 @@ public static class UriHelpers
 			}
 			stringBuilder.Append(queryParameterName);
 			stringBuilder.Append('=');
-			stringBuilder.Append(parameter);
+			AppendValue(stringBuilder, parameter);
 			firstItem = false;
 		}
 		return stringBuilder.ToString();
+	}
+
+	// The typeof(T) checks are JIT-time constants, so each instantiation keeps exactly one branch and the (X)(object)value casts do not box.
+	// Every typed overload formats with the current culture, exactly like the boxed ToString() call made by Append(object).
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static void AppendValue<T>(StringBuilder stringBuilder, T value)
+	{
+		if (typeof(T) == typeof(int))
+		{
+			stringBuilder.Append((int)(object)value!);
+		}
+		else if (typeof(T) == typeof(long))
+		{
+			stringBuilder.Append((long)(object)value!);
+		}
+		else if (typeof(T) == typeof(short))
+		{
+			stringBuilder.Append((short)(object)value!);
+		}
+		else if (typeof(T) == typeof(byte))
+		{
+			stringBuilder.Append((byte)(object)value!);
+		}
+		else if (typeof(T) == typeof(sbyte))
+		{
+			stringBuilder.Append((sbyte)(object)value!);
+		}
+		else if (typeof(T) == typeof(uint))
+		{
+			stringBuilder.Append((uint)(object)value!);
+		}
+		else if (typeof(T) == typeof(ulong))
+		{
+			stringBuilder.Append((ulong)(object)value!);
+		}
+		else if (typeof(T) == typeof(ushort))
+		{
+			stringBuilder.Append((ushort)(object)value!);
+		}
+		else if (typeof(T) == typeof(double))
+		{
+			stringBuilder.Append((double)(object)value!);
+		}
+		else if (typeof(T) == typeof(float))
+		{
+			stringBuilder.Append((float)(object)value!);
+		}
+		else if (typeof(T) == typeof(decimal))
+		{
+			stringBuilder.Append((decimal)(object)value!);
+		}
+		else if (typeof(T) == typeof(bool))
+		{
+			stringBuilder.Append((bool)(object)value!);
+		}
+		else if (typeof(T) == typeof(char))
+		{
+			stringBuilder.Append((char)(object)value!);
+		}
+		else if (typeof(T) == typeof(Guid))
+		{
+			stringBuilder.Append($"{(Guid)(object)value!}");
+		}
+		else
+		{
+			stringBuilder.Append(value);
+		}
 	}
 
 	/// <summary>

@@ -2,8 +2,11 @@
 using AutoFixture.AutoFakeItEasy;
 using CommonNetFuncs.Web.Ftp;
 using FakeItEasy;
+using FakeItEasy.Core;
 using Renci.SshNet;
 using Renci.SshNet.Common;
+using System.Reflection;
+using System.Text;
 
 namespace Web.Ftp.Tests;
 
@@ -525,4 +528,250 @@ public class SshFtpTests
 	}
 
 	#endregion
+}
+
+public sealed class SshFtpBehaviorTests
+{
+	private static readonly Type SessionType = typeof(SftpClient).Assembly.GetType("Renci.SshNet.Sftp.ISftpSession", true)!;
+	private static readonly Type AttributesType = typeof(SftpClient).Assembly.GetType("Renci.SshNet.Sftp.SftpFileAttributes", true)!;
+	private static readonly FieldInfo SessionField = typeof(SftpClient).GetField("_sftpSession", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static (SftpClient Client, object Session) CreateSessionBackedClient()
+	{
+		MethodInfo fakeMethod = typeof(A).GetMethods(BindingFlags.Public | BindingFlags.Static)
+			.Single(x => x.Name == "Fake" && x.IsGenericMethodDefinition && x.GetParameters().Length == 0);
+		object session = fakeMethod.MakeGenericMethod(SessionType).Invoke(null, null)!;
+		Configure(session, "get_WorkingDirectory", _ => "/");
+		Configure(session, "GetCanonicalPath", call => call.Arguments.Single());
+		Configure(session, "GetCanonicalPathAsync", call =>
+			CompletedTask(call.Arguments[0], typeof(string)));
+		SftpClient client = A.Fake<SftpClient>(options =>
+			options.WithArgumentsForConstructor(() => new SftpClient("host", 22, "user", "pass")));
+		A.CallTo(() => client.IsConnected).Returns(true);
+		SessionField.SetValue(client, session);
+		return (client, session);
+	}
+
+	private static object? CreateAttributes(bool directory = false, long size = 0)
+	{
+		ConstructorInfo constructor = AttributesType.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Single();
+		uint permissions = directory ? 0x4000u : 0x8000u;
+		return constructor.Invoke([DateTime.UtcNow, DateTime.UtcNow, size, 0, 0, permissions, new Dictionary<string, string>()]);
+	}
+
+	private static object CreateEntries(IEnumerable<(string Name, bool Directory)> values)
+	{
+		Type pairType = typeof(KeyValuePair<,>).MakeGenericType(typeof(string), AttributesType);
+		Array entries = Array.CreateInstance(pairType, values.Count());
+		int index = 0;
+		foreach ((string name, bool directory) in values)
+		{
+			entries.SetValue(Activator.CreateInstance(pairType, name, CreateAttributes(directory)), index++);
+		}
+		return entries;
+	}
+
+	private static void Configure(object session, string methodName, Func<IFakeObjectCall, object?> handler)
+	{
+		Fake.GetFakeManager(session).AddRuleFirst(new SessionRule(methodName, handler));
+	}
+
+	private static IEnumerable<IFakeObjectCall> GetCalls(object session, string methodName)
+	{
+		return Fake.GetCalls(session).Where(x => x.Method.Name == methodName);
+	}
+
+	private static object CompletedTask(object? value, Type valueType)
+	{
+		MethodInfo fromResult = typeof(Task).GetMethods(BindingFlags.Public | BindingFlags.Static)
+			.Single(x => x.Name == "FromResult" && x.IsGenericMethodDefinition);
+		return fromResult.MakeGenericMethod(valueType).Invoke(null, [value])!;
+	}
+
+	private sealed class SessionRule(string methodName, Func<IFakeObjectCall, object?> handler) : IFakeObjectCallRule
+	{
+		public int? NumberOfTimesToCall => null;
+
+		public bool IsApplicableTo(IFakeObjectCall fakeObjectCall) => fakeObjectCall.Method.Name == methodName;
+
+		public void Apply(IInterceptedFakeObjectCall fakeObjectCall)
+		{
+			fakeObjectCall.SetReturnValue(handler(fakeObjectCall));
+		}
+	}
+
+	private sealed class CsvRow
+	{
+		public string Value { get; set; } = string.Empty;
+	}
+
+	[Fact]
+	public void DirectoryOrFileExists_WithConnectedSession_UsesRequestedPath()
+	{
+		(SftpClient client, object session) = CreateSessionBackedClient();
+		Configure(session, "RequestLStat", _ => CreateAttributes());
+		Configure(session, "RequestStat", _ => CreateAttributes());
+
+		bool result = client.DirectoryOrFileExists("/remote/file.txt");
+
+		result.ShouldBeTrue();
+		GetCalls(session, "RequestLStat").Single().Arguments.Single().ShouldBe("/remote/file.txt");
+	}
+
+	[Fact]
+	public async Task DirectoryOrFileExistsAsync_WithExistingPath_ReturnsTrueAndUsesNoCancellation()
+	{
+		(SftpClient client, object session) = CreateSessionBackedClient();
+		Configure(session, "RequestLStatAsync", _ => CompletedTask(CreateAttributes(), AttributesType));
+
+		bool result = await client.DirectoryOrFileExistsAsync("/missing");
+
+		result.ShouldBeTrue();
+		((CancellationToken)GetCalls(session, "RequestLStatAsync").Single().Arguments[1]!).ShouldBe(CancellationToken.None);
+	}
+
+	[Fact]
+	public void GetFileList_WhenPathIsMissing_ThrowsArgumentException()
+	{
+		(SftpClient client, object session) = CreateSessionBackedClient();
+		Configure(session, "RequestLStat", _ => throw new SftpPathNotFoundException("missing"));
+
+		ArgumentException exception = Should.Throw<ArgumentException>(() => client.GetFileList("/missing"));
+
+		exception.ParamName.ShouldBe("path");
+		exception.Message.ShouldContain("/missing");
+	}
+
+	[Fact]
+	public void GetDataFromCsv_WhenExtensionIsNotCsv_RejectsBeforeOpening()
+	{
+		(SftpClient client, object session) = CreateSessionBackedClient();
+
+		ArgumentException exception = Should.Throw<ArgumentException>(() => client.GetDataFromCsv<CsvRow>("/file.txt").ToList());
+
+		exception.ParamName.ShouldBe("remoteFilePath");
+		GetCalls(session, "RequestOpen").ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void GetDataFromCsv_ReturnsLazySequenceAfterOwningStreamIsDisposed()
+	{
+		(SftpClient client, object session) = CreateSessionBackedClient();
+		byte[] csv = Encoding.UTF8.GetBytes("Value\nhello\nworld\n");
+		Configure(session, "RequestLStat", _ => CreateAttributes());
+		Configure(session, "RequestOpen", _ => "handle"u8.ToArray());
+		Configure(session, "RequestFStat", _ => CreateAttributes(size: csv.Length));
+		Configure(session, "RequestRead", call =>
+		{
+			int offset = checked((int)(ulong)call.Arguments[1]!);
+			int length = Math.Min(checked((int)(uint)call.Arguments[2]!), Math.Max(0, csv.Length - offset));
+			return length == 0 ? [] : csv.AsSpan(offset, length).ToArray();
+		});
+
+		IEnumerable<CsvRow> rows = client.GetDataFromCsv<CsvRow>("/file.csv");
+
+		Should.Throw<ArgumentException>(() => rows.ToList()).Message.ShouldBe("Stream was not readable.");
+		GetCalls(session, "RequestOpen").ShouldHaveSingleItem();
+	}
+
+	[Fact]
+	public async Task GetDataFromCsvAsync_WhenExtensionIsNotCsv_RejectsBeforeOpening()
+	{
+		(SftpClient client, object session) = CreateSessionBackedClient();
+
+		ArgumentException exception = await Should.ThrowAsync<ArgumentException>(
+			() => client.GetDataFromCsvAsync<CsvRow>("/file.txt"));
+
+		exception.ParamName.ShouldBe("remoteFilePath");
+		GetCalls(session, "RequestOpenAsync").ShouldBeEmpty();
+	}
+
+	[Fact]
+	public async Task GetDataFromCsvAsyncEnumerable_WhenExtensionIsNotCsv_RejectsDuringEnumeration()
+	{
+		(SftpClient client, object session) = CreateSessionBackedClient();
+
+		await Should.ThrowAsync<ArgumentException>(async () =>
+		{
+			await foreach (CsvRow _ in client.GetDataFromCsvAsyncEnumerable<CsvRow>("/file.txt")) { }
+		});
+		GetCalls(session, "RequestOpenAsync").ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void GetDataFromCsvEnumerable_WhenExtensionIsNotCsv_RejectsDuringEnumeration()
+	{
+		(SftpClient client, object session) = CreateSessionBackedClient();
+
+		Should.Throw<ArgumentException>(() =>
+		{
+			foreach (CsvRow _ in client.GetDataFromCsvEnumerable<CsvRow>("/file.txt")) { }
+		});
+		GetCalls(session, "RequestOpen").ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void DeleteSftpFile_WhenFileDisappears_ReturnsTrueAndUsesRemove()
+	{
+		(SftpClient client, object session) = CreateSessionBackedClient();
+		bool exists = true;
+		Configure(session, "RequestLStat", _ => exists ? CreateAttributes() : throw new SftpPathNotFoundException("missing"));
+		Configure(session, "RequestStat", _ => exists ? CreateAttributes() : throw new SftpPathNotFoundException("missing"));
+		Configure(session, "RequestRemove", _ =>
+		{
+			exists = false;
+			return null;
+		});
+
+		bool result = client.DeleteSftpFile("/remove.txt");
+
+		result.ShouldBeTrue();
+		GetCalls(session, "RequestRemove").Single().Arguments.Single().ShouldBe("/remove.txt");
+	}
+
+	[Fact]
+	public void DeleteSftpFile_WhenFileWasAlreadyMissing_DoesNotRemove()
+	{
+		(SftpClient client, object session) = CreateSessionBackedClient();
+		Configure(session, "RequestLStat", _ => throw new SftpPathNotFoundException("missing"));
+		Configure(session, "RequestStat", _ => throw new SftpPathNotFoundException("missing"));
+
+		client.DeleteSftpFile("/missing").ShouldBeTrue();
+
+		GetCalls(session, "RequestRemove").ShouldBeEmpty();
+	}
+
+	[Fact]
+	public async Task DeleteFileAsync_WhenFileDisappears_ReturnsTrueAndUsesCancellationDefault()
+	{
+		(SftpClient client, object session) = CreateSessionBackedClient();
+		bool exists = true;
+		Configure(session, "RequestLStatAsync", _ => exists
+			? CompletedTask(CreateAttributes(), AttributesType)
+			: throw new SftpPathNotFoundException("missing"));
+		Configure(session, "RequestStat", _ => exists ? CreateAttributes() : throw new SftpPathNotFoundException("missing"));
+		Configure(session, "RequestRemoveAsync", _ =>
+		{
+			exists = false;
+			return Task.CompletedTask;
+		});
+
+		bool result = await client.DeleteFileAsync("/remove.txt");
+
+		result.ShouldBeTrue();
+		GetCalls(session, "RequestRemoveAsync").Single().Arguments[1].ShouldBe(CancellationToken.None);
+	}
+
 }

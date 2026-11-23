@@ -1,7 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using CommonNetFuncs.Web.Common.ValidationAttributes;
+using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
-using CommonNetFuncs.Web.Common.ValidationAttributes;
-
 
 namespace Web.Common.Tests.ValidationAttributes;
 
@@ -400,4 +399,26 @@ public sealed class DenyRegularExpressionAttributeTests : ValidationTestBase
 		// Act & Assert
 		Should.Throw<InvalidOperationException>(() => attribute.GetValidationResult("test", DummyValidationContext));
 	}
+}
+
+public sealed class DenyRegularExpressionAttributeBehaviorTests : ValidationTestBase
+{
+
+
+
+
+	[Fact]
+	public void DenyRegularExpression_FormatErrorMessage_WithoutConfiguredMessage_UsesFallback()
+	{
+		DenyRegularExpressionAttribute attribute = new("secret")
+		{
+			ErrorMessage = null!,
+			ErrorMessageResourceName = nameof(EmptyValidationResource.Empty),
+			ErrorMessageResourceType = typeof(EmptyValidationResource),
+		};
+
+		attribute.FormatErrorMessage("Token")
+			.ShouldBe("The field Token must not match the pattern 'secret'.");
+	}
+
 }

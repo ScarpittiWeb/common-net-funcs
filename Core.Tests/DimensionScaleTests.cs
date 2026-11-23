@@ -1,5 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Core.Tests;
 

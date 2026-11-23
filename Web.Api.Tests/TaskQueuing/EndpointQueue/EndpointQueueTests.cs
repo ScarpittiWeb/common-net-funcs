@@ -1,6 +1,7 @@
-﻿using System.Threading.Channels;
-using CommonNetFuncs.Web.Api.TaskQueuing;
+﻿using CommonNetFuncs.Web.Api.TaskQueuing;
+using System.Threading.Channels;
 using static Xunit.TestContext;
+using EndpointQueueImpl = CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue.EndpointQueue;
 
 namespace Web.Api.Tests.TaskQueuing.EndpointQueue;
 
@@ -597,4 +598,114 @@ public class EndpointQueueTests : IDisposable
 		public string Name { get; set; } = string.Empty;
 		public List<int> Values { get; set; } = new();
 	}
+}
+
+public sealed class EndpointQueueBehaviorTests
+{
+
+
+
+
+	private static TaskCompletionSource CreateSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+	[Fact]
+	public async Task Enqueue_AfterDispose_IsCanceledWithoutExecutingDelegate()
+	{
+		EndpointQueueImpl queue = new("closed", new UnboundedChannelOptions());
+		queue.Dispose();
+		int invocations = 0;
+
+		await Should.ThrowAsync<TaskCanceledException>(async () =>
+			await queue.EnqueueAsync(_ =>
+			{
+				Interlocked.Increment(ref invocations);
+				return Task.FromResult(1);
+			}, Current.CancellationToken));
+
+		invocations.ShouldBe(0);
+	}
+
+	[Fact]
+	public async Task Dispose_CancelsActiveTaskWithQueueTokenAndLeavesFailedCountZero()
+	{
+		EndpointQueueImpl queue = new("cancel-active", new UnboundedChannelOptions());
+		TaskCompletionSource activeStarted = CreateSignal();
+		Task<int> active = queue.EnqueueAsync(async token =>
+		{
+			activeStarted.TrySetResult();
+			await Task.Delay(Timeout.InfiniteTimeSpan, token);
+			return 1;
+		}, Current.CancellationToken);
+		await activeStarted.Task;
+
+		queue.Dispose();
+
+		await Should.ThrowAsync<TaskCanceledException>(async () => await active);
+		queue.Stats.FailedTasks.ShouldBe(0);
+	}
+
+	[Fact]
+	public async Task Processing_PreservesExactFifoOrderWithoutTimingAssumptions()
+	{
+		EndpointQueueImpl queue = new("fifo", new BoundedChannelOptions(4), processTimeWindow: 1);
+		try
+		{
+			List<int> order = [];
+			TaskCompletionSource releaseFirst = CreateSignal();
+			TaskCompletionSource firstStarted = CreateSignal();
+			Task<int> first = queue.EnqueueAsync(async _ =>
+			{
+				firstStarted.TrySetResult();
+				await releaseFirst.Task;
+				order.Add(1);
+				return 1;
+			}, Current.CancellationToken);
+			await firstStarted.Task;
+			Task<int> second = queue.EnqueueAsync(_ =>
+			{
+				order.Add(2);
+				return Task.FromResult(2);
+			}, Current.CancellationToken);
+			Task<int> third = queue.EnqueueAsync(_ =>
+			{
+				order.Add(3);
+				return Task.FromResult(3);
+			}, Current.CancellationToken);
+
+			order.ShouldBeEmpty();
+			releaseFirst.SetResult();
+			(await first).ShouldBe(1);
+			(await second).ShouldBe(2);
+			(await third).ShouldBe(3);
+
+			order.ShouldBe([1, 2, 3]);
+			queue.Stats.AverageProcessingTime.ShouldNotBeNull();
+		}
+		finally
+		{
+			queue.Dispose();
+		}
+	}
+
+	[Fact]
+	public async Task Failure_IncrementsExactStatsAndPropagatesSameException()
+	{
+		EndpointQueueImpl queue = new("failure", new UnboundedChannelOptions());
+		try
+		{
+			InvalidOperationException error = new("queue failure");
+			InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(async () =>
+				await queue.EnqueueAsync<int>(_ => throw error, Current.CancellationToken));
+
+			thrown.ShouldBeSameAs(error);
+			queue.Stats.QueuedTasks.ShouldBe(1);
+			queue.Stats.FailedTasks.ShouldBe(1);
+			queue.Stats.ProcessedTasks.ShouldBe(0);
+		}
+		finally
+		{
+			queue.Dispose();
+		}
+	}
+
 }

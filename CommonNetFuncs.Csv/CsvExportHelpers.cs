@@ -26,7 +26,8 @@ public static class CsvExportHelpers
 		await using StreamWriter streamWriter = new(memoryStream, new UTF8Encoding(false), 1024, true);
 		await using CsvWriter csvWriter = CsvWriter.Create(streamWriter, new()
 		{
-			FormatProvider = CultureInfo.InvariantCulture
+			FormatProvider = CultureInfo.InvariantCulture,
+			NewLine = streamWriter.NewLine
 		});
 
 		try
@@ -57,45 +58,50 @@ public static class CsvExportHelpers
 		await using StreamWriter streamWriter = new(sourceMemoryStream, new UTF8Encoding(false));
 		try
 		{
+			// The writer targets an in-memory stream, so synchronous writes avoid a Task/state machine per cell without blocking on I/O
+			int columnCount = dataTable.Columns.Count;
+
 			//Headers
-			for (int i = 0; i < dataTable.Columns.Count; i++)
+			for (int i = 0; i < columnCount; i++)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
-				await streamWriter.WriteAsync(dataTable.Columns[i]?.ToString() ?? string.Empty).ConfigureAwait(false);
-				if (i < dataTable.Columns.Count - 1)
+				streamWriter.Write(dataTable.Columns[i]?.ToString() ?? string.Empty);
+				if (i < columnCount - 1)
 				{
-					await streamWriter.WriteAsync(",").ConfigureAwait(false);
+					streamWriter.Write(',');
 				}
 			}
-			await streamWriter.WriteAsync(streamWriter.NewLine).ConfigureAwait(false);
+			streamWriter.Write(streamWriter.NewLine);
 			foreach (DataRow row in dataTable.Rows)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
-				for (int i = 0; i < dataTable.Columns.Count; i++)
+				for (int i = 0; i < columnCount; i++)
 				{
-					if (!IsDBNull(row[i]))
+					object cell = row[i];
+					if (!IsDBNull(cell))
 					{
-						string? value = row[i].ToString();
+						string? value = cell.ToString();
 						if (value?.Contains(',') ?? false)
 						{
-							value = $"\"{value}\"";
-							await streamWriter.WriteAsync(value).ConfigureAwait(false);
+							streamWriter.Write('"');
+							streamWriter.Write(value);
+							streamWriter.Write('"');
 						}
 						else
 						{
-							await streamWriter.WriteAsync(row[i]?.ToString() ?? string.Empty).ConfigureAwait(false);
+							streamWriter.Write(value ?? string.Empty);
 						}
 					}
-					if (i < dataTable.Columns.Count - 1)
+					if (i < columnCount - 1)
 					{
-						await streamWriter.WriteAsync(",").ConfigureAwait(false);
+						streamWriter.Write(',');
 					}
 				}
-				await streamWriter.WriteAsync(streamWriter.NewLine).ConfigureAwait(false);
+				streamWriter.Write(streamWriter.NewLine);
 			}
 
 			cancellationToken.ThrowIfCancellationRequested();
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 			await streamWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
 #else
 			await streamWriter.FlushAsync().ConfigureAwait(false);

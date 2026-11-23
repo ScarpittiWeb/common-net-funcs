@@ -1,5 +1,13 @@
-﻿using CommonNetFuncs.EFCore.Logging;
+﻿using CommonNetFuncs.EFCore;
+using CommonNetFuncs.EFCore.Logging;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using NSubstitute;
+using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace EFCore.Tests.Logging;
 
@@ -450,3 +458,118 @@ internal sealed class TestLogger(List<string> logMessages, string categoryName) 
 }
 
 #endregion
+
+public sealed class FilteredEfCoreLoggerFactoryBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static (IServiceProvider Provider, CoverageContext Context) CreateProvider()
+	{
+		ServiceCollection services = new();
+		services.AddDbContextPool<CoverageContext>(options => options.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+		ServiceProvider provider = services.BuildServiceProvider();
+		return (provider, provider.GetRequiredService<CoverageContext>());
+	}
+
+	private static CoverageContext CreateContext() =>
+		new(new DbContextOptionsBuilder<CoverageContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+
+	private static IServiceProvider CreateThrowingTrackingProvider()
+	{
+		ServiceCollection services = new();
+		services.AddDbContext<ThrowOnTrackingContext>(options => options.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+		return services.BuildServiceProvider();
+	}
+
+	private static IAsyncEnumerable<CoverageEntity> InvokeStreamingHelper(Func<Func<bool, IQueryable<CoverageEntity>>> builderFactory)
+	{
+		MethodInfo method = typeof(BaseDbContextActions<CoverageEntity, CoverageContext>)
+			.GetMethod("ExecuteStreamingWithCircularRefHandling", BindingFlags.Static | BindingFlags.NonPublic)!
+			.MakeGenericMethod(typeof(CoverageEntity));
+		return (IAsyncEnumerable<CoverageEntity>)method.Invoke(null, [builderFactory(), CancellationToken.None])!;
+	}
+
+	private static ConcurrentDictionary<Type, bool> GetCircularReferenceCache() =>
+		(ConcurrentDictionary<Type, bool>)typeof(BaseDbContextActions<CoverageEntity, CoverageContext>)
+			.GetField("circularReferencingEntities", BindingFlags.Static | BindingFlags.NonPublic)!
+			.GetValue(null)!;
+
+	private static (IProperty Property, IEntityType EntityType, DbContext Context) CreateDateTimeMetadata(
+		string? providerName, string? storeType)
+	{
+		IProperty property = Substitute.For<IProperty>();
+		property.GetColumnType().Returns(storeType);
+		IEntityType entityType = Substitute.For<IEntityType>();
+		entityType.FindProperty(nameof(CoverageDateEntity.CreatedDate)).Returns(property);
+		return (property, entityType, CreateMockContext(providerName));
+	}
+
+	private static DbContext CreateMockContext(string? providerName)
+	{
+		DatabaseFacade database = Substitute.For<DatabaseFacade>(CreateContext());
+		database.ProviderName.Returns(providerName);
+		DbContext context = Substitute.For<DbContext>();
+		context.Database.Returns(database);
+		return context;
+	}
+
+	private static DateTime InvokeNormalize(
+		DateTime value,
+		IProperty property,
+		IEntityType entityType,
+		DbContext context,
+		PropertyInfo? clrProperty = null)
+	{
+		MethodInfo method = typeof(Collections).GetMethod(
+			"NormalizeDateTimeForDatabase", BindingFlags.Static | BindingFlags.NonPublic)!;
+		return (DateTime)method.Invoke(null,
+		[
+			value,
+			clrProperty ?? typeof(CoverageDateEntity).GetProperty(nameof(CoverageDateEntity.CreatedDate))!,
+			entityType,
+			context
+		])!;
+	}
+
+	[Fact]
+	public void FilteredLoggerFactory_UnmatchedCategory_KeepsUnderlyingLoggingEnabled()
+	{
+		ILoggerFactory inner = LoggerFactory.Create(builder =>
+		{
+			builder.SetMinimumLevel(LogLevel.Trace);
+			builder.AddProvider(new RecordingProvider());
+		});
+		FilteredEfCoreLoggerFactory factory = new(inner, new Dictionary<string, LogLevel>
+		{
+			["Database.Command"] = LogLevel.Warning
+		});
+
+		ILogger logger = factory.CreateLogger("Application.Query");
+
+		logger.IsEnabled(LogLevel.Trace).ShouldBeTrue();
+		factory.Dispose();
+	}
+
+}

@@ -83,6 +83,7 @@ public class ContentTypesTests
 	[InlineData("unknown.xyz")]
 	[InlineData("file.unknown")]
 	[InlineData("test.abc123")]
+	[InlineData("file.averyveryverylongextension")]
 	public void GetContentType_UnknownExtension_ReturnsOctetStream(string fileName)
 	{
 		// Act
@@ -90,6 +91,30 @@ public class ContentTypesTests
 
 		// Assert
 		result.ShouldBe(ContentTypes.BinaryStream);
+	}
+
+	[Theory]
+	[InlineData("README")]
+	[InlineData("file.")]
+	[InlineData("folder.name/file")]
+	public void GetContentType_NoExtension_ThrowsArgumentExceptionForExtension(string fileName)
+	{
+		// Act & Assert
+		ArgumentException ex = Should.Throw<ArgumentException>(fileName.GetContentType);
+		ex.ParamName.ShouldBe("extension");
+	}
+
+	[Theory]
+	[InlineData("page.htmlwithaverylongsuffix", ContentTypes.Html)]
+	[InlineData("script.javascript-minified-bundle", ContentTypes.Js)]
+	[InlineData("data.octet-stream-payload", ContentTypes.BinaryStream)]
+	public void GetContentType_ExtensionLongerThanKnownExtensions_UsesPrefixMatching(string fileName, string expectedContentType)
+	{
+		// Act
+		string result = fileName.GetContentType();
+
+		// Assert
+		result.ShouldBe(expectedContentType);
 	}
 
 	#endregion
@@ -267,4 +292,34 @@ public class EncodingTypesTests
 		EncodingTypes.GZip.ShouldBe("gzip");
 		EncodingTypes.Deflate.ShouldBe("deflate");
 	}
+}
+
+[Collection(FormDataExtensionCoverageCollection.Name)]
+public sealed class ContentTypesBehaviorTests
+{
+
+	[Fact]
+	public void GetContentTypeByExtension_MutableRegisteredFormDataType_ReturnsUrlEncodedFormData()
+	{
+		const string extension = ".registered-form-data";
+		string original = ContentTypes.FormDataTypes[0];
+		ContentTypes.FormDataTypes[0] = extension;
+
+		try
+		{
+			ContentTypes.GetContentTypeByExtension(extension)
+				.ShouldBe(ContentTypes.UrlEncodedFormData);
+		}
+		finally
+		{
+			ContentTypes.FormDataTypes[0] = original;
+		}
+	}
+
+}
+
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class FormDataExtensionCoverageCollection
+{
+	public const string Name = "FormData extension coverage";
 }

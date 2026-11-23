@@ -22,7 +22,7 @@ public sealed class EmailServiceTests
 		EmailContent emailContent = new("Subject", "Body");
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server but method should complete
@@ -42,7 +42,7 @@ public sealed class EmailServiceTests
 		EmailContent emailContent = new("Subject", "Body");
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -66,7 +66,7 @@ public sealed class EmailServiceTests
 		EmailContent emailContent = new("Subject", "Body");
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server but method should complete
@@ -86,7 +86,7 @@ public sealed class EmailServiceTests
 		EmailContent emailContent = new("Subject", "Body");
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -106,7 +106,7 @@ public sealed class EmailServiceTests
 		EmailContent emailContent = new("<h1>Subject</h1>", "<p>HTML Body</p>", true);
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -130,7 +130,7 @@ public sealed class EmailServiceTests
 		EmailContentBytes emailContent = new("Subject", "Body");
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server but method should complete
@@ -150,7 +150,7 @@ public sealed class EmailServiceTests
 		EmailContentBytes emailContent = new("Subject", "Body");
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -174,7 +174,7 @@ public sealed class EmailServiceTests
 		EmailContentBytes emailContent = new("Subject", "Body", false, attachments);
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -198,7 +198,7 @@ public sealed class EmailServiceTests
 		EmailContentBytes emailContent = new("Subject", "Body");
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server but method should complete
@@ -218,7 +218,7 @@ public sealed class EmailServiceTests
 		EmailContentBytes emailContent = new("Subject", "Body");
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -243,7 +243,7 @@ public sealed class EmailServiceTests
 		EmailContentBytes emailContent = new("Subject", "Body", false, attachments, true);
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -271,7 +271,7 @@ public sealed class EmailServiceTests
 		};
 
 		// Act
-		bool result = await service.SendEmail(config, Current.CancellationToken);
+		bool result = await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -295,7 +295,7 @@ public sealed class EmailServiceTests
 		};
 
 		// Act
-		bool result = await service.SendEmail(config, Current.CancellationToken);
+		bool result = await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -323,7 +323,7 @@ public sealed class EmailServiceTests
 		};
 
 		// Act
-		bool result = await service.SendEmail(config, Current.CancellationToken);
+		bool result = await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -349,7 +349,7 @@ public sealed class EmailServiceTests
 		};
 
 		// Act
-		bool result = await service.SendEmail(config, Current.CancellationToken);
+		bool result = await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -377,7 +377,7 @@ public sealed class EmailServiceTests
 		};
 
 		// Act
-		bool result = await service.SendEmail(config, Current.CancellationToken);
+		bool result = await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -401,7 +401,7 @@ public sealed class EmailServiceTests
 		};
 
 		// Act
-		bool result = await service.SendEmail(config, Current.CancellationToken);
+		bool result = await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -429,7 +429,7 @@ public sealed class EmailServiceTests
 		};
 
 		// Act
-		bool result = await service.SendEmail(config, Current.CancellationToken);
+		bool result = await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server
@@ -455,7 +455,7 @@ public sealed class EmailServiceTests
 		};
 
 		// Act
-		bool result = await service.SendEmail(config, Current.CancellationToken);
+		bool result = await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to invalid SMTP server

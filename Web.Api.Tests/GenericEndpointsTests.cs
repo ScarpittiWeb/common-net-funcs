@@ -1,6 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.Linq.Expressions;
-using AutoFixture;
+﻿using AutoFixture;
 using AutoFixture.AutoFakeItEasy;
 using CommonNetFuncs.EFCore;
 using CommonNetFuncs.Web.Api;
@@ -9,6 +7,8 @@ using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using System.ComponentModel.DataAnnotations;
+using System.Linq.Expressions;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests;

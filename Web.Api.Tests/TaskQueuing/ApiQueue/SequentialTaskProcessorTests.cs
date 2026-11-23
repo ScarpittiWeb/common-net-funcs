@@ -1,7 +1,7 @@
-﻿using System.Reflection;
-using System.Threading.Channels;
-using CommonNetFuncs.Web.Api.TaskQueuing;
+﻿using CommonNetFuncs.Web.Api.TaskQueuing;
 using CommonNetFuncs.Web.Api.TaskQueuing.ApiQueue;
+using System.Reflection;
+using System.Threading.Channels;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests.TaskQueuing.ApiQueue;
@@ -389,13 +389,22 @@ public class SequentialTaskProcessorTests
 		SequentialTaskProcessor processor = new(options);
 		await processor.StartAsync(CancellationToken.None);
 		bool taskCompleted = false;
+		TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+		TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		// Act
-		Task<int?> task = processor.EnqueueAsync(async ct => { await Task.Delay(100, ct); taskCompleted = true; return (int?)42; }, cancellationToken: Current.CancellationToken);
+		Task<int?> task = processor.EnqueueAsync(async ct =>
+		{
+			entered.SetResult();
+			await release.Task.WaitAsync(ct);
+			taskCompleted = true;
+			return (int?)42;
+		}, cancellationToken: Current.CancellationToken);
 
-		await Task.Delay(50, Current.CancellationToken); // Let it start processing
+		await entered.Task.WaitAsync(TimeSpan.FromSeconds(2), Current.CancellationToken);
 
 		processor.Dispose();
+		release.SetResult();
 
 		// Wait for the task to complete (it should finish even after dispose)
 		await task.WaitAsync(TimeSpan.FromSeconds(2), Current.CancellationToken);
@@ -686,4 +695,140 @@ public class SequentialTaskProcessorTests
 	}
 
 	#endregion
+}
+
+public sealed class SequentialTaskProcessorBehaviorTests
+{
+
+
+
+
+	private static TaskCompletionSource CreateSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+	[Fact]
+	public async Task Enqueue_WhenCapacityIsFull_CancellationAbortsOnlyWaitingWrite()
+	{
+		SequentialTaskProcessor processor = new(new BoundedChannelOptions(1));
+		try
+		{
+			await processor.StartAsync(Current.CancellationToken);
+			TaskCompletionSource activeStarted = CreateSignal();
+			TaskCompletionSource releaseActive = CreateSignal();
+			Task<int?> active = processor.EnqueueAsync<int?>(async _ =>
+			{
+				activeStarted.TrySetResult();
+				await releaseActive.Task;
+				return 1;
+			}, Current.CancellationToken);
+			await activeStarted.Task;
+
+			Task<int?> buffered = processor.EnqueueAsync(_ => Task.FromResult((int?)2), Current.CancellationToken);
+			using CancellationTokenSource cancelledWrite = new();
+			Task<int?> waiting = processor.EnqueueAsync(_ => Task.FromResult((int?)3), cancelledWrite.Token);
+			cancelledWrite.Cancel();
+
+			await Should.ThrowAsync<OperationCanceledException>(async () => await waiting);
+			processor.Stats.QueuedTasks.ShouldBe(2);
+
+			releaseActive.SetResult();
+			(await active).ShouldBe(1);
+			(await buffered).ShouldBe(2);
+		}
+		finally
+		{
+			processor.Dispose();
+		}
+	}
+
+	[Fact]
+	public async Task Enqueue_AfterShutdown_IsCanceledWithoutExecutingDelegate()
+	{
+		SequentialTaskProcessor processor = new(new UnboundedChannelOptions());
+		processor.Dispose();
+		int invocations = 0;
+
+		await Should.ThrowAsync<TaskCanceledException>(async () =>
+			await processor.EnqueueAsync(_ =>
+			{
+				Interlocked.Increment(ref invocations);
+				return Task.FromResult((int?)1);
+			}, Current.CancellationToken));
+
+		invocations.ShouldBe(0);
+	}
+
+	[Fact]
+	public async Task ProcessLoop_DisposedQueuedTask_IsCanceledAndNeverExecuted()
+	{
+		using ExposedSequentialProcessor processor = new();
+		QueuedTask queued = new(_ => throw new InvalidOperationException("must not run"));
+		processor.SetDisposed();
+		processor.Inject(queued);
+		processor.CompleteWriter();
+
+		await processor.RunLoopAsync(Current.CancellationToken);
+
+		queued.CompletionSource.Task.IsCanceled.ShouldBeTrue();
+	}
+
+	[Fact]
+	public async Task ProcessingWindow_AndFailureStatsRemainExact()
+	{
+		SequentialTaskProcessor processor = new(new UnboundedChannelOptions(), processTimeWindow: 1);
+		try
+		{
+			await processor.StartAsync(Current.CancellationToken);
+			(await processor.EnqueueAsync(_ => Task.FromResult((int?)10), Current.CancellationToken)).ShouldBe(10);
+			(await processor.EnqueueAsync(_ => Task.FromResult((int?)20), Current.CancellationToken)).ShouldBe(20);
+			await Should.ThrowAsync<InvalidOperationException>(async () =>
+				await processor.EnqueueAsync<int?>(_ => throw new InvalidOperationException("failure"), Current.CancellationToken));
+
+			QueueStats stats = processor.Stats;
+			stats.QueuedTasks.ShouldBe(3);
+			stats.ProcessedTasks.ShouldBe(2);
+			stats.FailedTasks.ShouldBe(1);
+			stats.AverageProcessingTime.ShouldNotBeNull();
+		}
+		finally
+		{
+			processor.Dispose();
+		}
+	}
+
+}
+
+internal sealed class ExposedSequentialProcessor : SequentialTaskProcessor
+{
+	private readonly ChannelWriter<QueuedTask> writer;
+
+	public ExposedSequentialProcessor() : base(new UnboundedChannelOptions())
+	{
+		writer = (ChannelWriter<QueuedTask>)GetField("writer").GetValue(this)!;
+	}
+
+	public void Inject(QueuedTask task) => writer.TryWrite(task).ShouldBeTrue();
+	public void CompleteWriter() => writer.TryComplete().ShouldBeTrue();
+	public void SetDisposed() => GetField("disposed").SetValue(this, true);
+	public Task RunLoopAsync(CancellationToken cancellationToken) => base.ExecuteAsync(cancellationToken);
+
+	private static FieldInfo GetField(string name) =>
+		typeof(SequentialTaskProcessor).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!;
+}
+
+internal sealed class ExposedPrioritizedProcessor : PrioritizedSequentialTaskProcessor
+{
+	private readonly ChannelWriter<PrioritizedQueuedTask> writer;
+
+	public ExposedPrioritizedProcessor() : base(new UnboundedChannelOptions())
+	{
+		writer = (ChannelWriter<PrioritizedQueuedTask>)GetField("writer").GetValue(this)!;
+	}
+
+	public void Inject(PrioritizedQueuedTask task) => writer.TryWrite(task).ShouldBeTrue();
+	public void CompleteWriter() => writer.TryComplete().ShouldBeTrue();
+	public void SetDisposed() => GetField("disposed").SetValue(this, true);
+	public Task RunLoopAsync(CancellationToken cancellationToken) => base.ExecuteAsync(cancellationToken);
+
+	private static FieldInfo GetField(string name) =>
+		typeof(PrioritizedSequentialTaskProcessor).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!;
 }

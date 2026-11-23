@@ -1,6 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using CommonNetFuncs.Web.Common.ValidationAttributes;
+using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
-using CommonNetFuncs.Web.Common.ValidationAttributes;
 
 namespace Web.Common.Tests.ValidationAttributes;
 
@@ -203,4 +203,24 @@ public sealed class ListRegularExpressionAttributeTests : ValidationTestBase
 		result.ShouldNotBeNull();
 		result.ErrorMessage?.ShouldContain("does not match");
 	}
+}
+
+public sealed class ListRegularExpressionAttributeBehaviorTests : ValidationTestBase
+{
+
+
+
+
+	[Fact]
+	public void ListRegularExpression_ReusedAttribute_KeepsConfiguredRegexAndValidationBehavior()
+	{
+		ListRegularExpressionAttribute attribute = new("^[A-Z]{2}$");
+		List<string> values = ["AB", "CD"];
+
+		attribute.GetValidationResult(values, CreateValidationContext("Codes"))
+			.ShouldBe(ValidationResult.Success);
+		attribute.FormatErrorMessage("Codes")
+			.ShouldBe("The field Codes is invalid.");
+	}
+
 }

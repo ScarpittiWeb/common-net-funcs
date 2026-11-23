@@ -1,10 +1,11 @@
-﻿using System.Text;
-using CommonNetFuncs.Web.Common.CachingSupportClasses;
+﻿using CommonNetFuncs.Web.Common.CachingSupportClasses;
 using CommonNetFuncs.Web.Middleware.CachingMiddleware;
 using FakeItEasy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
+using System.Reflection;
+using System.Text;
 using xRetry.v3;
 using static Xunit.TestContext;
 
@@ -261,4 +262,88 @@ public sealed class MemoryCacheSpaceManagementTests
 		// Assert - The middleware should handle this gracefully
 		metrics.CurrentCacheSize().ShouldBeLessThanOrEqualTo(smallOptions.MaxCacheSizeInBytes);
 	}
+}
+
+public sealed class MemoryCacheSpaceManagementBehaviorTests
+{
+
+
+
+
+
+	private static MemoryCacheMiddleware CreateMiddleware(CacheMetrics? metrics, CacheTracker tracker, CacheOptions? options = null)
+	{
+		return new MemoryCacheMiddleware(
+			_ => Task.CompletedTask,
+			new MemoryCache(new MemoryCacheOptions()),
+			options ?? new CacheOptions { SuppressLogs = true },
+			metrics,
+			tracker);
+	}
+
+	private static void InvokeHandleEviction(MemoryCacheMiddleware middleware, object key, object? value)
+	{
+		GetPrivateMethod("HandleEviction").Invoke(middleware, [key, value, EvictionReason.Removed, null]);
+	}
+
+	private static void InvokeAppendSortedQuery(StringBuilder builder, IQueryCollection query, string evictionQueryParam)
+	{
+		GetPrivateMethod("AppendSortedQuery").Invoke(null, [builder, query, evictionQueryParam]);
+	}
+
+	private static SemaphoreSlim GetCacheLock(MemoryCacheMiddleware middleware)
+	{
+		FieldInfo field = typeof(MemoryCacheMiddleware).GetField("cacheLock", BindingFlags.Instance | BindingFlags.NonPublic)
+			?? throw new InvalidOperationException("cacheLock field was not found.");
+		return (SemaphoreSlim)field.GetValue(middleware)!;
+	}
+
+	private static MethodInfo GetPrivateMethod(string name)
+	{
+		return typeof(MemoryCacheMiddleware).GetMethod(name, BindingFlags.Instance | BindingFlags.Static | BindingFlags.NonPublic)
+			?? throw new InvalidOperationException($"{name} method was not found.");
+	}
+
+	private sealed class NullStringObject
+	{
+		public override string? ToString()
+		{
+			return null;
+		}
+	}
+
+	[Fact]
+	public async Task EnsureCacheSpaceAvailableAfterLockWait_WhenMetricsDrop_ReturnsTrue()
+	{
+		// Arrange
+		CacheOptions options = new() { MaxCacheSizeInBytes = 100 };
+		CacheMetrics metrics = new();
+		metrics.AddToSize(100);
+		CacheTracker tracker = new();
+		using MemoryCacheMiddleware middleware = CreateMiddleware(metrics, tracker, options);
+		SemaphoreSlim cacheLock = GetCacheLock(middleware);
+		MethodInfo method = GetPrivateMethod("EnsureCacheSpaceAvailableAsync");
+		await cacheLock.WaitAsync(Xunit.TestContext.Current.CancellationToken);
+		try
+		{
+			ValueTask<bool> result = (ValueTask<bool>)method.Invoke(middleware, [1L])!;
+			Task<bool> resultTask = result.AsTask();
+			resultTask.IsCompleted.ShouldBeFalse();
+			metrics.SubtractFromSize(1);
+
+			// Act
+			cacheLock.Release();
+
+			// Assert
+			(await resultTask).ShouldBeTrue();
+		}
+		finally
+		{
+			if (cacheLock.CurrentCount == 0)
+			{
+				cacheLock.Release();
+			}
+		}
+	}
+
 }

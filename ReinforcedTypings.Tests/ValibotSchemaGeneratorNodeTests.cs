@@ -1,9 +1,8 @@
-﻿using System.Reflection;
-using CommonNetFuncs.ReinforcedTypings.Valibot;
+﻿using CommonNetFuncs.ReinforcedTypings.Valibot;
 using Reinforced.Typings;
 using Reinforced.Typings.Fluent;
 using ReinforcedTypings.Tests.TestModels;
-using ReinforcedTypings.Tests.TestModels.Valibot;
+using System.Reflection;
 
 namespace ReinforcedTypings.Tests;
 
@@ -67,7 +66,7 @@ public sealed class ValibotSchemaGeneratorNodeTests
 	public void FindProjectDirectory_CsprojPresentInAncestor_ReturnsThatAncestor()
 	{
 		string root = CreateTempDir();
-		string nested = Path.Combine(root, "bin", "Debug", "net10.0");
+		string nested = Path.Combine(root, "bin", "Debug", "net11.0");
 		Directory.CreateDirectory(nested);
 		File.WriteAllText(Path.Combine(root, "SomeProject.csproj"), "<Project />");
 

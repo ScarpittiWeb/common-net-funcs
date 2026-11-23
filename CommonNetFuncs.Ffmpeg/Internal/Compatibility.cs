@@ -6,7 +6,7 @@ namespace CommonNetFuncs.Ffmpeg.Internal;
 /// Shims for BCL/Core members that only exist on newer TFMs, needed so this project can multi-target netstandard2.1.
 /// Not compiled for TFMs where the real member already exists.
 /// </summary>
-#if !NET5_0_OR_GREATER
+#if NETSTANDARD2_1
 internal static class ProcessCompatExtensions
 {
 	public static Task WaitForExitAsync(this Process process, CancellationToken cancellationToken = default)
@@ -16,7 +16,7 @@ internal static class ProcessCompatExtensions
 }
 #endif
 
-#if !NET7_0_OR_GREATER
+#if NETSTANDARD2_1
 internal static class EnumerableCompatExtensions
 {
 	public static IEnumerable<T> Order<T>(this IEnumerable<T> source)

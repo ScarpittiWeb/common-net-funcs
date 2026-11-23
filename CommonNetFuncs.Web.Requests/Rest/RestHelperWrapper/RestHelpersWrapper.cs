@@ -1,8 +1,8 @@
-﻿using System.Runtime.CompilerServices;
-using System.Text;
-using CommonNetFuncs.Web.Requests.Rest.Options;
+﻿using CommonNetFuncs.Web.Requests.Rest.Options;
 using Microsoft.AspNetCore.JsonPatch;
 using NLog;
+using System.Runtime.CompilerServices;
+using System.Text;
 using static CommonNetFuncs.Web.Common.ContentTypes;
 using static CommonNetFuncs.Web.Requests.Rest.RestHelperWrapper.WrapperHelpers;
 using static Newtonsoft.Json.JsonConvert;

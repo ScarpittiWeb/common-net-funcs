@@ -1,11 +1,8 @@
-﻿using System.Collections;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.RegularExpressions;
-
 using static CommonNetFuncs.Core.Strings;
-using static CommonNetFuncs.Core.TypeChecks;
 
 namespace CommonNetFuncs.Web.Common.ValidationAttributes;
 

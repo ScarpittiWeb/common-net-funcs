@@ -1,5 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
-using CommonNetFuncs.Web.Common.ValidationAttributes;
+﻿using CommonNetFuncs.Web.Common.ValidationAttributes;
+using System.ComponentModel.DataAnnotations;
 
 namespace Web.Common.Tests.ValidationAttributes;
 

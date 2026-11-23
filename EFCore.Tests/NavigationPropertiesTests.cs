@@ -1,8 +1,14 @@
-﻿using System.Text.Json.Serialization;
-using System.Xml.Serialization;
-using CommonNetFuncs.EFCore;
+﻿using CommonNetFuncs.EFCore;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
+using System.Collections.Concurrent;
+using System.Reflection;
+using System.Text.Json.Serialization;
+using System.Xml.Serialization;
 
 namespace EFCore.Tests;
 
@@ -759,4 +765,147 @@ public sealed class NavigationPropertiesTests : IDisposable
 	}
 
 	#endregion
+}
+
+public sealed class NavigationPropertiesBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static (IServiceProvider Provider, CoverageContext Context) CreateProvider()
+	{
+		ServiceCollection services = new();
+		services.AddDbContextPool<CoverageContext>(options => options.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+		ServiceProvider provider = services.BuildServiceProvider();
+		return (provider, provider.GetRequiredService<CoverageContext>());
+	}
+
+	private static CoverageContext CreateContext() =>
+		new(new DbContextOptionsBuilder<CoverageContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+
+	private static IServiceProvider CreateThrowingTrackingProvider()
+	{
+		ServiceCollection services = new();
+		services.AddDbContext<ThrowOnTrackingContext>(options => options.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+		return services.BuildServiceProvider();
+	}
+
+	private static IAsyncEnumerable<CoverageEntity> InvokeStreamingHelper(Func<Func<bool, IQueryable<CoverageEntity>>> builderFactory)
+	{
+		MethodInfo method = typeof(BaseDbContextActions<CoverageEntity, CoverageContext>)
+			.GetMethod("ExecuteStreamingWithCircularRefHandling", BindingFlags.Static | BindingFlags.NonPublic)!
+			.MakeGenericMethod(typeof(CoverageEntity));
+		return (IAsyncEnumerable<CoverageEntity>)method.Invoke(null, [builderFactory(), CancellationToken.None])!;
+	}
+
+	private static ConcurrentDictionary<Type, bool> GetCircularReferenceCache() =>
+		(ConcurrentDictionary<Type, bool>)typeof(BaseDbContextActions<CoverageEntity, CoverageContext>)
+			.GetField("circularReferencingEntities", BindingFlags.Static | BindingFlags.NonPublic)!
+			.GetValue(null)!;
+
+	private static (IProperty Property, IEntityType EntityType, DbContext Context) CreateDateTimeMetadata(
+		string? providerName, string? storeType)
+	{
+		IProperty property = Substitute.For<IProperty>();
+		property.GetColumnType().Returns(storeType);
+		IEntityType entityType = Substitute.For<IEntityType>();
+		entityType.FindProperty(nameof(CoverageDateEntity.CreatedDate)).Returns(property);
+		return (property, entityType, CreateMockContext(providerName));
+	}
+
+	private static DbContext CreateMockContext(string? providerName)
+	{
+		DatabaseFacade database = Substitute.For<DatabaseFacade>(CreateContext());
+		database.ProviderName.Returns(providerName);
+		DbContext context = Substitute.For<DbContext>();
+		context.Database.Returns(database);
+		return context;
+	}
+
+	private static DateTime InvokeNormalize(
+		DateTime value,
+		IProperty property,
+		IEntityType entityType,
+		DbContext context,
+		PropertyInfo? clrProperty = null)
+	{
+		MethodInfo method = typeof(Collections).GetMethod(
+			"NormalizeDateTimeForDatabase", BindingFlags.Static | BindingFlags.NonPublic)!;
+		return (DateTime)method.Invoke(null,
+		[
+			value,
+			clrProperty ?? typeof(CoverageDateEntity).GetProperty(nameof(CoverageDateEntity.CreatedDate))!,
+			entityType,
+			context
+		])!;
+	}
+
+	[Fact]
+	public void NavigationPropertiesCacheValue_EmptyPath_IsIncludedAtAnyDepth()
+	{
+		NavigationProperties.NavigationPropertiesCacheValue value =
+			new(["", "A", "A.B"], 3);
+
+		value.GetNavigationsToDepth(0).ShouldContain(string.Empty);
+		value.GetNavigationsToDepth(0).ShouldContain("A");
+		value.GetNavigationsToDepth(0).ShouldNotContain("A.B");
+	}
+
+	[Fact]
+	public void NavigationProperties_UnmappedEntityAndNullOptions_ReturnEmptyPaths()
+	{
+		using CoverageContext context = CreateContext();
+
+		NavigationProperties.GetNavigations<UnmappedCoverageEntity>(context, null).ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void NavigationProperties_CustomIgnoreAttributes_SkipOnlyMarkedNavigation()
+	{
+		DbContextOptions<NavigationCoverageContext> options =
+			new DbContextOptionsBuilder<NavigationCoverageContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options;
+		using NavigationCoverageContext context = new(options);
+		NavigationProperties.NavigationCacheManager.ClearAllCaches();
+
+		HashSet<string> paths = NavigationProperties.GetNavigations<NavigationCoverageRoot>(
+			context,
+			new NavigationPropertiesOptions(
+				maxNavigationDepth: 3,
+				navPropAttributesToIgnore: [typeof(CoverageIgnoreAttribute), typeof(ObsoleteAttribute)],
+				useCaching: false));
+
+		paths.ShouldContain(nameof(NavigationCoverageRoot.Included));
+		paths.ShouldNotContain(nameof(NavigationCoverageRoot.Ignored));
+	}
+
+	[Fact]
+	public void TopLevelNavigationCache_ExplicitlyUncachedReadsMissingModelAsEmpty()
+	{
+		using CoverageContext context = CreateContext();
+
+		NavigationProperties.GetTopLevelNavigations<UnmappedCoverageEntity>(
+			context, useCaching: false).ShouldBeEmpty();
+	}
+
 }

@@ -1,6 +1,7 @@
 ﻿namespace CommonNetFuncs.Core;
 
 using CommonNetFuncs.Core.Internal;
+using System.Buffers;
 
 public static class Streams
 {
@@ -18,6 +19,12 @@ public static class Streams
 		try
 		{
 			await stream.CopyToAsync(ms, bufferSize, cancellationToken).ConfigureAwait(false);
+
+			// The MemoryStream is private to this method, so its buffer can be handed out when it holds exactly the data (pre-sized seekable source at position 0)
+			if (ms.TryGetBuffer(out ArraySegment<byte> segment) && (segment.Offset == 0) && (segment.Count == segment.Array!.Length))
+			{
+				return segment.Array;
+			}
 			return ms.ToArray();
 		}
 		finally
@@ -104,11 +111,18 @@ public sealed class CountingStream(Stream innerStream) : Stream
 		ThrowHelper.ThrowIfNull(destination, nameof(destination));
 		ThrowHelper.ThrowIfNegativeOrZero(bufferSize, nameof(bufferSize));
 
-		byte[] buffer = new byte[bufferSize];
-		int bytesRead;
-		while ((bytesRead = await ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) != 0)
+		byte[] buffer = ArrayPool<byte>.Shared.Rent(bufferSize);
+		try
 		{
-			await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+			int bytesRead;
+			while ((bytesRead = await ReadAsync(buffer.AsMemory(0, bufferSize), cancellationToken).ConfigureAwait(false)) != 0)
+			{
+				await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
+			}
+		}
+		finally
+		{
+			ArrayPool<byte>.Shared.Return(buffer);
 		}
 	}
 

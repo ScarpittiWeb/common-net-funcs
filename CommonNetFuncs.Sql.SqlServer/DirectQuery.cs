@@ -1,7 +1,7 @@
-﻿using System.Data;
-using System.Runtime.CompilerServices;
-using CommonNetFuncs.Sql.Common;
+﻿using CommonNetFuncs.Sql.Common;
 using Microsoft.Data.SqlClient;
+using System.Data;
+using System.Runtime.CompilerServices;
 using static CommonNetFuncs.Sql.Common.DirectQuery;
 
 namespace CommonNetFuncs.Sql.SqlServer;

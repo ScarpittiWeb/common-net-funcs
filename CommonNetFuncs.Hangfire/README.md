@@ -1,333 +1,208 @@
 # CommonNetFuncs.Hangfire
 
-[![License](https://img.shields.io/github/license/NickScarpitti/common-net-funcs.svg)](http://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/github/license/ScarpittiWeb/common-net-funcs.svg)](https://opensource.org/licenses/MIT)
 [![NuGet Version](https://img.shields.io/nuget/v/CommonNetFuncs.Hangfire)](https://www.nuget.org/packages/CommonNetFuncs.Hangfire/)
-[![nuget](https://img.shields.io/nuget/dt/CommonNetFuncs.Hangfire)](https://www.nuget.org/packages/CommonNetFuncs.Hangfire/)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/CommonNetFuncs.Hangfire)](https://www.nuget.org/packages/CommonNetFuncs.Hangfire/)
 
-This project contains helper methods and utilities for integrating Hangfire background job processing into ASP.NET Core applications with enhanced security, error handling, and graceful shutdown capabilities.
+Helpers for authenticated Hangfire dashboard access, job cancellation/matching, job failure context, and shutdown observation. This package targets `net11.0` and assumes Hangfire storage and server configuration have already been supplied by the host application.
 
 ## Contents
 
 - [CommonNetFuncs.Hangfire](#commonnetfuncshangfire)
   - [Contents](#contents)
-  - [HangfireAuthorizationFilter](#hangfireauthorizationfilter)
-    - [HangfireAuthorizationFilter Usage Examples](#hangfireauthorizationfilter-usage-examples)
-      - [Basic Setup with Roles](#basic-setup-with-roles)
-      - [Authentication Only (No Role Restrictions)](#authentication-only-no-role-restrictions)
-  - [HangfireJobException](#hangfirejobexception)
-    - [HangfireJobException Usage Examples](#hangfirejobexception-usage-examples)
-      - [Basic Job Exception](#basic-job-exception)
-      - [Exception with Retry Control](#exception-with-retry-control)
-      - [Exception with Operation Context](#exception-with-operation-context)
-      - [Full Context Exception](#full-context-exception)
-  - [HangfireShutdownMonitor](#hangfireshutdownmonitor)
-    - [HangfireShutdownMonitor Usage Examples](#hangfireshutdownmonitor-usage-examples)
-      - [Register Shutdown Monitor](#register-shutdown-monitor)
-  - [WaitForHangfireJobsToComplete](#waitforhangfirejobstocomplete)
-    - [WaitForHangfireJobsToComplete Usage Examples](#waitforhangfirejobstocomplete-usage-examples)
-      - [Wait for Jobs with Defaults](#wait-for-jobs-with-defaults)
-      - [Wait for Jobs with Custom Settings](#wait-for-jobs-with-custom-settings)
   - [Installation](#installation)
+  - [Dashboard authorization](#dashboard-authorization)
+  - [Job matching and deletion](#job-matching-and-deletion)
+  - [`HangfireJobException`](#hangfirejobexception)
+  - [Shutdown observation](#shutdown-observation)
+  - [Waiting for jobs](#waiting-for-jobs)
   - [License](#license)
 
----
-
-## HangfireAuthorizationFilter
-
-Authorization filter for Hangfire Dashboard that requires authenticated users with specific roles to access the dashboard.
-
-### HangfireAuthorizationFilter Usage Examples
-
-<details>
-<summary><h4>Usage Examples</h4></summary>
-
-#### Basic Setup with Roles
-
-Restrict dashboard access to specific roles (Admin, Manager, etc.)
-
-```cs
-using CommonNetFuncs.Hangfire;
-using Hangfire;
-using System.Collections.Frozen;
-
-// In Program.cs or Startup.cs
-var allowedRoles = new HashSet<string> { "Admin", "Manager" }.ToFrozenSet();
-
-app.UseHangfireDashboard("/hangfire", new DashboardOptions
-{
-    Authorization = new[] { new HangfireAuthorizationFilter(allowedRoles) }
-});
-```
-
-#### Authentication Only (No Role Restrictions)
-
-Allow any authenticated user to access the dashboard
-
-```cs
-using CommonNetFuncs.Hangfire;
-using Hangfire;
-using System.Collections.Frozen;
-
-// Empty set = any authenticated user can access
-var allowedRoles = new HashSet<string>().ToFrozenSet();
-
-app.UseHangfireDashboard("/hangfire", new DashboardOptions
-{
-    Authorization = new[] { new HangfireAuthorizationFilter(allowedRoles) }
-});
-```
-
-</details>
-
----
-
-## HangfireJobException
-
-Custom exception for Hangfire background jobs that provides context about the job operation and controls retry behavior.
-
-**Properties:**
-
-- `OperationName` - The name of the operation that failed
-- `EntityId` - The ID of the entity being processed when the failure occurred
-- `AllowRetry` - Whether Hangfire should retry the job (defaults to `true`)
-
-### HangfireJobException Usage Examples
-
-<details>
-<summary><h4>Usage Examples</h4></summary>
-
-#### Basic Job Exception
-
-Throw a simple exception that allows retry
-
-```cs
-using CommonNetFuncs.Hangfire;
-
-public async Task ProcessItem(int itemId)
-{
-    if (!await ValidateItem(itemId))
-    {
-        throw new HangfireJobException("Item validation failed");
-    }
-}
-```
-
-#### Exception with Retry Control
-
-Throw an exception that prevents retry for permanent failures
-
-```cs
-using CommonNetFuncs.Hangfire;
-
-public async Task ProcessPayment(int paymentId)
-{
-    var payment = await GetPayment(paymentId);
-
-    if (payment.Status == PaymentStatus.AlreadyProcessed)
-    {
-        // Don't retry - this is a permanent failure condition
-        throw new HangfireJobException(
-            "Payment has already been processed",
-            allowRetry: false);
-    }
-}
-```
-
-#### Exception with Operation Context
-
-Provide operation name for better logging and debugging
-
-```cs
-using CommonNetFuncs.Hangfire;
-
-public async Task SendEmailNotification(int userId)
-{
-    try
-    {
-        await emailService.SendNotificationAsync(userId);
-    }
-    catch (SmtpException ex)
-    {
-        throw new HangfireJobException(
-            "Failed to send email notification",
-            operationName: "SendEmailNotification",
-            allowRetry: true);
-    }
-}
-```
-
-#### Full Context Exception
-
-Include all context information for comprehensive error tracking
-
-```cs
-using CommonNetFuncs.Hangfire;
-
-public async Task UpdateCustomerData(int customerId)
-{
-    try
-    {
-        var customer = await dbContext.Customers.FindAsync(customerId);
-
-        if (customer == null)
-        {
-            throw new HangfireJobException(
-                message: "Customer not found in database",
-                operationName: "UpdateCustomerData",
-                entityId: customerId,
-                allowRetry: false); // Don't retry if customer doesn't exist
-        }
-
-        // Process customer...
-    }
-    catch (DbUpdateException ex)
-    {
-        throw new HangfireJobException(
-            message: "Database update failed",
-            operationName: "UpdateCustomerData",
-            entityId: customerId,
-            allowRetry: true); // Retry transient database errors
-    }
-}
-```
-
-</details>
-
----
-
-## HangfireShutdownMonitor
-
-Monitors Hangfire jobs during application shutdown to ensure graceful termination and log pending jobs.
-
-**Features:**
-
-- Logs pending job counts during shutdown (processing, enqueued, scheduled)
-- Properly disposes of the BackgroundJobServer
-- Handles errors gracefully during shutdown
-
-### HangfireShutdownMonitor Usage Examples
-
-<details>
-<summary><h4>Usage Examples</h4></summary>
-
-#### Register Shutdown Monitor
-
-Add the shutdown monitor as a hosted service in your ASP.NET Core application
-
-```cs
-using CommonNetFuncs.Hangfire;
-
-// In Program.cs or Startup.cs
-builder.Services.AddHostedService<HangfireShutdownMonitor>();
-
-// Configure Hangfire as normal
-builder.Services.AddHangfire(configuration => configuration
-    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-    .UseSimpleAssemblyNameTypeSerializer()
-    .UseRecommendedSerializerSettings()
-    .UseSqlServerStorage(connectionString));
-
-builder.Services.AddHangfireServer();
-```
-
-The monitor will automatically log pending jobs when the application shuts down:
-
-```text
-[INFO] Application shutting down with no pending Hangfire jobs
-```
-
-or
-
-```text
-[WARN] Application shutting down with 5 pending Hangfire job(s): 2 processing, 2 enqueued, 1 scheduled.
-       Jobs will be persisted in database and resumed by next instance.
-```
-
-</details>
-
----
-
-## WaitForHangfireJobsToComplete
-
-Utility method to wait for all Hangfire jobs to complete before continuing execution. Useful for graceful shutdown scenarios or integration tests.
-
-**Parameters:**
-
-- `checkIntervalSeconds` - How often to check job status (default: 5 seconds)
-- `maxWaitMinutes` - Maximum time to wait for jobs (default: 60 minutes)
-
-### WaitForHangfireJobsToComplete Usage Examples
-
-<details>
-<summary><h4>Usage Examples</h4></summary>
-
-#### Wait for Jobs with Defaults
-
-Wait up to 60 minutes, checking every 5 seconds
-
-```cs
-using CommonNetFuncs.Hangfire;
-
-public async Task ShutdownGracefully()
-{
-    logger.Info("Starting graceful shutdown...");
-
-    // Wait for all Hangfire jobs to complete
-    await WaitForHangfireJobsToComplete.WaitForAllHangfireJobsToComplete();
-
-    logger.Info("All jobs completed, continuing shutdown");
-}
-```
-
-#### Wait for Jobs with Custom Settings
-
-Wait up to 10 minutes, checking every 10 seconds
-
-```cs
-using CommonNetFuncs.Hangfire;
-
-public async Task RunIntegrationTest()
-{
-    // Enqueue test jobs
-    BackgroundJob.Enqueue(() => ProcessTestData());
-    BackgroundJob.Enqueue(() => ValidateResults());
-
-    // Wait for jobs to complete before asserting results
-    // Check every 10 seconds, timeout after 10 minutes
-    await WaitForHangfireJobsToComplete.WaitForAllHangfireJobsToComplete(
-        checkIntervalSeconds: 10,
-        maxWaitMinutes: 10);
-
-    // Assert test results...
-}
-```
-
-The method logs progress while waiting:
-
-```text
-[INFO] Waiting for 3 Hangfire job(s): 2 enqueued, 1 processing, 0 scheduled
-[INFO] Waiting for 1 Hangfire job(s): 0 enqueued, 1 processing, 0 scheduled
-[INFO] No pending Hangfire jobs found
-```
-
-If the timeout is exceeded:
-
-```text
-[WARN] Maximum wait time of 10 minutes exceeded. Some jobs may still be pending.
-```
-
-</details>
-
----
-
 ## Installation
-
-Install via NuGet:
 
 ```bash
 dotnet add package CommonNetFuncs.Hangfire
 ```
 
+## Dashboard authorization
+
+`HangfireAuthorizationFilter` implements `IDashboardAuthorizationFilter`; its constructor takes a `FrozenSet<string>`.
+
+```csharp
+using System.Collections.Frozen;
+using CommonNetFuncs.Hangfire;
+using Hangfire;
+using Hangfire.Dashboard;
+
+FrozenSet<string> roles = new[] { "Admin", "Manager" }.ToFrozenSet();
+HangfireAuthorizationFilter roleFilter = new(roles);
+
+// Authentication middleware must run before the dashboard.
+app.UseAuthentication();
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = [roleFilter]
+});
+
+// Hangfire calls this method for dashboard requests. A unit/integration helper can
+// invoke the same public entry point with the context supplied by the host:
+static bool CheckAuthorization(
+    HangfireAuthorizationFilter filter,
+    DashboardContext context) =>
+    filter.Authorize(context);
+```
+
+The filter only checks an already-populated `HttpContext.User`: unauthenticated users are denied. If the set is nonempty, access is granted when the user has **any** listed role; names use `ClaimsPrincipal.IsInRole`. If the set is empty, every authenticated user is granted access.
+
+```csharp
+FrozenSet<string> noRoleRestriction = FrozenSet<string>.Empty;
+var authenticatedOnly = new HangfireAuthorizationFilter(noRoleRestriction);
+```
+
+It does not authenticate a request, challenge a client, restrict the dashboard hostname, or configure Hangfire itself. Apply ASP.NET authentication and network exposure controls separately.
+
+## Job matching and deletion
+
+`HangfireJobHelpers` reads enqueued jobs for the named queue and processing/scheduled jobs globally, filters by method/argument values, and calls `BackgroundJob.Delete` for matches. It uses `JobStorage.Current`, so Hangfire storage must be configured.
+
+The strongly typed overload extracts the method name and argument names/values from an expression:
+
+```csharp
+public interface IReportJob
+{
+    void GenerateReport(int accountId, string format, int maxRetries = 3);
+}
+
+int accountId = 42;
+List<string> deleted = "reports".FindAndCancelJobs<IReportJob>(
+    job => job.GenerateReport(accountId, "pdf"));
+```
+
+For that expression, required/default argument rules matter: `null` values and values equal to a parameter's declared default are omitted as wildcards; no-argument/defaulted values therefore do not narrow the match. The lambda body must be a method call or `ArgumentException` is thrown. All matched values are converted with `ToString()` in the current process culture; use stable string representations when culture-sensitive values are involved.
+
+The string overload permits manual subset matching and demonstrates the same operation:
+
+```csharp
+List<string> alsoDeleted = "reports".FindAndCancelJobs(
+    methodName: "GenerateReport",
+    matchParameters: new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["accountId"] = "42",
+        ["format"] = "pdf"
+    });
+```
+
+Method names, parameter dictionary keys, and string representations of argument values are matched case-insensitively. An empty dictionary matches any arguments for the method. Only the supplied parameters must match.
+
+`IsJobMatch` can be used without storage:
+
+```csharp
+using Hangfire.Common;
+using System.Reflection;
+
+MethodInfo method = typeof(IReportJob).GetMethod(nameof(IReportJob.GenerateReport))!;
+Job job = new(typeof(IReportJob), method, [42, "pdf", 3]);
+bool matches = HangfireJobHelpers.IsJobMatch(
+    job, "generatereport",
+    new() { ["accountId"] = "42" });
+```
+
+Queue checks have two public overloads:
+
+```csharp
+bool inQueue = HangfireJobHelpers.IsJobInQueue("123", "reports");
+
+using Hangfire.Storage.IStorageConnection connection =
+    JobStorage.Current.GetConnection();
+bool inQueueWithConnection =
+    HangfireJobHelpers.IsJobInQueue("123", "reports", connection);
+```
+
+They read the job's `Queue` storage parameter. A missing parameter or a storage/lookup exception returns `true` conservatively to avoid false-negative deletion. Consequently, `true` does not prove the queue is known.
+
+Deletion is not cooperative cancellation: deleting a processing job does not necessarily stop code already executing. The helper also attempts no worker-thread abort and returns IDs only for deletions that Hangfire reports as successful. These operations are parallelized across the three states and use `JobStorage.Current`; failures from storage or deletion can surface to the caller. Do not rely on the helper's internal lock-observation logging as proof that a distributed lock was removed—it currently only reads/logs job data.
+
+## `HangfireJobException`
+
+The type stores optional `OperationName`, optional integer `EntityId`, and `AllowRetry`. Its `Message` adds operation/entity context and appends `[PERMANENT FAILURE - NO RETRY]` when `AllowRetry` is false.
+
+Every public constructor is shown below:
+
+```csharp
+Exception inner = new InvalidOperationException("database unavailable");
+
+HangfireJobException a = new();
+HangfireJobException b = new("Job failed");
+HangfireJobException c = new("Job failed", inner);
+HangfireJobException d = new("Permanent validation error", allowRetry: false);
+HangfireJobException e = new(
+    "Notification failed", "SendNotification", allowRetry: true);
+HangfireJobException f = new(
+    "Customer update failed", "UpdateCustomer", 42, allowRetry: false);
+HangfireJobException g = new(
+    "Dependency failed", inner, allowRetry: true);
+HangfireJobException h = new(
+    "Customer update failed", "UpdateCustomer", 42, inner, allowRetry: false);
+
+Console.WriteLine(h.OperationName);
+Console.WriteLine(h.EntityId);
+Console.WriteLine(h.AllowRetry);
+Console.WriteLine(h.InnerException);
+Console.WriteLine(h.Message);
+```
+
+The throwing helpers each have a default `allowRetry` value of `true` in the current API, despite comments that describe some defaults as false:
+
+```csharp
+HangfireJobException.ThrowEntityNotFound("User", 42, "LoadUser");
+HangfireJobException.ThrowEntityNotFound(
+    "Document", "doc-42", "LoadDocument", allowRetry: false);
+HangfireJobException.ThrowEntityNotFound(
+    "Transaction", 9876543210L, "LoadTransaction", allowRetry: true);
+HangfireJobException.ThrowValidationFailed(
+    "Email is invalid", "ValidateEmail", 42, allowRetry: false);
+HangfireJobException.ThrowDependencyUnavailable(
+    "PaymentGateway", "ChargePayment", allowRetry: true);
+```
+
+String and `long` not-found overloads include the ID in `Message` but cannot populate the `int? EntityId` property. `ThrowDependencyUnavailable` currently sets `EntityId` to `0`.
+
+`AllowRetry` is context only. **This package contains no Hangfire filter or automatic retry policy that reads it.** Configure retry attributes/filters and storage policy separately if `allowRetry: false` must actually prevent retries.
+
+## Shutdown observation
+
+Register `HangfireShutdownMonitor` as a hosted service after configuring Hangfire:
+
+```csharp
+builder.Services.AddHangfire(configuration => configuration
+    .UseRecommendedSerializerSettings()
+    .UseSqlServerStorage(connectionString));
+builder.Services.AddHangfireServer();
+builder.Services.AddHostedService<HangfireShutdownMonitor>();
+```
+
+Its constructor requires `IServiceProvider` and `IHostApplicationLifetime`. `StartAsync` registers an `ApplicationStopping` callback; `StopAsync` returns immediately:
+
+```csharp
+HangfireShutdownMonitor monitor = new(
+    serviceProvider, hostApplicationLifetime);
+await monitor.StartAsync(CancellationToken.None);
+await monitor.StopAsync(CancellationToken.None);
+```
+
+On shutdown it synchronously resolves a concrete `BackgroundJobServer`, reads processing/enqueued/scheduled statistics from `JobStorage.Current`, disposes that server, and logs either no pending jobs or the three counts. Exceptions are caught and logged. This does not wait for jobs, drain every Hangfire server, or guarantee persistence/recovery. It assumes durable Hangfire storage, and resolving/disposal can fail if the concrete server is not registered through the expected DI service. If the server is also owned by Hangfire's hosting integration, coordinate its disposal rather than assuming this monitor is the only owner.
+
+## Waiting for jobs
+
+```csharp
+await WaitForHangfireJobsToComplete.WaitForAllHangfireJobsToComplete();
+await WaitForHangfireJobsToComplete.WaitForAllHangfireJobsToComplete(
+    checkIntervalSeconds: 10,
+    maxWaitMinutes: 10);
+```
+
+The method checks `JobStorage.Current` every five seconds by default and returns when enqueued + processing + scheduled counts become zero. It returns (after logging a warning) when 60 minutes have elapsed by default, so return does **not** prove all jobs completed. There is no cancellation token and no returned success result. Job arguments/types are not controlled here; use stable, serialization-safe job inputs and a bounded application shutdown policy. Inputs are passed directly to `TimeSpan`/`Task.Delay`, so validate external values before calling.
+
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/NickScarpitti/common-net-funcs/blob/main/LICENSE) file for details.
+MIT. See [LICENSE](https://github.com/ScarpittiWeb/common-net-funcs/blob/main/LICENSE).

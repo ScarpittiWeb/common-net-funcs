@@ -1,13 +1,13 @@
-﻿using System.Collections.Concurrent;
-using System.IO.Compression;
-using System.Net;
-using Amazon.S3;
+﻿using Amazon.S3;
 using Amazon.S3.Model;
 using CommonNetFuncs.Web.Aws.S3;
 using FakeItEasy;
 using NLog;
 using NLog.Config;
 using NLog.Targets;
+using System.Collections.Concurrent;
+using System.IO.Compression;
+using System.Net;
 using static CommonNetFuncs.Compression.Streams;
 using static Xunit.TestContext;
 
@@ -1994,4 +1994,378 @@ public class AwsS3HelpersStaticTests
 	}
 
 	#endregion
+}
+
+public sealed class AwsS3HelpersBehaviorTests
+{
+	private readonly IAmazonS3 client = A.Fake<IAmazonS3>();
+	private readonly ConcurrentDictionary<string, bool> validBucket = new() { ["bucket"] = true };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private void SetupMissingObject()
+	{
+		A.CallTo(() => client.GetObjectMetadataAsync(A<GetObjectMetadataRequest>._, A<CancellationToken>._))
+			.ThrowsAsync(new AmazonS3Exception("missing") { StatusCode = HttpStatusCode.NotFound });
+	}
+
+	private static string CreateTempFile(byte[] bytes)
+	{
+		string path = Path.GetTempFileName();
+		File.WriteAllBytes(path, bytes);
+		return path;
+	}
+
+	private static async Task<(bool Result, bool Threw)> InvokeSafely(Func<Task<bool>> operation)
+	{
+		try
+		{
+			return (await operation(), false);
+		}
+		catch
+		{
+			return (false, true);
+		}
+	}
+
+	private sealed class ShortReadStream(byte[] bytes, int readableBytes) : MemoryStream(bytes)
+	{
+		private int remaining = readableBytes;
+
+		public override int Read(byte[] buffer, int offset, int count)
+		{
+			int requested = Math.Min(count, remaining);
+			int read = base.Read(buffer, offset, requested);
+			remaining -= read;
+			return read;
+		}
+
+		public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+		{
+			return Task.FromResult(Read(buffer, offset, count));
+		}
+	}
+
+	[Fact]
+	public async Task UploadS3File_Stream_BuildsEncryptedRequest_AndLeavesSeekableUploadAtStart()
+	{
+		byte[] source = [1, 2, 3, 4, 5];
+		await using MemoryStream input = new(source);
+		PutObjectRequest? captured = null;
+		byte[]? uploaded = null;
+		SetupMissingObject();
+		A.CallTo(() => client.PutObjectAsync(A<PutObjectRequest>._, A<CancellationToken>._))
+			.Invokes((PutObjectRequest request, CancellationToken _) =>
+			{
+				captured = request;
+				uploaded = ((MemoryStream)request.InputStream).ToArray();
+			})
+			.Returns(new PutObjectResponse { HttpStatusCode = HttpStatusCode.OK });
+
+		bool result = await client.UploadS3File("bucket", "key", input, validBucket, compressSteam: false, cancellationToken: Current.CancellationToken);
+
+		result.ShouldBeTrue();
+		captured!.BucketName.ShouldBe("bucket");
+		captured.Key.ShouldBe("key");
+		captured.BucketKeyEnabled.ShouldBe(true);
+		captured.ServerSideEncryptionMethod.ShouldBe(ServerSideEncryptionMethod.AES256);
+		uploaded.ShouldBe(source);
+		input.CanRead.ShouldBeFalse();
+	}
+
+	[Fact]
+	public async Task UploadS3File_Stream_WhenAwsReturnsNull_ReturnsFalseWithoutCrashing()
+	{
+		await using MemoryStream input = new([1, 2]);
+		SetupMissingObject();
+		A.CallTo(() => client.PutObjectAsync(A<PutObjectRequest>._, A<CancellationToken>._))
+			.Returns((PutObjectResponse)null!);
+
+		(bool result, bool threw) = await InvokeSafely(() => client.UploadS3File("bucket", "key", input, validBucket));
+
+		result.ShouldBeFalse();
+		threw.ShouldBeFalse();
+	}
+
+	[Fact]
+	public async Task UploadS3File_Stream_WhenPutThrowsOperationException_ReturnsFalse()
+	{
+		await using MemoryStream input = new([1]);
+		SetupMissingObject();
+		A.CallTo(() => client.PutObjectAsync(A<PutObjectRequest>._, A<CancellationToken>._))
+			.ThrowsAsync(new InvalidOperationException("put failed"));
+
+		bool result = await client.UploadS3File("bucket", "key", input, validBucket, cancellationToken: Current.CancellationToken);
+
+		result.ShouldBeFalse();
+	}
+
+	[Fact]
+	public async Task UploadS3File_Stream_WithExistingGzipAndCompressionDisabled_PreservesEncoding()
+	{
+		byte[] compressed;
+		await using (MemoryStream compressedOutput = new())
+		{
+			await using (GZipStream gzip = new(compressedOutput, CompressionLevel.Optimal, true))
+			{
+				await gzip.WriteAsync("payload"u8.ToArray(), Current.CancellationToken);
+			}
+			compressed = compressedOutput.ToArray();
+		}
+		await using MemoryStream input = new(compressed);
+		PutObjectRequest? captured = null;
+		SetupMissingObject();
+		A.CallTo(() => client.PutObjectAsync(A<PutObjectRequest>._, A<CancellationToken>._))
+			.Invokes((PutObjectRequest request, CancellationToken _) => captured = request)
+			.Returns(new PutObjectResponse { HttpStatusCode = HttpStatusCode.OK });
+
+		bool result = await client.UploadS3File("bucket", "key", input, validBucket, compressSteam: false, cancellationToken: Current.CancellationToken);
+
+		result.ShouldBeTrue();
+		captured!.Headers["Content-Encoding"].ShouldBe("gzip");
+	}
+
+	[Fact]
+	public async Task UploadS3File_FilePath_WhenPutThrowsAwsException_ReturnsFalseAndDoesNotLeakFile()
+	{
+		string path = CreateTempFile([1, 2, 3]);
+		try
+		{
+			SetupMissingObject();
+			A.CallTo(() => client.PutObjectAsync(A<PutObjectRequest>._, A<CancellationToken>._))
+				.ThrowsAsync(new AmazonS3Exception("aws failure") { StatusCode = HttpStatusCode.ServiceUnavailable });
+
+			bool result = await client.UploadS3File("bucket", "key", path, validBucket, cancellationToken: Current.CancellationToken);
+
+			result.ShouldBeFalse();
+			using FileStream stream = new(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+		}
+		finally
+		{
+			File.Delete(path);
+		}
+	}
+
+	[Fact]
+	public async Task UploadS3File_FilePath_WhenPutThrowsOperationException_ReturnsFalse()
+	{
+		string path = CreateTempFile([1, 2]);
+		try
+		{
+			SetupMissingObject();
+			A.CallTo(() => client.PutObjectAsync(A<PutObjectRequest>._, A<CancellationToken>._))
+				.ThrowsAsync(new InvalidOperationException("put failed"));
+
+			(await client.UploadS3File("bucket", "key", path, validBucket, cancellationToken: Current.CancellationToken)).ShouldBeFalse();
+		}
+		finally
+		{
+			File.Delete(path);
+		}
+	}
+
+	[Fact]
+	public async Task UploadMultipartAsync_WhenPartCountIsIncomplete_AbortsAndReturnsFalse()
+	{
+		await using MemoryStream input = new(new byte[11 * 1024 * 1024]);
+		A.CallTo(() => client.InitiateMultipartUploadAsync(A<InitiateMultipartUploadRequest>._, A<CancellationToken>._))
+			.Returns(new InitiateMultipartUploadResponse { UploadId = "upload-id" });
+		A.CallTo(() => client.UploadPartAsync(A<UploadPartRequest>._, A<CancellationToken>._))
+			.Returns(new UploadPartResponse { HttpStatusCode = HttpStatusCode.BadRequest });
+		A.CallTo(() => client.AbortMultipartUploadAsync(A<AbortMultipartUploadRequest>._, A<CancellationToken>._))
+			.ThrowsAsync(new InvalidOperationException("abort failed"));
+
+		bool result = await client.UploadMultipartAsync("bucket", "key", input, cancellationToken: Current.CancellationToken);
+
+		result.ShouldBeFalse();
+		A.CallTo(() => client.AbortMultipartUploadAsync(
+			A<AbortMultipartUploadRequest>.That.Matches(x => x.UploadId == "upload-id"), A<CancellationToken>._))
+			.MustHaveHappenedOnceExactly();
+	}
+
+	[Fact]
+	public async Task UploadPartAsync_WhenSourceReadIsShort_ReturnsNullAndReleasesSemaphore()
+	{
+		await using ShortReadStream input = new(new byte[4], readableBytes: 1);
+		using SemaphoreSlim semaphore = new(1);
+
+		PartETag? result = await client.UploadPartAsync("bucket", "key", "id", input, 1, 4, 4, semaphore, cancellationToken: Current.CancellationToken);
+
+		result.ShouldBeNull();
+		(await semaphore.WaitAsync(TimeSpan.Zero, Current.CancellationToken)).ShouldBeTrue();
+		semaphore.Release();
+	}
+
+	[Fact]
+	public async Task UploadPartAsync_UsesPartialFinalPartSizeAndPropagatesRequestState()
+	{
+		await using MemoryStream input = new([1, 2, 3, 4, 5]);
+		using SemaphoreSlim semaphore = new(1);
+		UploadPartRequest? captured = null;
+		byte[]? uploaded = null;
+		A.CallTo(() => client.UploadPartAsync(A<UploadPartRequest>._, A<CancellationToken>._))
+			.Invokes((UploadPartRequest request, CancellationToken _) =>
+			{
+				captured = request;
+				uploaded = ((MemoryStream)request.InputStream).ToArray();
+			})
+			.Returns(new UploadPartResponse { HttpStatusCode = HttpStatusCode.OK, ETag = "etag" });
+
+		PartETag? result = await client.UploadPartAsync("bucket", "key", "id", input, 2, 3, 5, semaphore, cancellationToken: Current.CancellationToken);
+
+		result!.PartNumber.ShouldBe(2);
+		result.ETag.ShouldBe("etag");
+		captured!.PartSize.ShouldBe(2);
+		uploaded.ShouldBe([4, 5]);
+	}
+
+	[Theory]
+	[InlineData(HttpStatusCode.BadRequest)]
+	[InlineData(HttpStatusCode.InternalServerError)]
+	public async Task UploadPartAsync_WhenAwsRejectsPart_ReturnsNull(HttpStatusCode statusCode)
+	{
+		await using MemoryStream input = new([1, 2, 3]);
+		using SemaphoreSlim semaphore = new(1);
+		A.CallTo(() => client.UploadPartAsync(A<UploadPartRequest>._, A<CancellationToken>._))
+			.Returns(new UploadPartResponse { HttpStatusCode = statusCode });
+
+		PartETag? result = await client.UploadPartAsync("bucket", "key", "id", input, 1, 3, 3, semaphore, cancellationToken: Current.CancellationToken);
+
+		result.ShouldBeNull();
+	}
+
+	[Fact]
+	public async Task UploadPartAsync_WhenSdkReturnsNull_ReturnsNullAfterCatchPath()
+	{
+		await using MemoryStream input = new([1]);
+		using SemaphoreSlim semaphore = new(1);
+		A.CallTo(() => client.UploadPartAsync(A<UploadPartRequest>._, A<CancellationToken>._))
+			.Returns((UploadPartResponse)null!);
+
+		PartETag? result = await client.UploadPartAsync("bucket", "key", "id", input, 1, 1, 1, semaphore, cancellationToken: Current.CancellationToken);
+
+		result.ShouldBeNull();
+	}
+
+	[Fact]
+	public async Task GetS3File_Stream_WhenResponseIsNull_ReturnsWithoutWriting()
+	{
+		await using MemoryStream output = new();
+		A.CallTo(() => client.GetObjectAsync(A<GetObjectRequest>._, A<CancellationToken>._))
+			.Returns((GetObjectResponse)null!);
+
+		await client.GetS3File("bucket", "key", output, validBucket, cancellationToken: Current.CancellationToken);
+
+		output.Length.ShouldBe(0);
+	}
+
+	[Fact]
+	public async Task DeleteS3File_WhenDeleteThrowsNotFoundOrAwsError_ReturnsFalseWithoutPropagating()
+	{
+		A.CallTo(() => client.GetObjectMetadataAsync(A<GetObjectMetadataRequest>._, A<CancellationToken>._))
+			.Returns(new GetObjectMetadataResponse { HttpStatusCode = HttpStatusCode.OK });
+		A.CallTo(() => client.DeleteObjectAsync(A<string>._, A<string>._, A<CancellationToken>._))
+			.ThrowsAsync(new AmazonS3Exception("missing") { StatusCode = HttpStatusCode.NotFound });
+
+		(await client.DeleteS3File("bucket", "key", validBucket, cancellationToken: Current.CancellationToken)).ShouldBeFalse();
+
+		A.CallTo(() => client.DeleteObjectAsync(A<string>._, A<string>._, A<CancellationToken>._))
+			.ThrowsAsync(new AmazonS3Exception("aws") { StatusCode = HttpStatusCode.InternalServerError });
+		(await client.DeleteS3File("bucket", "key", validBucket, cancellationToken: Current.CancellationToken)).ShouldBeFalse();
+	}
+
+	[Fact]
+	public async Task DeleteS3File_WhenDeleteThrowsUnexpectedException_ReturnsFalse()
+	{
+		A.CallTo(() => client.GetObjectMetadataAsync(A<GetObjectMetadataRequest>._, A<CancellationToken>._))
+			.Returns(new GetObjectMetadataResponse { HttpStatusCode = HttpStatusCode.OK });
+		A.CallTo(() => client.DeleteObjectAsync(A<string>._, A<string>._, A<CancellationToken>._))
+			.ThrowsAsync(new InvalidOperationException("unexpected"));
+
+		bool result = await client.DeleteS3File("bucket", "key", validBucket, cancellationToken: Current.CancellationToken);
+
+		result.ShouldBeFalse();
+	}
+
+	[Fact]
+	public async Task GetAllS3BucketFiles_WhenSdkReturnsNull_PreservesEmptyResult()
+	{
+		A.CallTo(() => client.ListObjectsV2Async(A<ListObjectsV2Request>._, A<CancellationToken>._))
+			.Returns((ListObjectsV2Response)null!);
+
+		List<string>? result = await client.GetAllS3BucketFiles("bucket", cancellationToken: Current.CancellationToken);
+
+		result.ShouldBeEmpty();
+	}
+
+	[Fact]
+	public async Task IsBucketValid_WhenUncachedValidationIsInterrupted_PreservesSdkUtilityResult()
+	{
+		ConcurrentDictionary<string, bool> cache = new();
+		A.CallTo(() => client.ListObjectsV2Async(A<ListObjectsV2Request>._, A<CancellationToken>._))
+			.ThrowsAsync(new OperationCanceledException("validation canceled"));
+
+		bool result = await client.IsBucketValid("uncached", cache);
+
+		result.ShouldBeTrue();
+	}
+
+	[Fact]
+	public async Task IsBucketValid_WhenCachedFalse_RetriesAndUpdatesCaseInsensitively()
+	{
+		ConcurrentDictionary<string, bool> cache = new() { ["BUCKET"] = false };
+		A.CallTo(() => client.ListObjectsV2Async(
+				A<ListObjectsV2Request>.That.Matches(x => x.BucketName == "bucket" && x.MaxKeys == 1),
+				A<CancellationToken>._))
+			.Returns(new ListObjectsV2Response { HttpStatusCode = HttpStatusCode.OK });
+
+		bool result = await client.IsBucketValid("bucket", cache);
+
+		result.ShouldBeTrue();
+		cache["bucket"].ShouldBeTrue();
+	}
+
+	[Fact]
+	public async Task IsBucketValid_WhenBucketNameCannotBeCached_ReturnsComputedValue()
+	{
+		ConcurrentDictionary<string, bool> cache = new();
+		A.CallTo(() => client.ListObjectsV2Async(A<ListObjectsV2Request>._, A<CancellationToken>._))
+			.Returns(new ListObjectsV2Response { HttpStatusCode = HttpStatusCode.OK });
+
+		bool result = await client.IsBucketValid(null!, cache);
+
+		result.ShouldBeTrue();
+	}
+
+	[Fact]
+	public async Task S3FileExists_PassesCancellationTokenAndReturnsFalseForNullResponse()
+	{
+		using CancellationTokenSource cts = new();
+		A.CallTo(() => client.GetObjectMetadataAsync(
+				A<GetObjectMetadataRequest>.That.Matches(x => x.BucketName == "bucket" && x.Key == "key" && x.VersionId == "v1"),
+				cts.Token))
+			.Returns((GetObjectMetadataResponse)null!);
+
+		bool result = await client.S3FileExists("bucket", "key", "v1", cts.Token);
+
+		result.ShouldBeFalse();
+	}
+
 }

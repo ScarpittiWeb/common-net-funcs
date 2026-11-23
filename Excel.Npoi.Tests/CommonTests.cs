@@ -1,5 +1,4 @@
-﻿using System.Data;
-using CommonNetFuncs.Excel.Common;
+﻿using CommonNetFuncs.Excel.Common;
 using CommonNetFuncs.Excel.Npoi;
 using NPOI.HSSF.UserModel;
 using NPOI.HSSF.Util;
@@ -8,6 +7,8 @@ using NPOI.SS.Util;
 using NPOI.XSSF.Streaming;
 using NPOI.XSSF.UserModel;
 using NSubstitute;
+using System.Data;
+using System.Reflection;
 using xRetry.v3;
 using static CommonNetFuncs.Excel.Npoi.Common;
 
@@ -2840,4 +2841,168 @@ public sealed class CommonTests : IDisposable
 		cell.CellType.Returns((CellType)99);
 		cell.GetStringValue().ShouldBe(string.Empty);
 	}
+}
+
+public sealed class NpoiCommonBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+	private static MemoryStream CreateWorkbookStream()
+	{
+		using XSSFWorkbook workbook = new();
+		ISheet sheet = workbook.CreateSheet("Data");
+		IRow first = sheet.CreateRow(0);
+		first.CreateCell(0).SetCellValue("A");
+		first.CreateCell(1).SetCellValue("B");
+		IRow second = sheet.CreateRow(1);
+		second.CreateCell(0).SetCellValue("C");
+		second.CreateCell(1).SetCellValue("D");
+		MemoryStream stream = new();
+		workbook.Write(stream, true);
+		stream.Position = 0;
+		return stream;
+	}
+
+	private sealed class NpoiExportRow
+	{
+		public string? Value { get; set; }
+	}
+
+	private sealed class ThrowingValue
+	{
+		public override string ToString() => throw new InvalidOperationException("serialization failed");
+	}
+
+	[Fact]
+	public void NamedRangeOperations_WithNullWorkbook_ReturnWithoutThrowing()
+	{
+		IWorkbook? workbook = null;
+
+		workbook!.GetCellFromName("Missing").ShouldBeNull();
+		Should.NotThrow(() => workbook!.ClearAllFromName("Missing"));
+	}
+
+	[Theory]
+	[InlineData("Double", 1.21, 1.2)]
+	[InlineData("Double", 1.25, 1.2)]
+	[InlineData("Double", 1.29, 1.2)]
+	[InlineData("Double", -1.21, -1.2)]
+	[InlineData("Double", -1.25, -1.2)]
+	[InlineData("Double", -1.29, -1.2)]
+	[InlineData("Decimal", 1.21, 1.2)]
+	[InlineData("Decimal", 1.25, 1.2)]
+	[InlineData("Decimal", 1.29, 1.2)]
+	[InlineData("Decimal", -1.21, -1.2)]
+	[InlineData("Decimal", -1.25, -1.2)]
+	[InlineData("Decimal", -1.29, -1.2)]
+	public void MathCompat_Round_TruncatesAcrossRoundingPartitions(string numericType, double input, double expected)
+	{
+		Type compat = typeof(CommonNetFuncs.Excel.Npoi.Common).Assembly
+			.GetType("CommonNetFuncs.Excel.Npoi.Internal.MathCompat")!;
+		Type type = numericType == "Double" ? typeof(double) : typeof(decimal);
+		MethodInfo method = compat.GetMethod("Round", BindingFlags.Public | BindingFlags.Static, binder: null, [type, typeof(int)], modifiers: null)!;
+		object value = type == typeof(double) ? input : (decimal)input;
+
+		object? result = method.Invoke(null, [value, 1]);
+
+		(type == typeof(double) ? (double)result! : (double)(decimal)result!).ShouldBe(expected, 0.0000001);
+	}
+
+	[Fact]
+	public void GetStringValue_UnknownFormulaResultType_ReturnsEmpty()
+	{
+		ICell cell = Substitute.For<ICell>();
+		cell.CellType.Returns(CellType.Formula);
+		cell.CachedFormulaResultType.Returns((CellType)777);
+
+		cell.GetStringValue().ShouldBe(string.Empty);
+	}
+
+	[Fact]
+	public void GetRangeOfMergedCells_WhenCellIsNotInsideAnyReportedRegion_ReturnsNull()
+	{
+		ISheet sheet = Substitute.For<ISheet>();
+		ICell cell = Substitute.For<ICell>();
+		cell.IsMergedCell.Returns(true);
+		cell.Sheet.Returns(sheet);
+		cell.RowIndex.Returns(5);
+		cell.ColumnIndex.Returns(5);
+		sheet.NumMergedRegions.Returns(1);
+		sheet.GetMergedRegion(0).Returns(new CellRangeAddress(0, 0, 0, 0));
+
+		cell.GetRangeOfMergedCells().ShouldBeNull();
+	}
+
+	[Fact]
+	public void ReadExcelFileToDataTable_ExplicitBoundsWithoutHeaders_UsesGeneratedNames()
+	{
+		using MemoryStream stream = CreateWorkbookStream();
+
+		using System.Data.DataTable table = stream.ReadExcelFileToDataTable(hasHeaders: false, startCellReference: "A1", endCellReference: "B2", cancellationToken: TestContext.Current.CancellationToken);
+		table.Columns[0].ColumnName.ShouldBe("Column0");
+		table.Columns[1].ColumnName.ShouldBe("Column1");
+		table.Rows.Count.ShouldBe(2);
+	}
+
+	[Fact]
+	public void ReadExcelFileToDataTable_InvalidStream_ReturnsEmptyTable()
+	{
+		using MemoryStream stream = new([1, 2, 3, 4]);
+
+		stream.ReadExcelFileToDataTable(cancellationToken: TestContext.Current.CancellationToken).Rows.Count.ShouldBe(0);
+	}
+
+	[Fact]
+	public void ReadExcelTableToDataTable_NonXlsxAndMissingTable_ReturnEmptyTables()
+	{
+		using HSSFWorkbook workbook = new();
+		workbook.CreateSheet("Data");
+		using MemoryStream xls = new();
+		workbook.Write(xls);
+		xls.Position = 0;
+
+		xls.ReadExcelTableToDataTable(cancellationToken: TestContext.Current.CancellationToken).Columns.Count.ShouldBe(0);
+
+		using MemoryStream xlsx = CreateWorkbookStream();
+		using System.Data.DataTable table = xlsx.ReadExcelTableToDataTable("Missing", cancellationToken: TestContext.Current.CancellationToken);
+		table.Columns.Count.ShouldBe(0);
+	}
+
+	[Fact]
+	public void ReadExcelTableToDataTable_UnknownNameWithExistingTable_FindsFirstTable()
+	{
+		using XSSFWorkbook workbook = new();
+		ISheet sheet = workbook.CreateSheet("Data");
+		IRow header = sheet.CreateRow(0);
+		header.CreateCell(0).SetCellValue("Value");
+		IRow body = sheet.CreateRow(1);
+		body.CreateCell(0).SetCellValue("item");
+		workbook.CreateTable(sheet.SheetName, "Existing", 0, 0, 0, 1, ["Value"]);
+		using MemoryStream stream = new();
+		workbook.Write(stream, true);
+		stream.Position = 0;
+
+		using System.Data.DataTable table = stream.ReadExcelTableToDataTable("Missing", cancellationToken: TestContext.Current.CancellationToken);
+		table.Rows.Count.ShouldBe(1);
+	}
+
+	[Fact]
+	public void ReadExcelTableToDataTable_TruncatedXlsx_ReturnsEmptyTable()
+	{
+		using MemoryStream stream = CreateWorkbookStream();
+		byte[] truncated = stream.ToArray().Take(12).ToArray();
+		using MemoryStream corrupt = new(truncated);
+
+		corrupt.ReadExcelTableToDataTable(cancellationToken: TestContext.Current.CancellationToken).Columns.Count.ShouldBe(0);
+	}
+
 }

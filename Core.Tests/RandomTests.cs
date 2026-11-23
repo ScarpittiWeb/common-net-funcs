@@ -3,6 +3,7 @@ using System.Reflection;
 using static CommonNetFuncs.Core.MathHelpers;
 using static CommonNetFuncs.Core.Random;
 using static Xunit.TestContext;
+using RandomHelpers = CommonNetFuncs.Core.Random;
 
 namespace Core.Tests;
 
@@ -2392,7 +2393,7 @@ public sealed class RandomTests
 
 	#region BitLength Function Tests (via Reflection)
 
-#if !NET6_0_OR_GREATER
+#if !CORE_NATIVE_BUILD
 
 	[Theory]
 	[InlineData(0UL, 0)]
@@ -2527,7 +2528,7 @@ public sealed class RandomTests
 
 	/// <summary>
 	/// Invokes the private BitLength method via reflection.
-	/// Only available when not NET6_0_OR_GREATER.
+	/// Only available in the netstandard2.1 build.
 	/// </summary>
 	private static int InvokeBitLength(ulong value)
 	{
@@ -2549,4 +2550,40 @@ public sealed class RandomTests
 	}
 
 	#endregion
+}
+
+public sealed class RandomBehaviorTests
+{
+
+
+	[Fact]
+	public void GenerateRepeatableRandomString_RejectsInvalidLengthBoundsAndFullBlacklist()
+	{
+		Should.Throw<ArgumentOutOfRangeException>(() => RandomHelpers.GenerateRepeatableRandomString(2, new System.Random(1), 3));
+		Should.Throw<ArgumentOutOfRangeException>(() => RandomHelpers.GenerateRepeatableRandomString(2, new System.Random(1), lowerAsciiBound: 5, upperAsciiBound: 5));
+		Should.Throw<ArgumentException>(() => RandomHelpers.GenerateRepeatableRandomString(2, new System.Random(1), lowerAsciiBound: 65, upperAsciiBound: 66, blacklistedCharacters: new HashSet<char> { 'A', 'B' }));
+	}
+
+	[Fact]
+	public void GenerateRandomStringByCharSet_HandlesEmptyNegativeAndLargeCharacterSets()
+	{
+		Should.Throw<ArgumentOutOfRangeException>(() => RandomHelpers.GenerateRandomStringByCharSet(-1));
+		RandomHelpers.GenerateRandomStringByCharSet(0, new HashSet<char>(), Current.CancellationToken).ShouldBeEmpty();
+
+		HashSet<char> chars = Enumerable.Range(0, 300).Select(i => (char)(0x100 + i)).ToHashSet();
+		string value = RandomHelpers.GenerateRandomStringByCharSet(300, chars, Current.CancellationToken);
+
+		value.Length.ShouldBe(300);
+		value.ShouldAllBe(c => chars.Contains(c));
+	}
+
+	[Fact]
+	public void GenerateRandomStringByCharSet_CancelledPositiveLengthThrows()
+	{
+		using CancellationTokenSource source = new();
+		source.Cancel();
+
+		Should.Throw<OperationCanceledException>(() => RandomHelpers.GenerateRandomStringByCharSet(1, cancellationToken: source.Token));
+	}
+
 }

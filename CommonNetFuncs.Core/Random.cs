@@ -4,7 +4,7 @@ using System.Text;
 using ZLinq;
 using ZLinq.Linq;
 
-#if NET8_0_OR_GREATER
+#if !NETSTANDARD2_1
 
 using System.Collections.Frozen;
 using System.Numerics;
@@ -23,7 +23,10 @@ public static class Random
 	private const string NumberToGenerateError = "Number to generate must be greater than 0.";
 	private const string MaxValueError = "Max value must be greater than 0.";
 
-#if NET8_0_OR_GREATER
+	// Bytes of cryptographic randomness fetched per RandomNumberGenerator call in ShuffleListInPlace (4 bytes are consumed per element)
+	private const int ShuffleRandomBufferSize = 256;
+
+#if !NETSTANDARD2_1
 	// FrozenSet lookups are faster than HashSet once built, ideal for this never-mutated default set
 	internal static readonly FrozenSet<char> DefaultCharSet = new HashSet<char>(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 		'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']).ToFrozenSet();
@@ -31,6 +34,8 @@ public static class Random
 	internal static readonly HashSet<char> DefaultCharSet = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 		'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 #endif
+
+	private static readonly char[] DefaultCharArray = [.. DefaultCharSet];
 
 	/// <summary>
 	/// Generate a random integer between 0 and maxValue - 1
@@ -586,11 +591,27 @@ public static class Random
 	public static IList<T> ShuffleListInPlace<T>(this IList<T> list, CancellationToken cancellationToken = default)
 	{
 		int n = list.Count;
+		if (n <= 1)
+		{
+			return list;
+		}
+
+		Span<byte> randomBytes = stackalloc byte[ShuffleRandomBufferSize];
+		int offset = ShuffleRandomBufferSize;
 		while (n > 1)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 			n--;
-			int k = GetRandomInt(0, n + 1);
+			if (offset == ShuffleRandomBufferSize)
+			{
+				rng.GetBytes(randomBytes);
+				offset = 0;
+			}
+
+			// Same transform as GetRandomInt(0, n + 1): non-negative int32 modulo the range
+			int result = BitConverter.ToInt32(randomBytes.Slice(offset, 4)) & 0x7FFFFFFF;
+			offset += 4;
+			int k = result % (n + 1);
 			(list[n], list[k]) = (list[k], list[n]);
 		}
 		return list;
@@ -914,14 +935,14 @@ public static class Random
 
 		int length = minLength == -1 ? maxLength : GetRandomInt(minLength, maxLength);
 
-		StringBuilder result = new(length);
-
 		if (blacklistedCharacters == null || blacklistedCharacters.Count == 0)
 		{
-			for (int i = 0; i < length; i++)
+			Span<char> rangeChars = stackalloc char[upperAsciiBound - lowerAsciiBound + 1];
+			for (int i = 0; i < rangeChars.Length; i++)
 			{
-				result.Append((char)GetRandomInt(lowerAsciiBound, upperAsciiBound + 1));
+				rangeChars[i] = (char)(lowerAsciiBound + i);
 			}
+			return GetRandomString(rangeChars, length, CancellationToken.None);
 		}
 		else
 		{
@@ -945,15 +966,8 @@ public static class Random
 				allowedIndex++;
 			}
 
-			for (int i = 0; i < length; i++)
-			{
-				cancellationToken.ThrowIfCancellationRequested();
-				int randomIndex = GetRandomInt(0, allowedChars.Length);
-				result.Append(allowedChars[randomIndex]);
-			}
+			return GetRandomString(allowedChars, length, cancellationToken);
 		}
-
-		return result.ToString();
 	}
 
 	/// <summary>
@@ -1125,18 +1139,79 @@ public static class Random
 			charSet = DefaultCharSet;
 		}
 
-		ReadOnlySpan<char> charSetSpan = new(charSet.ToArray());
-		int setLength = charSetSpan.Length;
+		return GetRandomString(ReferenceEquals(charSet, DefaultCharSet) ? DefaultCharArray : charSet.ToArray(), length, cancellationToken);
+	}
 
-		StringBuilder result = new(length);
-		for (int i = 0; i < length; i++)
+	/// <summary>
+	/// Builds a cryptographically random string from <paramref name="allowedChars"/>, requesting random bytes in bulk rather than one RNG call per character.
+	/// </summary>
+	private static string GetRandomString(ReadOnlySpan<char> allowedChars, int length, CancellationToken cancellationToken)
+	{
+		if (length > 0)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			char randomChar = charSetSpan[GetRandomInt(0, setLength)];
-			result.Append(randomChar);
 		}
 
-		return result.ToString();
+#if !NETSTANDARD2_1
+		return RandomNumberGenerator.GetString(allowedChars, length);
+#else
+		if (length < 0)
+		{
+			throw new ArgumentOutOfRangeException(nameof(length));
+		}
+
+		if (length == 0)
+		{
+			return string.Empty;
+		}
+
+		char[]? rented = null;
+		Span<char> destination = length <= 256 ? stackalloc char[length] : (rented = System.Buffers.ArrayPool<char>.Shared.Rent(length)).AsSpan(0, length);
+		try
+		{
+			int setLength = allowedChars.Length;
+			if (setLength > 256)
+			{
+				// Byte-based sampling can't index sets larger than 256 characters, so fall back to one RNG call per character
+				for (int i = 0; i < destination.Length; i++)
+				{
+					cancellationToken.ThrowIfCancellationRequested();
+					destination[i] = allowedChars[GetRandomInt(0, setLength)];
+				}
+				return new string(destination);
+			}
+
+			// Rejection sampling: only bytes below the largest multiple of setLength are used so every character is equally likely
+			int acceptLimit = 256 - (256 % setLength);
+			Span<byte> randomBytes = stackalloc byte[256];
+			int written = 0;
+			while (written < destination.Length)
+			{
+				cancellationToken.ThrowIfCancellationRequested();
+				Span<byte> chunk = randomBytes.Slice(0, Math.Min(randomBytes.Length, ((destination.Length - written) * 256 / acceptLimit) + 4));
+				rng.GetBytes(chunk);
+				foreach (byte randomByte in chunk)
+				{
+					if (randomByte < acceptLimit)
+					{
+						destination[written++] = allowedChars[randomByte % setLength];
+						if (written == destination.Length)
+						{
+							break;
+						}
+					}
+				}
+			}
+			return new string(destination);
+		}
+		finally
+		{
+			if (rented != null)
+			{
+				System.Buffers.ArrayPool<char>.Shared.Return(rented);
+			}
+		}
+#endif
 	}
 
 	/// <summary>
@@ -1255,7 +1330,7 @@ public static class Random
 		if ((ulong)index >= (ulong)domain) throw new ArgumentOutOfRangeException(nameof(index));
 
 		// Smallest even bit-width such that 2^bits >= domain
-#if NET6_0_OR_GREATER
+#if !NETSTANDARD2_1
 		int bits = 64 - BitOperations.LeadingZeroCount((ulong)(domain - 1));
 #else
 		int bits = BitLength((ulong)(domain - 1));
@@ -1300,7 +1375,7 @@ public static class Random
 		}
 	}
 
-#if !NET6_0_OR_GREATER
+#if NETSTANDARD2_1
 
 	// Number of bits needed to represent value (BitLength(0) == 0, BitLength(1) == 1, BitLength(255) == 8).
 	private static int BitLength(ulong value)

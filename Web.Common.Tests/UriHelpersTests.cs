@@ -1,7 +1,7 @@
-﻿using System.Globalization;
-using CommonNetFuncs.Web.Common;
+﻿using CommonNetFuncs.Web.Common;
 using FakeItEasy;
 using Microsoft.AspNetCore.Http;
+using System.Globalization;
 
 namespace Web.Common.Tests;
 
@@ -25,6 +25,28 @@ public class UriHelpersTests
 
 		// Assert
 		result.ShouldBe(expected);
+	}
+
+	[Fact]
+	public void ListToQueryParameters_WithTypedValues_ShouldMatchCurrentCultureToString()
+	{
+		// Arrange
+		double[] doubles = [1.5, -2.25, 1e21];
+		decimal[] decimals = [1234.5m, -0.01m];
+		long[] longs = [long.MinValue, 42];
+		bool[] bools = [true, false];
+		char[] chars = ['a', '%'];
+		Guid[] guids = [Guid.Parse("0f8fad5b-d9cb-469f-a165-70867728950e")];
+		int?[] nullableInts = [1, null, 3];
+
+		// Act & Assert - every typed path must produce the same text as the boxed ToString() call
+		doubles.ListToQueryParameters("d").ShouldBe(string.Join('&', doubles.Select(x => $"d={x.ToString()}")));
+		decimals.ListToQueryParameters("m").ShouldBe(string.Join('&', decimals.Select(x => $"m={x.ToString()}")));
+		longs.ListToQueryParameters("l").ShouldBe(string.Join('&', longs.Select(x => $"l={x.ToString()}")));
+		bools.ListToQueryParameters("b").ShouldBe("b=True&b=False");
+		chars.ListToQueryParameters("c").ShouldBe("c=a&c=%");
+		guids.ListToQueryParameters("g").ShouldBe("g=0f8fad5b-d9cb-469f-a165-70867728950e");
+		nullableInts.ListToQueryParameters("n").ShouldBe("n=1&n=&n=3");
 	}
 
 	[Theory]
@@ -212,4 +234,77 @@ public class UriHelpersTests
 		// Assert
 		result.ShouldBe("https://example.com/api/v1/resource?key=value");
 	}
+}
+
+public sealed class UriHelpersBehaviorTests
+{
+
+
+
+
+
+
+	[Fact]
+	public void ListToQueryParameters_ShortValues_FormatsEveryValue()
+	{
+		short[] values = [short.MinValue, 0, short.MaxValue];
+
+		values.ListToQueryParameters("short")
+			.ShouldBe("short=-32768&short=0&short=32767");
+	}
+
+	[Fact]
+	public void ListToQueryParameters_ByteValues_FormatsEveryValue()
+	{
+		byte[] values = [byte.MinValue, byte.MaxValue];
+
+		values.ListToQueryParameters("byte")
+			.ShouldBe("byte=0&byte=255");
+	}
+
+	[Fact]
+	public void ListToQueryParameters_SByteValues_FormatsEveryValue()
+	{
+		sbyte[] values = [sbyte.MinValue, sbyte.MaxValue];
+
+		values.ListToQueryParameters("sbyte")
+			.ShouldBe("sbyte=-128&sbyte=127");
+	}
+
+	[Fact]
+	public void ListToQueryParameters_UIntValues_FormatsEveryValue()
+	{
+		uint[] values = [uint.MinValue, uint.MaxValue];
+
+		values.ListToQueryParameters("uint")
+			.ShouldBe("uint=0&uint=4294967295");
+	}
+
+	[Fact]
+	public void ListToQueryParameters_ULongValues_FormatsEveryValue()
+	{
+		ulong[] values = [ulong.MinValue, ulong.MaxValue];
+
+		values.ListToQueryParameters("ulong")
+			.ShouldBe("ulong=0&ulong=18446744073709551615");
+	}
+
+	[Fact]
+	public void ListToQueryParameters_UShortValues_FormatsEveryValue()
+	{
+		ushort[] values = [ushort.MinValue, ushort.MaxValue];
+
+		values.ListToQueryParameters("ushort")
+			.ShouldBe("ushort=0&ushort=65535");
+	}
+
+	[Fact]
+	public void ListToQueryParameters_FloatValues_FormatsEveryValue()
+	{
+		float[] values = [1.0f, -2.0f];
+
+		values.ListToQueryParameters("float")
+			.ShouldBe("float=1&float=-2");
+	}
+
 }

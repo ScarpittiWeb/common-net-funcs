@@ -1,15 +1,13 @@
-﻿using System.Buffers;
 using CommonNetFuncs.Web.Api.MsgPack;
 using CommonNetFuncs.Web.Requests.MessagePack;
 using MessagePack;
 using MessagePack.AspNetCoreMvcFormatter;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Buffers;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests.MsgPack;

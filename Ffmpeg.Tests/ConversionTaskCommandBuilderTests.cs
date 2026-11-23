@@ -1,5 +1,8 @@
 ﻿using CommonNetFuncs.Ffmpeg;
 using CommonNetFuncs.Ffmpeg.FfmpegRawCalls;
+using FakeItEasy;
+using System.Diagnostics;
+using System.Reflection;
 using Xabe.FFmpeg;
 using xRetry.v3;
 
@@ -221,4 +224,56 @@ public sealed class ConversionTaskCommandBuilderTests() : ConversionTaskTestsBas
 		command.ShouldNotBeNullOrEmpty();
 		command.ShouldContain(outputFileName);
 	}
+}
+
+public sealed class ConversionCommandBehaviorTests() : ConversionTaskTestsBase("ConversionTaskTests_CommandBehavior")
+{
+
+
+
+
+
+
+
+
+
+	private static T InvokePrivate<T>(Type type, string methodName, params object?[] arguments)
+	{
+		MethodInfo method = type.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static)!;
+		return (T)method.Invoke(null, arguments)!;
+	}
+
+	private static DataReceivedEventArgs CreateDataReceivedEventArgs(string? data)
+	{
+		DataReceivedEventArgs args = (DataReceivedEventArgs)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(DataReceivedEventArgs));
+		typeof(DataReceivedEventArgs)
+			.GetField("_data", BindingFlags.NonPublic | BindingFlags.Instance)!
+			.SetValue(args, data);
+		return args;
+	}
+
+	[Fact]
+	public async Task GetConversionCommandFromXabe_AudioOnlyMediaBuildsOutputFormatWithoutVideoCodec()
+	{
+		FileInfo source = new(testVideoPath);
+		IMediaInfo mediaInfo = A.Fake<IMediaInfo>();
+		A.CallTo(() => mediaInfo.VideoStreams).Returns([]);
+		A.CallTo(() => mediaInfo.AudioStreams).Returns([]);
+
+		mediaInfo.VideoStreams.ShouldBeEmpty();
+		string command = await RawConversionTask.GetConversionCommandFromXabe(
+			source,
+			"audio.mp4",
+			VideoCodec.h264,
+			Format.mp4,
+			ConversionPreset.UltraFast,
+			workingDir,
+			mediaInfo);
+
+		command.ShouldContain("audio.mp4");
+		command.ShouldContain("-f mp4");
+		command.ShouldNotContain("-i ");
+		command.ShouldNotContain("libx264");
+	}
+
 }

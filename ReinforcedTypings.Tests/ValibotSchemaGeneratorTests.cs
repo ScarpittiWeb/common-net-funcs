@@ -1,7 +1,10 @@
-﻿using System.Reflection;
+﻿using CommonNetFuncs.ReinforcedTypings;
 using CommonNetFuncs.ReinforcedTypings.Valibot;
 using ReinforcedTypings.Tests.TestModels;
 using ReinforcedTypings.Tests.TestModels.Valibot;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+
 namespace ReinforcedTypings.Tests;
 
 /// <summary>
@@ -285,4 +288,109 @@ public sealed class ValibotSchemaGeneratorTests
 
 		result.ShouldBeNull();
 	}
+}
+
+public sealed class ValibotSchemaGeneratorBehaviorTests
+{
+	private static readonly Type GeneratorType = typeof(ReinforcedTypingsFluentConfig);
+
+	private static MethodInfo PrivateMethod(string name) => GeneratorType.GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)
+		?? throw new InvalidOperationException($"{name} was not found.");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	[Fact]
+	public void ValibotGenerator_CustomAttributesUseAlternateReflectedPropertyNames()
+	{
+		MethodInfo method = typeof(ValibotSchemaGenerator).GetMethod("GetCustomAttributePipe", BindingFlags.NonPublic | BindingFlags.Static)
+			?? throw new InvalidOperationException("GetCustomAttributePipe was not found.");
+
+		(bool deniedItemLevel, string? deniedPipe) = ((bool, string?))method.Invoke(null,
+			[new TestModels.Coverage.Attributes.DenyCharactersAttribute("]^-")])!;
+		(bool allowedItemLevel, string? allowedPipe) = ((bool, string?))method.Invoke(null,
+			[new TestModels.Coverage.Attributes.AllowedNullableValuesAttribute("A", 2)])!;
+
+		deniedItemLevel.ShouldBeFalse();
+		deniedPipe.ShouldBe("v.regex(/^[^\\]\\^\\-]*$/)");
+		allowedItemLevel.ShouldBeFalse();
+		allowedPipe.ShouldBe("v.union([v.literal('A'), v.literal(2)])");
+	}
+
+	[Fact]
+	public void ValibotGenerator_NonAttributeMetadataIsIgnored()
+	{
+		MethodInfo method = typeof(ValibotSchemaGenerator).GetMethod("BuildPropertySchema", BindingFlags.NonPublic | BindingFlags.Static)
+			?? throw new InvalidOperationException("BuildPropertySchema was not found.");
+		PropertyInfo property = typeof(TestModels.Coverage.Attributes.NonAttributeCoverageModel).GetProperty(nameof(TestModels.Coverage.Attributes.NonAttributeCoverageModel.Value))!;
+
+		string schema = (string)method.Invoke(null, [property, new object[] { new object() }, new HashSet<Type>(), new NullabilityInfoContext()])!;
+
+		schema.ShouldBe("v.string()");
+	}
+
+	[Fact]
+	public void ValibotGenerator_UnrecognizedGenericTypeUsesAnyFallback()
+	{
+		MethodInfo method = typeof(ValibotSchemaGenerator).GetMethod("GetBaseSchema", BindingFlags.NonPublic | BindingFlags.Static)
+			?? throw new InvalidOperationException("GetBaseSchema was not found.");
+
+		string schema = (string)method.Invoke(null, [typeof(Dictionary<string, int>), new HashSet<Type>(), new NullabilityInfoContext()])!;
+
+		schema.ShouldBe("v.any()");
+	}
+
+	[Fact]
+	public void ValibotGenerator_NullableCollectionAndZeroMinimumStringLengthAreResolvedPrecisely()
+	{
+		MethodInfo getArrayItemType = typeof(ValibotSchemaGenerator).GetMethod("GetArrayItemType", BindingFlags.NonPublic | BindingFlags.Static)!;
+		MethodInfo buildStringLength = typeof(ValibotSchemaGenerator).GetMethod("BuildStringLengthPipe", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+		((Type?)getArrayItemType.Invoke(null, [typeof(int?[])])!).ShouldBe(typeof(int));
+		((Type?)getArrayItemType.Invoke(null, [typeof(int)])!).ShouldBeNull();
+		((string)buildStringLength.Invoke(null, [new System.ComponentModel.DataAnnotations.StringLengthAttribute(8)])!)
+			.ShouldBe("v.maxLength(8)");
+		((Type?)getArrayItemType.Invoke(null, [typeof(Dictionary<string, int>)])!).ShouldBeNull();
+	}
+
+	[Fact]
+	public void ValibotGenerator_GenericStructAndAbsentRangeBoundsUseFallbackBranches()
+	{
+		MethodInfo buildProperty = typeof(ValibotSchemaGenerator).GetMethod("BuildPropertySchema", BindingFlags.NonPublic | BindingFlags.Static)!;
+		PropertyInfo property = typeof(TestModels.Coverage.Generic.GenericValueModel).GetProperty(nameof(TestModels.Coverage.Generic.GenericValueModel.Value))!;
+		string schema = (string)buildProperty.Invoke(null, [property, property.GetCustomAttributes(true), new HashSet<Type>(), new NullabilityInfoContext()])!;
+		schema.ShouldBe("v.optional(v.any())");
+
+		MethodInfo buildRange = typeof(ValibotSchemaGenerator).GetMethod("BuildRangePipe", BindingFlags.NonPublic | BindingFlags.Static)!;
+		System.ComponentModel.DataAnnotations.RangeAttribute range =
+			(System.ComponentModel.DataAnnotations.RangeAttribute)RuntimeHelpers.GetUninitializedObject(typeof(System.ComponentModel.DataAnnotations.RangeAttribute));
+		((string)buildRange.Invoke(null, [range])!).ShouldBeEmpty();
+	}
+
+	[Fact]
+	public void ValibotGenerator_MalformedSubsetMetadataLeavesOriginalType()
+	{
+		MethodInfo method = typeof(ValibotSchemaGenerator).GetMethod("ResolveSourceType", BindingFlags.NonPublic | BindingFlags.Static)
+			?? throw new InvalidOperationException("ResolveSourceType was not found.");
+
+		Type result = (Type)method.Invoke(null, [typeof(TestModels.Coverage.Attributes.MalformedSubsetModel)])!;
+
+		result.ShouldBe(typeof(TestModels.Coverage.Attributes.MalformedSubsetModel));
+	}
+
 }

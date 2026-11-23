@@ -1,7 +1,7 @@
-﻿using System.Collections;
+﻿using CommonNetFuncs.Core;
+using System.Collections;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
-using CommonNetFuncs.Core;
 
 namespace Core.Tests;
 

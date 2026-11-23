@@ -1,5 +1,5 @@
-﻿using System.Globalization;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
+using System.Globalization;
 
 namespace Core.Tests;
 

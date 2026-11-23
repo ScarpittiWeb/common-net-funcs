@@ -56,6 +56,27 @@ public static class Manipulation
 	private const string ReduceQualityErrorMessage = "Error reducing image quality to {Quality} with width {Width} and height {Height}";
 	private const int DefaultResizeQuality = 90;
 	private static readonly SKSamplingOptions DefaultSampling = new(SKCubicResampler.Mitchell);
+	private const int MaxArrayLength = 0x7FFFFFC7; // Array.MaxLength (not available on netstandard2.1)
+
+	// Reads the rest of the stream into a byte array. Seekable streams are pre-sized to their remaining length so the MemoryStream buffer can
+	// be returned as-is when it was filled exactly; otherwise (non-seekable, inaccurate Length, ...) this behaves like CopyTo + ToArray.
+	private static byte[] ReadStreamToBytes(Stream inputStream)
+	{
+		int capacity = 0;
+		if (inputStream.CanSeek)
+		{
+			long remaining = inputStream.Length - inputStream.Position;
+			if (remaining > 0 && remaining <= MaxArrayLength)
+			{
+				capacity = (int)remaining;
+			}
+		}
+
+		using MemoryStream ms = new(capacity);
+		inputStream.CopyTo(ms);
+		byte[] buffer = ms.GetBuffer();
+		return buffer.Length == ms.Length ? buffer : ms.ToArray();
+	}
 
 	// Decodes a bitmap using SkiaSharp. Throws InvalidOperationException for unsupported formats (e.g. TIFF).
 	private static SKBitmap DecodeBitmap(byte[] data)
@@ -240,8 +261,7 @@ public static class Manipulation
 		SKBitmap? mutated = null;
 		try
 		{
-			byte[] _streamBytes;
-			using (MemoryStream _ms = new()) { inputStream.CopyTo(_ms); _streamBytes = _ms.ToArray(); }
+			byte[] _streamBytes = ReadStreamToBytes(inputStream);
 			if (inputStream.CanSeek) inputStream.Position = 0;
 			original = DecodeBitmap(_streamBytes) ?? throw new InvalidOperationException("Failed to load image from stream");
 			resized = ResizeCore(original, resizeOptions, width, height, samplingOptions, useDimsAsMax, true);
@@ -339,7 +359,7 @@ public static class Manipulation
 
 			if (isSameFile)
 			{
-#if NET5_0_OR_GREATER
+#if !NETSTANDARD2_1
 				File.Move(tempFilePath, outputFilePath, true);
 #else
 				if (File.Exists(outputFilePath))
@@ -384,8 +404,7 @@ public static class Manipulation
 		SKBitmap? mutated = null;
 		try
 		{
-			byte[] _streamBytes;
-			using (MemoryStream _ms = new()) { inputStream.CopyTo(_ms); _streamBytes = _ms.ToArray(); }
+			byte[] _streamBytes = ReadStreamToBytes(inputStream);
 			if (inputStream.CanSeek) inputStream.Position = 0;
 			original = DecodeBitmap(_streamBytes) ?? throw new InvalidOperationException("Failed to load image from stream");
 			resized = ResizeCore(original, resizeOptions, width, height, samplingOptions, useDimsAsMax, false);
@@ -645,6 +664,18 @@ public static class Manipulation
 	/// </summary>
 	public static SKBitmap ResizeTo(this SKBitmap sourceBitmap, int width, int height, SKCubicResampler? resampler = null)
 	{
+		// SKImage.FromBitmap copies the pixels of a mutable bitmap; wrapping the pixel memory is enough because the image never outlives this
+		// call. Falls back to FromBitmap when the bitmap has no raster pixels or they cannot be wrapped.
+		IntPtr pixels = sourceBitmap?.GetPixels() ?? IntPtr.Zero;
+		if (pixels != IntPtr.Zero)
+		{
+			using SKImage? pixelsImage = SKImage.FromPixels(sourceBitmap!.Info, pixels, sourceBitmap.RowBytes);
+			if (pixelsImage != null)
+			{
+				return pixelsImage.ResizeTo(width, height, resampler);
+			}
+		}
+
 		using SKImage image = SKImage.FromBitmap(sourceBitmap);
 		return image.ResizeTo(width, height, resampler);
 	}
@@ -955,9 +986,7 @@ public static class Manipulation
 				return false;
 			}
 
-			using MemoryStream ms = new();
-			imageStream.CopyTo(ms);
-			byte[] bytes = ms.ToArray();
+			byte[] bytes = ReadStreamToBytes(imageStream);
 
 			if (imageStream.CanSeek)
 			{
@@ -1018,7 +1047,6 @@ public static class Manipulation
 	public static bool TryGetMetadata(string imagePath, out ImageInfo metadata)
 	{
 		metadata = new ImageInfo();
-		SKBitmap? bitmap = null;
 		SKCodec? codec = null;
 		try
 		{
@@ -1028,15 +1056,14 @@ public static class Manipulation
 			}
 			codec = SKCodec.Create(imagePath);
 			if (codec == null) return false;
-			try { bitmap = DecodeBitmap(File.ReadAllBytes(imagePath)); } catch { /* fallback to codec info */ }
-			int w = bitmap?.Width ?? codec.Info.Width;
-			int h = bitmap?.Height ?? codec.Info.Height;
-			if (w > 0 && h > 0)
+			// A full decode always yields exactly codec.Info's dimensions (and decode failures fell back to them), so only the header is read
+			SKImageInfo info = codec.Info;
+			if (info.Width > 0 && info.Height > 0)
 			{
 				metadata = new ImageInfo
 				{
-					Width = w,
-					Height = h,
+					Width = info.Width,
+					Height = info.Height,
 					EncodedFormat = codec.EncodedFormat,
 					HorizontalResolution = 96.0,
 					VerticalResolution = 96.0,
@@ -1050,7 +1077,6 @@ public static class Manipulation
 		}
 		finally
 		{
-			bitmap?.Dispose();
 			codec?.Dispose();
 		}
 
@@ -1068,7 +1094,6 @@ public static class Manipulation
 		metadata = new ImageInfo();
 		SKData? data = null;
 		SKCodec? codec = null;
-		SKBitmap? bitmap = null;
 		try
 		{
 			if (imageStream.CanSeek && imageStream.Length < 4)
@@ -1076,10 +1101,7 @@ public static class Manipulation
 				return false;
 			}
 
-			// Buffer the stream so we can both detect format and decode the bitmap
-			using MemoryStream ms = new();
-			imageStream.CopyTo(ms);
-			byte[] bytes = ms.ToArray();
+			byte[] bytes = ReadStreamToBytes(imageStream);
 
 			if (imageStream.CanSeek)
 			{
@@ -1094,15 +1116,14 @@ public static class Manipulation
 			data = SKData.CreateCopy(bytes);
 			codec = SKCodec.Create(data);
 			if (codec == null) return false;
-			try { bitmap = DecodeBitmap(bytes); } catch { /* fallback to codec info */ }
-			int w = bitmap?.Width ?? codec.Info.Width;
-			int h = bitmap?.Height ?? codec.Info.Height;
-			if (w > 0 && h > 0)
+			// A full decode always yields exactly codec.Info's dimensions (and decode failures fell back to them), so only the header is read
+			SKImageInfo info = codec.Info;
+			if (info.Width > 0 && info.Height > 0)
 			{
 				metadata = new ImageInfo
 				{
-					Width = w,
-					Height = h,
+					Width = info.Width,
+					Height = info.Height,
 					EncodedFormat = codec.EncodedFormat,
 					HorizontalResolution = 96.0,
 					VerticalResolution = 96.0,
@@ -1116,7 +1137,6 @@ public static class Manipulation
 		}
 		finally
 		{
-			bitmap?.Dispose();
 			codec?.Dispose();
 			data?.Dispose();
 		}
@@ -1135,7 +1155,6 @@ public static class Manipulation
 		metadata = new ImageInfo();
 		SKData? data = null;
 		SKCodec? codec = null;
-		SKBitmap? bitmap = null;
 		try
 		{
 			if (imageData.Length < 4)
@@ -1143,19 +1162,17 @@ public static class Manipulation
 				return false;
 			}
 
-			byte[] arr = imageData.ToArray();
-			data = SKData.CreateCopy(arr);
+			data = SKData.CreateCopy(imageData.ToArray());
 			codec = SKCodec.Create(data);
 			if (codec == null) return false;
-			try { bitmap = DecodeBitmap(arr); } catch { /* fallback to codec info */ }
-			int w = bitmap?.Width ?? codec.Info.Width;
-			int h = bitmap?.Height ?? codec.Info.Height;
-			if (w > 0 && h > 0)
+			// A full decode always yields exactly codec.Info's dimensions (and decode failures fell back to them), so only the header is read
+			SKImageInfo info = codec.Info;
+			if (info.Width > 0 && info.Height > 0)
 			{
 				metadata = new ImageInfo
 				{
-					Width = w,
-					Height = h,
+					Width = info.Width,
+					Height = info.Height,
 					EncodedFormat = codec.EncodedFormat,
 					HorizontalResolution = 96.0,
 					VerticalResolution = 96.0,
@@ -1169,7 +1186,6 @@ public static class Manipulation
 		}
 		finally
 		{
-			bitmap?.Dispose();
 			codec?.Dispose();
 			data?.Dispose();
 		}
@@ -1238,8 +1254,7 @@ public static class Manipulation
 		SKBitmap? mutated = null;
 		try
 		{
-			byte[] _bytes;
-			using (MemoryStream _ms = new()) { inputStream.CopyTo(_ms); _bytes = _ms.ToArray(); }
+			byte[] _bytes = ReadStreamToBytes(inputStream);
 			if (inputStream.CanSeek) inputStream.Position = 0;
 			bitmap = DecodeBitmap(_bytes) ?? throw new InvalidOperationException("Failed to load image from stream");
 			SKBitmap current = bitmap;

@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using CommonNetFuncs.Ffmpeg.Internal;
 using ZLinq;
 using static CommonNetFuncs.Core.Strings;
 

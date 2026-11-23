@@ -1,12 +1,11 @@
-﻿using System.IO.Compression;
-
-#if !CORE_NATIVE_BUILD
+﻿#if !CORE_NATIVE_BUILD
 
 namespace Compression.Tests.Internal;
 
-// ZLibCompatStream only exists in the netstandard2.1 build of CommonNetFuncs.Compression (guarded by #if !NET6_0_OR_GREATER in production)
-// on net10.0 the type isn't compiled at all, so these tests only run against the net8.0 leg (which maps to the netstandard2.1 build).
+// ZLibCompatStream only exists in the netstandard2.1 build of CommonNetFuncs.Compression (guarded by #if NETSTANDARD2_1 in production);
+// the native net11.0 build uses the BCL ZLibStream instead, so these tests only run when the tests are built against the netstandard2.1 library.
 using CommonNetFuncs.Compression.Internal;
+using System.IO.Compression;
 
 public sealed class ZLibCompatStreamTests
 {

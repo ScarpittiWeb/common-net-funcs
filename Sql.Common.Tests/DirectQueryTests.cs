@@ -1,7 +1,9 @@
-﻿using System.Data;
-using CommonNetFuncs.Sql.Common;
+﻿using CommonNetFuncs.Sql.Common;
 using Microsoft.Data.Sqlite;
 using SQLitePCL;
+using System.Data;
+using System.Data.Common;
+using System.Diagnostics.CodeAnalysis;
 using static Xunit.TestContext;
 
 namespace Sql.Common.Tests;
@@ -1540,4 +1542,147 @@ public sealed class DirectQueryTests : IDisposable
 		DirectQuery.CacheManager.GetLimitedCache().ContainsKey(typeof(TestModel)).ShouldBeTrue();
 		DirectQuery.CacheManager.GetCache().ContainsKey(typeof(TestModel)).ShouldBeFalse();
 	}
+}
+
+public sealed class DirectQueryFailureBehaviorTests
+{
+
+
+
+
+
+	private sealed class CancellingRow
+	{
+		public static CancellationTokenSource? CancellationSource { get; set; }
+
+		private int value;
+
+		public int Value
+		{
+			get => value;
+			set
+			{
+				this.value = value;
+				CancellationSource?.Cancel();
+			}
+		}
+	}
+
+	private sealed class ThrowingDbConnection(string message) : DbConnection
+	{
+		[AllowNull]
+		public override string ConnectionString { get; set; } = string.Empty;
+
+		public override string Database => "unit-tests";
+
+		public override string DataSource => "unit-tests";
+
+		public override string ServerVersion => "1";
+
+		public override ConnectionState State => ConnectionState.Closed;
+
+		public int OpenCount { get; private set; }
+
+		public int CloseCount { get; private set; }
+
+		public override void ChangeDatabase(string databaseName) => throw new NotSupportedException();
+
+		public override void Close() => CloseCount++;
+
+		public override void Open()
+		{
+			OpenCount++;
+			throw new InvalidOperationException(message);
+		}
+
+		public override Task OpenAsync(CancellationToken cancellationToken)
+		{
+			Open();
+			return Task.CompletedTask;
+		}
+
+		protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotSupportedException();
+
+		protected override DbCommand CreateDbCommand() => new FakeDbCommand();
+	}
+
+	[Fact]
+	public async Task GetDataTableAsync_WhenOpenThrowsNonDbException_ShouldRetryAndReturnEmptyTable()
+	{
+		ThrowingDbConnection connection = new("table-async");
+		using FakeDbCommand command = new();
+
+		using DataTable result = await DirectQuery.GetDataTableAsync(connection, command, commandTimeoutSeconds: 17, maxRetry: 2, cancellationToken: Current.CancellationToken);
+
+		result.Rows.Count.ShouldBe(0);
+		command.CommandTimeout.ShouldBe(17);
+		connection.OpenCount.ShouldBe(2);
+		connection.CloseCount.ShouldBe(2);
+	}
+
+	[Fact]
+	public void GetDataTable_WhenOpenThrowsNonDbException_ShouldRetryAndReturnEmptyTable()
+	{
+		ThrowingDbConnection connection = new("table-sync");
+		using FakeDbCommand command = new();
+
+		using DataTable result = DirectQuery.GetDataTable(connection, command, commandTimeoutSeconds: 19, maxRetry: 2);
+
+		result.Rows.Count.ShouldBe(0);
+		command.CommandTimeout.ShouldBe(19);
+		connection.OpenCount.ShouldBe(2);
+		connection.CloseCount.ShouldBe(2);
+	}
+
+	[Fact]
+	public async Task RunUpdateQueryAsync_WhenOpenThrowsNonDbException_ShouldRetryAndReturnFailure()
+	{
+		ThrowingDbConnection connection = new("update-async");
+		using FakeDbCommand command = new();
+
+		UpdateResult result = await DirectQuery.RunUpdateQueryAsync(connection, command, commandTimeoutSeconds: 23, maxRetry: 2, cancellationToken: Current.CancellationToken);
+
+		result.Success.ShouldBeFalse();
+		result.RecordsChanged.ShouldBe(0);
+		command.CommandTimeout.ShouldBe(23);
+		connection.OpenCount.ShouldBe(2);
+		connection.CloseCount.ShouldBe(2);
+	}
+
+	[Fact]
+	public void RunUpdateQuery_WhenOpenThrowsNonDbException_ShouldRetryAndReturnFailure()
+	{
+		ThrowingDbConnection connection = new("update-sync");
+		using FakeDbCommand command = new();
+
+		UpdateResult result = DirectQuery.RunUpdateQuery(connection, command, commandTimeoutSeconds: 29, maxRetry: 2);
+
+		result.Success.ShouldBeFalse();
+		result.RecordsChanged.ShouldBe(0);
+		command.CommandTimeout.ShouldBe(29);
+		connection.OpenCount.ShouldBe(2);
+		connection.CloseCount.ShouldBe(2);
+	}
+
+	[Fact]
+	public async Task GetDataStreamAsync_WhenPropertySetterCancelsToken_ShouldStopBeforeYield()
+	{
+		await using SqliteConnection connection = new("DataSource=:memory:");
+		await connection.OpenAsync(Current.CancellationToken);
+		await using SqliteCommand command = connection.CreateCommand();
+		command.CommandText = "SELECT 7 AS Value";
+		using CancellationTokenSource cancellation = new();
+		CancellingRow.CancellationSource = cancellation;
+
+		List<CancellingRow> rows = [];
+		await foreach (CancellingRow row in DirectQuery.GetDataStreamAsync<CancellingRow>(connection, command, cancellationToken: cancellation.Token))
+		{
+			rows.Add(row);
+		}
+
+		rows.ShouldBeEmpty();
+		connection.State.ShouldBe(ConnectionState.Closed);
+		CancellingRow.CancellationSource = null;
+	}
+
 }

@@ -1,5 +1,5 @@
-﻿using System.Text;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
+﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.Text;
 
 namespace CommonNetFuncs.Web.Interface;
 

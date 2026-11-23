@@ -1,7 +1,9 @@
-﻿using System.Runtime.InteropServices;
+﻿using CommonNetFuncs.Office.Common;
+using System.Runtime.InteropServices;
+using System.Text;
 using xRetry.v3;
-using static System.IO.Path;
 using static CommonNetFuncs.Office.Common.PdfConversion;
+using static System.IO.Path;
 using static Xunit.TestContext;
 
 namespace Office.Common.Tests;
@@ -1511,3 +1513,135 @@ public sealed class PdfConversionTests //: IDisposable
 	}
 }
 
+public sealed class PdfConversionBehaviorTests
+{
+
+
+
+
+	private static string CreateWorkDirectory()
+	{
+		string path = Combine(GetTempPath(), $"office_fake_{Guid.NewGuid():N}");
+		Directory.CreateDirectory(path);
+		return path;
+	}
+
+	private static string CreateSource(string directory)
+	{
+		string path = Combine(directory, "source.xlsx");
+		File.WriteAllText(path, "source");
+		return path;
+	}
+
+	private static string CreateFakeConverter(string directory, bool createPdf, int exitCode)
+	{
+		string executable;
+		if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+		{
+			executable = Combine(directory, "fake-soffice.cmd");
+			string writePdf = createPdf
+				? "for %%F in (\"%~3\") do > \"%~5\\%%~nF.pdf\" echo fake pdf"
+				: "rem no pdf intentionally";
+			File.WriteAllText(executable, $"@echo off\r\n{writePdf}\r\n@exit /b {exitCode}\r\n", Encoding.ASCII);
+		}
+		else
+		{
+			executable = Combine(directory, "fake-soffice.sh");
+			string writePdf = createPdf
+				? "name=\"${3##*/}\"; name=\"${name%.*}\"; printf 'fake pdf' > \"$5/$name.pdf\""
+				: ":";
+			File.WriteAllText(executable, $"#!/bin/sh\n{writePdf}\nexit {exitCode}\n", Encoding.ASCII);
+			File.SetUnixFileMode(executable, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+		}
+		return executable;
+	}
+
+	[Fact]
+	public void ConvertToPdf_SuccessfulToolWithoutPdf_CompletesWithoutCreatingOutput()
+	{
+		string work = CreateWorkDirectory();
+		string executable = CreateFakeConverter(work, createPdf: false, exitCode: 0);
+		string source = CreateSource(work);
+
+		try
+		{
+			PdfConversion.ConvertToPdf(executable, source, work, maxRetries: 0);
+
+			File.Exists(Combine(work, "source.pdf")).ShouldBeFalse();
+		}
+		finally
+		{
+			Directory.Delete(work, true);
+		}
+	}
+
+	[Fact]
+	public async Task ConvertToPdfAsync_SuccessfulToolCreatesPdfAndOverwritesDestination()
+	{
+		string work = CreateWorkDirectory();
+		string executable = CreateFakeConverter(work, createPdf: true, exitCode: 0);
+		string source = CreateSource(work);
+		string output = Combine(work, "source.pdf");
+		await File.WriteAllTextAsync(output, "old", Current.CancellationToken);
+
+		try
+		{
+			await PdfConversion.ConvertToPdfAsync(
+				executable,
+				source,
+				work,
+				maxRetries: 0,
+				overwriteExistingFile: true);
+
+			File.ReadAllText(output).Trim().ShouldBe("fake pdf");
+		}
+		finally
+		{
+			Directory.Delete(work, true);
+		}
+	}
+
+	[Fact]
+	public void ConvertToPdf_OverwriteFalse_DoesNotReplaceExistingPdf()
+	{
+		string work = CreateWorkDirectory();
+		string executable = CreateFakeConverter(work, createPdf: true, exitCode: 0);
+		string source = CreateSource(work);
+		string output = Combine(work, "source.pdf");
+		File.WriteAllText(output, "old");
+
+		try
+		{
+			PdfConversion.LibreOfficeFailedException exception = Should.Throw<PdfConversion.LibreOfficeFailedException>(() =>
+				PdfConversion.ConvertToPdf(executable, source, work, maxRetries: 0, overwriteExistingFile: false));
+
+			exception.InnerException.ShouldBeOfType<IOException>();
+			File.ReadAllText(output).ShouldBe("old");
+		}
+		finally
+		{
+			Directory.Delete(work, true);
+		}
+	}
+
+	[Fact]
+	public void ConvertToPdf_NonZeroExit_RetriesThenReportsFinalCode()
+	{
+		string work = CreateWorkDirectory();
+		string executable = CreateFakeConverter(work, createPdf: false, exitCode: 7);
+		string source = CreateSource(work);
+
+		try
+		{
+			PdfConversion.LibreOfficeFailedException exception = Should.Throw<PdfConversion.LibreOfficeFailedException>(() =>
+				PdfConversion.ConvertToPdf(executable, source, work, maxRetries: 2));
+
+			exception.InnerException?.Message.ShouldBe("LibreOffice has failed with 7");
+		}
+		finally
+		{
+			Directory.Delete(work, true);
+		}
+	}
+
+}

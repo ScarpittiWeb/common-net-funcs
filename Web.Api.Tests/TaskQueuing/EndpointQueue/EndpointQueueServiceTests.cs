@@ -1,7 +1,7 @@
-﻿using System.Collections.Concurrent;
-using System.Threading.Channels;
-using CommonNetFuncs.Web.Api.TaskQueuing;
+﻿using CommonNetFuncs.Web.Api.TaskQueuing;
 using CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
+using System.Collections.Concurrent;
+using System.Threading.Channels;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests.TaskQueuing.EndpointQueue;
@@ -896,4 +896,44 @@ public class EndpointQueueServiceTests : IDisposable
 		public string Name { get; set; } = string.Empty;
 		public List<string> Values { get; set; } = new();
 	}
+}
+
+public sealed class EndpointQueueServiceCapacityBehaviorTests
+{
+
+
+	private static TaskCompletionSource CreateSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+	private sealed class MockServiceProvider : IServiceProvider
+	{
+		public object? GetService(Type serviceType) => null;
+	}
+
+	[Fact]
+	public async Task EndpointService_BoundedFullWriteHonorsCancellationWithoutGrowingStats()
+	{
+		using EndpointQueueService service = new();
+		TaskCompletionSource started = CreateSignal();
+		TaskCompletionSource release = CreateSignal();
+		BoundedChannelOptions options = new(1) { FullMode = BoundedChannelFullMode.Wait };
+		Task<int> active = service.ExecuteAsync("capacity", async _ =>
+		{
+			started.TrySetResult();
+			await release.Task;
+			return 1;
+		}, options, Current.CancellationToken);
+		await started.Task;
+		Task<int> buffered = service.ExecuteAsync("capacity", _ => Task.FromResult(2), options, Current.CancellationToken);
+		using CancellationTokenSource cancelled = new();
+		Task<int> waiting = service.ExecuteAsync("capacity", _ => Task.FromResult(3), options, cancelled.Token);
+		cancelled.Cancel();
+
+		await Should.ThrowAsync<OperationCanceledException>(async () => await waiting);
+		(await service.GetQueueStatsAsync("capacity")).QueuedTasks.ShouldBe(2);
+
+		release.TrySetResult();
+		(await active).ShouldBe(1);
+		(await buffered).ShouldBe(2);
+	}
+
 }

@@ -1,11 +1,17 @@
 ﻿using System.Diagnostics;
 using System.Threading.Channels;
-using CommonNetFuncs.Core;
 
 namespace CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
 // Individual Endpoint Queue
 
 
+/// <summary>
+/// Processes tasks for a single endpoint in submission order.
+/// </summary>
+/// <remarks>
+/// Disposal is non-blocking. Shutdown cancels the active task and any pending tasks, and managed
+/// synchronization resources are released after the processing loop has stopped.
+/// </remarks>
 public class EndpointQueue : IDisposable
 {
 	private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
@@ -16,7 +22,7 @@ public class EndpointQueue : IDisposable
 	private readonly CancellationTokenSource cancellationTokenSource;
 	private readonly Task processingTask;
 	private readonly QueueStats stats;
-	private readonly List<TimeSpan> processingTimes = new();
+	private readonly Queue<TimeSpan> processingTimes = new();
 	private readonly Lock statsLock = new();
 	private readonly int processTimeWindow;
 
@@ -61,7 +67,15 @@ public class EndpointQueue : IDisposable
 	public async Task<T?> EnqueueAsync<T>(Func<CancellationToken, Task<T>> taskFunction, CancellationToken cancellationToken = default)
 	{
 		QueuedTask queuedTask = new(async ct => await taskFunction(ct).ConfigureAwait(false));
-		await writer.WriteAsync(queuedTask, cancellationToken).ConfigureAwait(false);
+		try
+		{
+			await writer.WriteAsync(queuedTask, cancellationToken).ConfigureAwait(false);
+		}
+		catch (ChannelClosedException) when (disposed != 0)
+		{
+			queuedTask.CompletionSource.TrySetCanceled();
+			throw new TaskCanceledException("The endpoint queue is shutting down.");
+		}
 
 		lock (statsLock)
 		{
@@ -74,47 +88,57 @@ public class EndpointQueue : IDisposable
 
 	private async Task ProcessTasksAsync(CancellationToken cancellationToken)
 	{
-		await foreach (QueuedTask task in reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+		try
 		{
-			Stopwatch stopwatch = Stopwatch.StartNew();
-
-			try
+			await foreach (QueuedTask task in reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
 			{
-				logger.Debug("Processing task {TaskId} for endpoint {EndpointKey}", task.Id, EndpointKey);
+				Stopwatch stopwatch = Stopwatch.StartNew();
 
-				object? result = await task.TaskFunction(cancellationToken).ConfigureAwait(false);
-				task.CompletionSource.SetResult(result);
-
-				stopwatch.Stop();
-
-				lock (statsLock)
+				try
 				{
-					stats.ProcessedTasks++;
-					stats.LastProcessedAt = DateTime.UtcNow;
-					processingTimes.Add(stopwatch.Elapsed);
+					logger.Debug("Processing task {TaskId} for endpoint {EndpointKey}", task.Id, EndpointKey);
 
-					// Keep only last 100 processing times for average calculation
+					object? result = await task.TaskFunction(cancellationToken).ConfigureAwait(false);
+					task.CompletionSource.SetResult(result);
 
-					if (processingTimes.Count > processTimeWindow)
+					stopwatch.Stop();
+
+					lock (statsLock)
 					{
-						processingTimes.RemoveAt(0);
+						stats.ProcessedTasks++;
+						stats.LastProcessedAt = DateTime.UtcNow;
+						processingTimes.Enqueue(stopwatch.Elapsed);
+
+						// Keep only the last processTimeWindow processing times for average calculation
+						if (processingTimes.Count > processTimeWindow)
+						{
+							processingTimes.Dequeue();
+						}
 					}
+
+					logger.Debug("Completed task {TaskId} for endpoint {EndpointKey} in {Duration}ms", task.Id, EndpointKey, stopwatch.ElapsedMilliseconds);
 				}
-
-				logger.Debug("Completed task {TaskId} for endpoint {EndpointKey} in {Duration}ms", task.Id, EndpointKey, stopwatch.ElapsedMilliseconds);
-			}
-			catch (Exception ex)
-			{
-				stopwatch.Stop();
-
-				lock (statsLock)
+				catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 				{
-					stats.FailedTasks++;
+					task.CompletionSource.TrySetCanceled(cancellationToken);
 				}
+				catch (Exception ex)
+				{
+					stopwatch.Stop();
 
-				logger.Error(ex, "Error processing task {TaskId} for endpoint {EndpointKey}", task.Id, EndpointKey);
-				task.CompletionSource.SetException(ex);
+					lock (statsLock)
+					{
+						stats.FailedTasks++;
+					}
+
+					logger.Error(ex, "Error processing task {TaskId} for endpoint {EndpointKey}", task.Id, EndpointKey);
+					task.CompletionSource.SetException(ex);
+				}
 			}
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			// Expected during queue shutdown.
 		}
 	}
 
@@ -130,7 +154,8 @@ public class EndpointQueue : IDisposable
 				LastProcessedAt = stats.LastProcessedAt
 			};
 
-			if (processingTimes.AnyFast())
+			// Queue<T> enumerates oldest -> newest, so the average is summed in the same order as before
+			if (processingTimes.Count > 0)
 			{
 				currentStats.AverageProcessingTime = TimeSpan.FromMilliseconds(processingTimes.Average(t => t.TotalMilliseconds));
 			}
@@ -139,8 +164,12 @@ public class EndpointQueue : IDisposable
 		}
 	}
 
-	private bool disposed;
+	private int disposed;
+	private Task? disposalTask;
 
+	/// <summary>
+	/// Initiates a non-blocking shutdown and cancels active and pending tasks.
+	/// </summary>
 	public void Dispose()
 	{
 		Dispose(true);
@@ -149,41 +178,62 @@ public class EndpointQueue : IDisposable
 
 	protected virtual void Dispose(bool disposing)
 	{
-		if (!disposed)
+		if (Interlocked.Exchange(ref disposed, 1) != 0)
 		{
-			if (disposing)
+			return;
+		}
+
+		if (disposing)
+		{
+			try
 			{
-				writer.Complete();
-				cancellationTokenSource.Cancel();
-
-				try
-				{
-					processingTask.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
-				}
-				catch (Exception ex)
-				{
-					logger.Warn(ex, "Error waiting for processing task to complete for endpoint {EndpointKey}", EndpointKey);
-				}
-
-				try
-				{
-					cancellationTokenSource.Dispose();
-				}
-				catch (Exception ex)
-				{
-					logger.Warn(ex, "Error disposing cancellationTokenSource");
-				}
-
-				try
-				{
-					channel?.Writer?.Complete();
-				}
-				catch (Exception ex)
-				{
-					logger.Warn(ex, "Error completing channel writer");
-				}
+				writer.TryComplete();
 			}
-			disposed = true;
+			catch (Exception ex)
+			{
+				logger.Warn(ex, "Error completing channel writer for endpoint {EndpointKey}", EndpointKey);
+			}
+
+			try
+			{
+				cancellationTokenSource.Cancel();
+			}
+			catch (Exception ex)
+			{
+				logger.Warn(ex, "Error canceling endpoint queue processing for endpoint {EndpointKey}", EndpointKey);
+			}
+
+			CancelPendingTasks();
+			disposalTask = CompleteDisposeAsync();
+		}
+	}
+
+	private void CancelPendingTasks()
+	{
+		while (reader.TryRead(out QueuedTask? pendingTask))
+		{
+			pendingTask.CompletionSource.TrySetCanceled();
+		}
+	}
+
+	private async Task CompleteDisposeAsync()
+	{
+		try
+		{
+			await processingTask.ConfigureAwait(false);
+		}
+		catch (OperationCanceledException)
+		{
+			// Expected during shutdown.
+		}
+		catch (Exception ex)
+		{
+			logger.Warn(ex, "Error waiting for endpoint processing task to stop for endpoint {EndpointKey}", EndpointKey);
+		}
+		finally
+		{
+			CancelPendingTasks();
+			cancellationTokenSource.Dispose();
 		}
 	}
 

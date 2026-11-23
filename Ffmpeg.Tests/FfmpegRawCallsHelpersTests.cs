@@ -1,5 +1,8 @@
 ﻿using CommonNetFuncs.Core;
 using CommonNetFuncs.Ffmpeg.FfmpegRawCalls;
+using FakeItEasy;
+using System.Diagnostics;
+using System.Reflection;
 using xRetry.v3;
 
 namespace Ffmpeg.Tests;
@@ -199,4 +202,47 @@ public sealed class FfmpegRawCallsHelpersTests
 		result.Streams.Count(s => s?.CodecType == CodecType.Audio).ShouldBe(1);
 		result.Streams.Count(s => s?.CodecType == CodecType.Subtitle).ShouldBe(1);
 	}
+}
+
+public sealed class FfmpegRawCallsBehaviorTests() : ConversionTaskTestsBase("FfmpegRawCallsHelpersTests_Behavior")
+{
+	private static T InvokePrivate<T>(Type type, string methodName, params object?[] arguments)
+	{
+		MethodInfo method = type.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static)!;
+		return (T)method.Invoke(null, arguments)!;
+	}
+
+	private static DataReceivedEventArgs CreateDataReceivedEventArgs(string? data)
+	{
+		DataReceivedEventArgs args = (DataReceivedEventArgs)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(DataReceivedEventArgs));
+		typeof(DataReceivedEventArgs)
+			.GetField("_data", BindingFlags.NonPublic | BindingFlags.Instance)!
+			.SetValue(args, data);
+		return args;
+	}
+
+	[Fact]
+	public async Task WaitOneAsync_CompletedHandleCompletesWithTrue()
+	{
+		using ManualResetEvent reset = new(initialState: true);
+
+		Task<bool> result = reset.WaitOneAsync();
+		bool completed = await result;
+
+		completed.ShouldBeTrue();
+	}
+
+	[Fact]
+	public async Task WaitOneAsync_UnsatisfiedHandleCompletesAfterSignal()
+	{
+		using ManualResetEvent reset = new(initialState: false);
+
+		Task<bool> result = reset.WaitOneAsync();
+		result.IsCompleted.ShouldBeFalse();
+		reset.Set();
+
+		bool completed = await result.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+		completed.ShouldBeTrue();
+	}
+
 }

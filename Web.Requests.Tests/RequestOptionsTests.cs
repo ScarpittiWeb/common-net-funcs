@@ -1,5 +1,4 @@
-﻿using CommonNetFuncs.Web.Requests;
-using CommonNetFuncs.Web.Requests.Rest;
+﻿using CommonNetFuncs.Web.Requests.Rest;
 using MessagePack;
 
 namespace Web.Requests.Tests;

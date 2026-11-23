@@ -1,5 +1,5 @@
-﻿using System.Globalization;
-using CommonNetFuncs.Core.Internal;
+﻿using CommonNetFuncs.Core.Internal;
+using System.Globalization;
 using static Xunit.TestContext;
 
 namespace Core.Tests.Internal;
@@ -203,7 +203,7 @@ public sealed class MathCompatTests
 	[InlineData(1.0, 0, 1.0)]
 	public void Round_Decimal_TruncatesTowardZero(double value, int digits, double expected)
 	{
-		MathCompat.Round((decimal)value, digits).ShouldBe((decimal)expected);
+		MathCompat.Round(value.ToShortestDecimal(), digits).ShouldBe(expected.ToShortestDecimal());
 	}
 
 	[Theory]
@@ -381,7 +381,7 @@ public sealed class CancellationTokenSourceExtensionsTests
 		cts.IsCancellationRequested.ShouldBeTrue();
 	}
 
-	// On both test TFMs the real BCL instance method takes precedence over the extension, so the shim body is never actually
+	// On the net11.0 build the real BCL instance method takes precedence over the extension, so the shim body is never actually
 	// reached via normal member resolution. Call it explicitly via its static form to exercise the shim itself (netstandard2.1 build only).
 #if !CORE_NATIVE_BUILD
 	[Fact]
@@ -405,13 +405,13 @@ public sealed class HashAlgorithmExtensionsTests
 		HashCompat.ToHexStringLower(hash).ShouldBe("5eb63bbbe01eeed093cb22bb8f5acdc3");
 	}
 
-	// On both test TFMs the real BCL instance method takes precedence over the extension, so the shim body is never actually
+	// On the net11.0 build the real BCL instance method takes precedence over the extension, so the shim body is never actually
 	// reached via normal member resolution. Call it explicitly via its static form to exercise the shim itself (netstandard2.1 build only).
 #if !CORE_NATIVE_BUILD
 	[Fact]
 	public async Task ComputeHashAsync_Shim_ReturnsExpectedHash()
 	{
-		using System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create();
+using System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create();
 		using MemoryStream stream = new("hello world"u8.ToArray());
 		byte[] hash = await HashAlgorithmExtensions.ComputeHashAsync(md5, stream, Current.CancellationToken);
 		HashCompat.ToHexStringLower(hash).ShouldBe("5eb63bbbe01eeed093cb22bb8f5acdc3");
@@ -419,7 +419,7 @@ public sealed class HashAlgorithmExtensionsTests
 #endif
 }
 
-// DictionaryCompatExtensions.AsReadOnly only exists in the netstandard2.1 build of Core (guarded by #if !NET9_0_OR_GREATER in production); on net10.0 the type isn't compiled at all.
+// DictionaryCompatExtensions.AsReadOnly only exists in the netstandard2.1 build of Core (guarded by #if NETSTANDARD2_1 in production); on the net11.0 build the type isn't compiled at all.
 #if !CORE_NATIVE_BUILD
 public sealed class DictionaryCompatExtensionsTests
 {

@@ -1,7 +1,8 @@
-﻿using System.Collections.Concurrent;
-using System.Diagnostics;
-using CommonNetFuncs.Ffmpeg;
+﻿using CommonNetFuncs.Ffmpeg;
 using CommonNetFuncs.Ffmpeg.FfmpegRawCalls;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Reflection;
 using Xabe.FFmpeg;
 using xRetry.v3;
 
@@ -173,4 +174,54 @@ public sealed class ConversionTaskTests() : ConversionTaskTestsBase("ConversionT
 		values.encoder.ShouldBe(default);
 		values.device.ShouldBe(default);
 	}
+}
+
+public sealed class ConversionTaskBehaviorTests() : ConversionTaskTestsBase("ConversionTaskTests_Behavior")
+{
+
+
+
+
+
+
+
+
+
+	private static T InvokePrivate<T>(Type type, string methodName, params object?[] arguments)
+	{
+		MethodInfo method = type.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static)!;
+		return (T)method.Invoke(null, arguments)!;
+	}
+
+	private static DataReceivedEventArgs CreateDataReceivedEventArgs(string? data)
+	{
+		DataReceivedEventArgs args = (DataReceivedEventArgs)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(DataReceivedEventArgs));
+		typeof(DataReceivedEventArgs)
+			.GetField("_data", BindingFlags.NonPublic | BindingFlags.Instance)!
+			.SetValue(args, data);
+		return args;
+	}
+
+	[Fact]
+	public async Task FfmpegConversionTask_AlreadyCanceledAfterMediaProbe_ReturnsFalse()
+	{
+		FileInfo source = new(testVideoPath);
+		IMediaInfo mediaInfo = await FFmpeg.GetMediaInfo(source.FullName, TestContext.Current.CancellationToken);
+		using CancellationTokenSource cancellation = new();
+		await cancellation.CancelAsync();
+
+		bool result = await ConversionTask.FfmpegConversionTask(
+			source,
+			"canceled.mp4",
+			VideoCodec.h264,
+			Format.mp4,
+			ConversionPreset.UltraFast,
+			workingDir,
+			mediaInfo: mediaInfo,
+			strict: false,
+			cancellationTokenSource: cancellation);
+
+		result.ShouldBeFalse();
+	}
+
 }

@@ -1,8 +1,8 @@
-﻿using System.Text.Json;
-using CommonNetFuncs.Web.Requests;
+﻿using CommonNetFuncs.Web.Requests;
 using CommonNetFuncs.Web.Requests.Rest;
 using MemoryPack;
 using MessagePack;
+using System.Text.Json;
 using static Xunit.TestContext;
 
 namespace Web.Requests.Tests;

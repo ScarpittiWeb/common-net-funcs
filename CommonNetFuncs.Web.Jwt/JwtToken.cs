@@ -4,7 +4,7 @@ using MessagePack;
 namespace CommonNetFuncs.Web.Jwt;
 
 // MemoryPack's generated serializer relies on static abstract interface members, which don't work correctly when compiled for netstandard2.1.
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 [MemoryPackable]
 #endif
 [MessagePackObject(true)]

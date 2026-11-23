@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using CommonNetFuncs.Excel.OpenXml;
+﻿using CommonNetFuncs.Excel.OpenXml;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
@@ -68,7 +67,7 @@ public sealed class ReadToEnumerableTests
 	}
 
 	// Uri is a reference type whose TypeCode is Object and which Convert.ChangeType cannot produce,
-	// so assigning an invalid string exercises the exception-catch branch in SetExcelPropertyValue.
+	// so assigning an invalid string exercises the exception-catch branch in ExcelColumnBinder.Set.
 	public class ModelWithUri
 	{
 		public string Name { get; set; } = string.Empty;

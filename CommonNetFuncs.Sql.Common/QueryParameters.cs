@@ -68,8 +68,57 @@ public static class QueryParameters
 	/// <returns><see langword="true"/> if there are no suspect characters or strings in the parameter</returns>
 	public static bool IsClean(this string? parameter, bool excludeSingleQuote = false)
 	{
-		return parameter.IsNullOrWhiteSpace() || (!parameter.Contains(';') && (excludeSingleQuote || !parameter.Contains('\'')) && !parameter.Contains('[') && !parameter.Contains(']') &&
-						!parameter.Contains('"') && !parameter.Contains('`') && !parameter.Contains("/*") && !parameter.Contains("*/") && !parameter.Contains("xp_") && !parameter.Contains("--"));
+		if (parameter.IsNullOrWhiteSpace())
+		{
+			return true;
+		}
+
+		// Single ordinal pass: multi-character tokens ("/*", "*/", "--", "xp_") are checked at their first character
+		ReadOnlySpan<char> span = parameter.AsSpan();
+		int last = span.Length - 1;
+		for (int i = 0; i < span.Length; i++)
+		{
+			switch (span[i])
+			{
+				case ';':
+				case '[':
+				case ']':
+				case '"':
+				case '`':
+					return false;
+				case '\'':
+					if (!excludeSingleQuote)
+					{
+						return false;
+					}
+					break;
+				case '/':
+					if (i < last && span[i + 1] == '*')
+					{
+						return false;
+					}
+					break;
+				case '*':
+					if (i < last && span[i + 1] == '/')
+					{
+						return false;
+					}
+					break;
+				case '-':
+					if (i < last && span[i + 1] == '-')
+					{
+						return false;
+					}
+					break;
+				case 'x':
+					if (i < last - 1 && span[i + 1] == 'p' && span[i + 2] == '_')
+					{
+						return false;
+					}
+					break;
+			}
+		}
+		return true;
 	}
 
 	/// <summary>
@@ -89,7 +138,7 @@ public static class QueryParameters
 		{
 			if (onlyAlphanumeric || onlyAlphaChars || onlyNumberChars)
 			{
-				if((onlyAlphanumeric && parameter.IsAlphanumeric()) || (onlyAlphaChars && parameter.IsAlphaOnly()) || (onlyNumberChars && parameter.IsNumericOnly()))
+				if ((onlyAlphanumeric && parameter.IsAlphanumeric()) || (onlyAlphaChars && parameter.IsAlphaOnly()) || (onlyNumberChars && parameter.IsNumericOnly()))
 				{
 					result = parameter;
 				}
@@ -100,6 +149,12 @@ public static class QueryParameters
 			}
 		}
 
-		return result?.Replace("'", "''").Replace("%", string.Empty).Replace("*", string.Empty) ?? defaultValue;
+		if (result == null)
+		{
+			return defaultValue;
+		}
+
+		// Skip the Replace chain (and its allocations) when there is nothing to escape or remove
+		return result.AsSpan().IndexOfAny('\'', '%', '*') < 0 ? result : result.Replace("'", "''").Replace("%", string.Empty).Replace("*", string.Empty);
 	}
 }

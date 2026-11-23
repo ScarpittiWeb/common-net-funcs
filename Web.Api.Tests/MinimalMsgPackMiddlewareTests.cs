@@ -1,15 +1,19 @@
-﻿using System.Net;
-using System.Net.Http.Headers;
-using System.Text;
-using CommonNetFuncs.Web.Api.MsgPack;
+﻿using CommonNetFuncs.Web.Api.MsgPack;
 using MessagePack;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Reflection;
+using System.Text;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests;
@@ -461,3 +465,203 @@ public sealed class DirectMsgPackResultTests
 		response.Content.Headers.ContentType?.MediaType.ShouldBe(MsgPackMimeType);
 	}
 }
+
+public sealed class MsgPackMiddlewareBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+	private static async Task<WebApplication> CreateApp(Action<WebApplication> configure)
+	{
+		WebApplicationBuilder builder = WebApplication.CreateBuilder();
+		builder.Logging.ClearProviders();
+		builder.WebHost.UseTestServer();
+		WebApplication app = builder.Build();
+		configure(app);
+		await app.StartAsync();
+		return app;
+	}
+
+	private static OpenApiDocumentTransformerContext CreateOpenApiContext() => new()
+	{
+		DocumentName = "coverage",
+		DescriptionGroups = [],
+		ApplicationServices = null!
+	};
+
+	private sealed class CoverageController : ControllerBase;
+
+	[Fact]
+	public async Task MsgPackOutput_FilterUsesLaterAcceptValueAndPreservesExactStatusBodyAndHeaders()
+	{
+		await using WebApplication app = await CreateApp(app =>
+		{
+			app.MapGet("/", () => Results.Json(new MinimalMsgPackCoveragePayload("later"), statusCode: StatusCodes.Status202Accepted, contentType: "application/json"))
+				.WithMsgPackOutput();
+		});
+		using HttpRequestMessage request = new(HttpMethod.Get, "/");
+		request.Headers.TryAddWithoutValidation("Accept", ["application/json", "application/x-msgpack"]);
+
+		using HttpResponseMessage response = await app.GetTestClient().SendAsync(request, Current.CancellationToken);
+
+		response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+		response.Content.Headers.ContentType?.MediaType.ShouldBe("application/x-msgpack");
+		MinimalMsgPackCoveragePayload payload =
+			MessagePackSerializer.Deserialize<MinimalMsgPackCoveragePayload>(
+				await response.Content.ReadAsByteArrayAsync(Current.CancellationToken),
+				MsgPackSerializerConfig.DateTimesAsStrings,
+				Current.CancellationToken);
+		payload.Name.ShouldBe("later");
+	}
+
+	[Fact]
+	public async Task MsgPackOutput_NonJsonContentTypeRemainsUnchanged()
+	{
+		await using WebApplication app = await CreateApp(app =>
+		{
+			app.MapGet("/", () => Results.Text("plain-body", "text/plain", statusCode: StatusCodes.Status203NonAuthoritative))
+				.WithMsgPackOutput();
+		});
+		using HttpRequestMessage request = new(HttpMethod.Get, "/");
+		request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/x-msgpack"));
+
+		using HttpResponseMessage response = await app.GetTestClient().SendAsync(request, Current.CancellationToken);
+
+		response.StatusCode.ShouldBe(HttpStatusCode.NonAuthoritativeInformation);
+		response.Content.Headers.ContentType?.MediaType.ShouldBe("text/plain");
+		(await response.Content.ReadAsStringAsync(Current.CancellationToken)).ShouldBe("plain-body");
+	}
+
+	[Fact]
+	public async Task MsgPackOutput_NullStatusCodeUsesOkFallback()
+	{
+		await using WebApplication app = await CreateApp(app =>
+		{
+			app.MapGet("/", () => Results.Json(new MinimalMsgPackCoveragePayload("fallback"), contentType: "application/json"))
+				.WithMsgPackOutput();
+		});
+		using HttpRequestMessage request = new(HttpMethod.Get, "/");
+		request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/x-msgpack"));
+
+		using HttpResponseMessage response = await app.GetTestClient().SendAsync(request, Current.CancellationToken);
+
+		response.StatusCode.ShouldBe(HttpStatusCode.OK);
+		response.Content.Headers.ContentType?.MediaType.ShouldBe("application/x-msgpack");
+	}
+
+	[Fact]
+	public async Task DirectMsgPack_NullValueSetsStatusWithoutContentTypeOrBody()
+	{
+		Type type = typeof(MsgPackOutputFilter).Assembly.GetType("CommonNetFuncs.Web.Api.MsgPack.DirectMsgPackResult", throwOnError: true)!;
+		IResult result = (IResult)Activator.CreateInstance(
+			type,
+			BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+			binder: null,
+			args: [null, StatusCodes.Status207MultiStatus, MsgPackSerializerConfig.DateTimesAsStrings],
+			culture: null)!;
+		DefaultHttpContext context = new();
+		context.Response.Body = new MemoryStream();
+
+		await result.ExecuteAsync(context);
+
+		context.Response.StatusCode.ShouldBe(StatusCodes.Status207MultiStatus);
+		context.Response.ContentType.ShouldBeNull();
+		((MemoryStream)context.Response.Body).ToArray().ShouldBeEmpty();
+	}
+
+	[Fact]
+	public async Task MsgPackOutput_ValueWithoutStatusContractDefaultsToOk()
+	{
+		MsgPackOutputFilter filter = new(MsgPackSerializerConfig.DateTimesAsStrings);
+		DefaultHttpContext httpContext = new();
+		httpContext.Request.Headers.Accept = "application/x-msgpack";
+		EndpointFilterInvocationContext context = DefaultEndpointFilterInvocationContext.Create(
+			httpContext,
+			Array.Empty<object?>());
+
+		ValueOnlyMsgPackResult original = new(new MinimalMsgPackCoveragePayload("statusless"));
+		object? filtered = await filter.InvokeAsync(context, _ => ValueTask.FromResult<object?>(original));
+		filtered.ShouldBeAssignableTo<IResult>();
+		await ((IResult)filtered!).ExecuteAsync(httpContext);
+
+		httpContext.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
+		httpContext.Response.ContentType.ShouldBe("application/x-msgpack");
+	}
+
+	[Fact]
+	public void MsgPackOutput_AcceptsNullHeaderEntryOnlyAfterLaterValidValue()
+	{
+		MethodInfo method = typeof(MsgPackOutputFilter).GetMethod("AcceptsMsgPack", BindingFlags.Static | BindingFlags.NonPublic)!;
+		StringValues accept = new([null!, "APPLICATION/X-MSGPACK"]);
+
+		bool result = (bool)method.Invoke(null, [accept])!;
+
+		result.ShouldBeTrue();
+	}
+
+	[Fact]
+	public async Task MsgPackRequest_CaseInsensitiveContentTypeTransformsExactBodyAndHeaders()
+	{
+		string? capturedContentType = null;
+		long? capturedLength = null;
+		string? capturedBody = null;
+		RequestDelegate next = async context =>
+		{
+			capturedContentType = context.Request.ContentType;
+			capturedLength = context.Request.ContentLength;
+			using StreamReader reader = new(context.Request.Body);
+			capturedBody = await reader.ReadToEndAsync(Current.CancellationToken);
+			context.Response.StatusCode = StatusCodes.Status204NoContent;
+		};
+		MsgPackRequestMiddleware middleware = new(next);
+		DefaultHttpContext context = new();
+		byte[] encoded = MessagePackSerializer.ConvertFromJson("""{"name":"exact"}""", cancellationToken: Current.CancellationToken);
+		context.Request.ContentType = "Application/X-MsgPack";
+		context.Request.ContentLength = encoded.Length;
+		context.Request.Body = new MemoryStream(encoded);
+
+		await middleware.InvokeAsync(context);
+
+		capturedContentType.ShouldBe("application/json; charset=utf-8");
+		capturedLength.ShouldBe(System.Text.Encoding.UTF8.GetByteCount("""{"name":"exact"}"""));
+		capturedBody.ShouldBe("""{"name":"exact"}""");
+		context.Response.StatusCode.ShouldBe(StatusCodes.Status204NoContent);
+	}
+
+	[Fact]
+	public async Task MsgPackRequest_EmptyMsgPackBodyKeepsHeadersAndCallsNext()
+	{
+		int calls = 0;
+		MsgPackRequestMiddleware middleware = new(context =>
+		{
+			calls++;
+			context.Response.StatusCode = StatusCodes.Status204NoContent;
+			return Task.CompletedTask;
+		}, options: null);
+		DefaultHttpContext context = new();
+		context.Request.ContentType = "application/x-msgpack";
+		context.Request.ContentLength = 0;
+		context.Request.Body = Stream.Null;
+
+		await middleware.InvokeAsync(context);
+
+		calls.ShouldBe(1);
+		context.Request.ContentType.ShouldBe("application/x-msgpack");
+		context.Request.ContentLength.ShouldBe(0);
+	}
+
+}
+
+[MessagePackObject]
+public sealed record MinimalMsgPackCoveragePayload([property: Key(0)] string Name);
+
+internal sealed record ValueOnlyMsgPackResult(object? Value) : IValueHttpResult;

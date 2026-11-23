@@ -1,12 +1,12 @@
-﻿using System.Collections.Immutable;
-using System.Net;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
 using CommonNetFuncs.Web.Requests.Rest.Options;
-using static System.Net.HttpStatusCode;
+using System.Collections.Immutable;
+using System.Net;
 using static CommonNetFuncs.Compression.Streams;
 using static CommonNetFuncs.Core.Random;
 using static CommonNetFuncs.Web.Common.ContentTypes;
 using static CommonNetFuncs.Web.Requests.Rest.RestHelperConstants;
+using static System.Net.HttpStatusCode;
 
 namespace CommonNetFuncs.Web.Requests.Rest.RestHelperWrapper;
 
@@ -20,6 +20,18 @@ internal static class WrapperHelpers
 
 	private static readonly ImmutableDictionary<string, string> JsonHeadersWithGzip = ImmutableDictionary.CreateRange([JsonContentHeader, JsonAcceptHeader, GzipEncodingHeader]);
 	private static readonly ImmutableDictionary<string, string> JsonHeadersWithBrotli = ImmutableDictionary.CreateRange([JsonContentHeader, JsonAcceptHeader, BrotliEncodingHeader]);
+
+	// Snapshots taken from the immutable dictionaries above, so iteration order (and therefore header insertion order) is unchanged
+	private static readonly KeyValuePair<string, string>[] MemPackHeadersWithGzipArray = [.. MemPackHeadersWithGzip];
+	private static readonly KeyValuePair<string, string>[] MemPackHeadersWithBrotliArray = [.. MemPackHeadersWithBrotli];
+	private static readonly KeyValuePair<string, string>[] MsgPackHeadersWithGzipArray = [.. MsgPackHeadersWithGzip];
+	private static readonly KeyValuePair<string, string>[] MsgPackHeadersWithBrotliArray = [.. MsgPackHeadersWithBrotli];
+	private static readonly KeyValuePair<string, string>[] JsonHeadersWithGzipArray = [.. JsonHeadersWithGzip];
+	private static readonly KeyValuePair<string, string>[] JsonHeadersWithBrotliArray = [.. JsonHeadersWithBrotli];
+	private static readonly KeyValuePair<string, string>[] MemPackHeadersArray = [.. MemPackHeaders];
+	private static readonly KeyValuePair<string, string>[] MsgPackHeadersArray = [.. MsgPackHeaders];
+	private static readonly KeyValuePair<string, string>[] JsonHeadersArray = [.. JsonHeaders];
+	private static readonly KeyValuePair<string, string>[] JsonNoEncodeHeadersArray = [.. JsonNoEncodeHeaders];
 
 	/// <summary>
 	/// Populates a dictionary with custom and compression headers.
@@ -44,104 +56,45 @@ internal static class WrapperHelpers
 	/// </summary>
 	private static void SetCompressionHttpHeadersInPlace(Dictionary<string, string> headers, CompressionOptions? compressionOptions = null, bool isStreaming = false)
 	{
-		IEnumerable<KeyValuePair<string, string>>? compressionHeaders = null;
-
-		if (compressionOptions?.UseCompression == true)
-		{
-			if (compressionOptions.CompressionType != null)
-			{
-				if (compressionOptions.CompressionType == ECompressionType.Gzip)
-				{
-					if (compressionOptions.UseMemPack)
-					{
-						compressionHeaders = MemPackHeadersWithGzip;
-					}
-					else if (compressionOptions.UseMsgPack)
-					{
-						compressionHeaders = MsgPackHeadersWithGzip;
-					}
-					else
-					{
-						compressionHeaders = JsonHeadersWithGzip;
-					}
-				}
-				else if (compressionOptions.CompressionType == ECompressionType.Brotli)
-				{
-					if (compressionOptions.UseMemPack)
-					{
-						compressionHeaders = MemPackHeadersWithBrotli;
-					}
-					else if (compressionOptions.UseMsgPack)
-					{
-						compressionHeaders = MsgPackHeadersWithBrotli;
-					}
-					else
-					{
-						compressionHeaders = JsonHeadersWithBrotli;
-					}
-				}
-				else
-				{
-					if (compressionOptions.UseMemPack)
-					{
-						compressionHeaders = MemPackHeadersWithGzip;
-					}
-					else if (compressionOptions.UseMsgPack)
-					{
-						compressionHeaders = MsgPackHeadersWithGzip;
-					}
-					else
-					{
-						compressionHeaders = JsonHeadersWithGzip;
-					}
-				}
-			}
-			else
-			{
-				if (compressionOptions.UseMemPack)
-				{
-					compressionHeaders = MemPackHeaders;
-				}
-				else if (compressionOptions.UseMsgPack)
-				{
-					compressionHeaders = MsgPackHeaders;
-				}
-				else
-				{
-					compressionHeaders = JsonHeaders;
-				}
-			}
-		}
-		else if (isStreaming)
-		{
-			// When streaming without compression, use appropriate headers based on serialization type
-			if (compressionOptions?.UseMemPack == true)
-			{
-				compressionHeaders = MemPackHeaders;
-			}
-			else if (compressionOptions?.UseMsgPack == true)
-			{
-				compressionHeaders = MsgPackHeaders;
-			}
-			else
-			{
-				compressionHeaders = JsonNoEncodeHeaders; // Default to JSON with no compression when streaming
-			}
-		}
+		KeyValuePair<string, string>[]? compressionHeaders = SelectCompressionHeaders(compressionOptions, isStreaming);
 
 		// Add compression headers to the existing dictionary if they don't already exist
 		if (compressionHeaders != null)
 		{
-#pragma warning disable S3267 // Loops should be simplified using the "Where" LINQ method
 			foreach (KeyValuePair<string, string> header in compressionHeaders)
 			{
-				if (!headers.ContainsKey(header.Key))
-				{
-					headers[header.Key] = header.Value;
-				}
+				headers.TryAdd(header.Key, header.Value);
 			}
-#pragma warning restore S3267 // Loops should be simplified using the "Where" LINQ method
 		}
+	}
+
+	private static KeyValuePair<string, string>[]? SelectCompressionHeaders(CompressionOptions? compressionOptions, bool isStreaming)
+	{
+		if (compressionOptions?.UseCompression == true)
+		{
+			if (compressionOptions.CompressionType == null)
+			{
+				return compressionOptions.UseMemPack ? MemPackHeadersArray : compressionOptions.UseMsgPack ? MsgPackHeadersArray : JsonHeadersArray;
+			}
+
+			// Any type other than Brotli (including Gzip) maps to the Gzip header sets
+			if (compressionOptions.CompressionType == ECompressionType.Brotli)
+			{
+				return compressionOptions.UseMemPack ? MemPackHeadersWithBrotliArray : compressionOptions.UseMsgPack ? MsgPackHeadersWithBrotliArray : JsonHeadersWithBrotliArray;
+			}
+			return compressionOptions.UseMemPack ? MemPackHeadersWithGzipArray : compressionOptions.UseMsgPack ? MsgPackHeadersWithGzipArray : JsonHeadersWithGzipArray;
+		}
+
+		if (isStreaming)
+		{
+			// When streaming without compression, use appropriate headers based on serialization type, defaulting to JSON with no compression
+			if (compressionOptions?.UseMemPack == true)
+			{
+				return MemPackHeadersArray;
+			}
+			return compressionOptions?.UseMsgPack == true ? MsgPackHeadersArray : JsonNoEncodeHeadersArray;
+		}
+		return null;
 	}
 
 	internal static TimeSpan GetWaitTime(ResilienceOptions resilienceOptions, int attempts)

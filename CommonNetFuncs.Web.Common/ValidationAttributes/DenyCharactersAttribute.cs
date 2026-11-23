@@ -1,6 +1,6 @@
+﻿using System.Buffers;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
-using static CommonNetFuncs.Core.Strings;
 
 namespace CommonNetFuncs.Web.Common.ValidationAttributes;
 
@@ -12,6 +12,8 @@ namespace CommonNetFuncs.Web.Common.ValidationAttributes;
 /// </summary>
 public sealed class DenyCharactersAttribute : ValidationAttribute
 {
+	private readonly SearchValues<char> denySearchValues;
+
 	/// <summary>
 	/// Gets the deny characters
 	/// </summary>
@@ -31,6 +33,7 @@ public sealed class DenyCharactersAttribute : ValidationAttribute
 		}
 
 		DenyCharacters = denyCharacters;
+		denySearchValues = SearchValues.Create(denyCharacters.AsSpan());
 		ErrorMessage = "The field {0} must not contain any of the following characters: '{1}'.";
 	}
 
@@ -48,6 +51,7 @@ public sealed class DenyCharactersAttribute : ValidationAttribute
 		}
 
 		DenyCharacters = new string(denyCharacters);
+		denySearchValues = SearchValues.Create(DenyCharacters.AsSpan());
 		ErrorMessage = "The field {0} must not contain any of the following characters: '{1}'.";
 	}
 
@@ -66,8 +70,8 @@ public sealed class DenyCharactersAttribute : ValidationAttribute
 			return ValidationResult.Success;
 		}
 
-		// Check if the string contains any deny characters
-		if (stringValue.ContainsAnyCharacter(DenyCharacters.AsSpan()))
+		// Same result as IndexOfAny(DenyCharacters) >= 0 (both inputs are non-empty here), but the lookup structure is built once
+		if (stringValue.AsSpan().ContainsAny(denySearchValues))
 		{
 			string memberName = validationContext.MemberName ?? string.Empty;
 			return new ValidationResult(

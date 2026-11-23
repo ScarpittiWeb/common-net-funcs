@@ -4,7 +4,7 @@ namespace CommonNetFuncs.Web.Api.TaskQueuing;
 
 internal static class PrioritizedQueueStatsRecorder
 {
-	internal static void RecordProcessedTask(PrioritizedQueueStats stats, Lock statsLock, Dictionary<TaskPriority, List<TimeSpan>> processingTimesByPriority, int processTimeWindow,
+	internal static void RecordProcessedTask(PrioritizedQueueStats stats, Lock statsLock, Dictionary<TaskPriority, Queue<TimeSpan>> processingTimesByPriority, int processTimeWindow,
 		TaskPriority priority, TimeSpan elapsed)
 	{
 		lock (statsLock)
@@ -16,12 +16,12 @@ internal static class PrioritizedQueueStatsRecorder
 			priorityStats.ProcessedTasks++;
 			priorityStats.LastProcessedAt = DateTime.UtcNow;
 
-			List<TimeSpan> processingTimes = processingTimesByPriority[priority];
-			processingTimes.Add(elapsed);
+			Queue<TimeSpan> processingTimes = processingTimesByPriority[priority];
+			processingTimes.Enqueue(elapsed);
 
 			if (processingTimes.Count > processTimeWindow)
 			{
-				processingTimes.RemoveAt(0);
+				processingTimes.Dequeue();
 			}
 		}
 	}

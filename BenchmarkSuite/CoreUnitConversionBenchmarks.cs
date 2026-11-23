@@ -1,6 +1,5 @@
 ﻿using BenchmarkDotNet.Attributes;
 using CommonNetFuncs.Core;
-using static System.Convert;
 using static System.Math;
 
 namespace BenchmarkSuite;

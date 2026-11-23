@@ -1,8 +1,12 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.IO.Compression;
-using AutoFixture.Xunit3;
+﻿using AutoFixture.Xunit3;
 using CommonNetFuncs.Email;
 using MimeKit;
+using System.ComponentModel.DataAnnotations;
+using System.IO.Compression;
+using System.Net;
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using static CommonNetFuncs.Compression.Streams;
 using static CommonNetFuncs.Email.Email;
 using static Xunit.TestContext;
@@ -109,7 +113,7 @@ public sealed class EmailTests
 		};
 
 		// Act
-		bool result = await SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent }, Current.CancellationToken);
+		bool result = await SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings.WithFastSmtpFailure(), EmailAddresses = emailAddresses, EmailContent = emailContent }, Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -139,7 +143,7 @@ public sealed class EmailTests
 		};
 
 		// Act
-		bool result = await SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent }, Current.CancellationToken);
+		bool result = await SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings.WithFastSmtpFailure(), EmailAddresses = emailAddresses, EmailContent = emailContent }, Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse();
@@ -217,7 +221,7 @@ public sealed class EmailTests
 		// Act
 		bool result = await SendEmail(new SendEmailConfig()
 		{
-			SmtpSettings = smtpSettings,
+			SmtpSettings = smtpSettings.WithFastSmtpFailure(),
 			EmailAddresses = emailAddresses,
 			EmailContent = emailContent,
 			ReadReceipt = true,
@@ -254,7 +258,7 @@ public sealed class EmailTests
 		};
 
 		// Act
-		bool result = await SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent }, Current.CancellationToken);
+		bool result = await SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings.WithFastSmtpFailure(), EmailAddresses = emailAddresses, EmailContent = emailContent }, Current.CancellationToken);
 
 		// Note: Similar to above, we can't directly verify the content type
 		// but the method should complete without throwing
@@ -543,8 +547,11 @@ public sealed class EmailTests
 		MailAttachmentBytes attachment = new("test.txt", (Stream?)null);
 
 		// Assert
+		// .NET 11 GZipStream writes a valid empty gzip frame even when nothing is written, so check the decompressed content rather than the compressed length
 		attachment.AttachmentBytes.ShouldNotBeNull();
-		attachment.AttachmentBytes.Length.ShouldBe(0);
+		using Stream? stream = attachment.GetStream();
+		stream.ShouldNotBeNull();
+		stream.Length.ShouldBe(0);
 	}
 
 	#endregion
@@ -558,9 +565,9 @@ public sealed class EmailTests
 		BodyBuilder bodyBuilder = new();
 		IMailAttachment[] attachments = new IMailAttachment[]
 		{
-						new MailAttachment("test1.txt", new MemoryStream(new byte[] { 1, 2, 3 })),
-						new MailAttachmentBytes("test2.txt", new byte[] { 4, 5, 6 }),
-						new MailAttachment("test3.txt", new MemoryStream(new byte[] { 7, 8, 9 }))
+			new MailAttachment("test1.txt", new MemoryStream(new byte[] { 1, 2, 3 })),
+			new MailAttachmentBytes("test2.txt", new byte[] { 4, 5, 6 }),
+			new MailAttachment("test3.txt", new MemoryStream(new byte[] { 7, 8, 9 }))
 		};
 
 		// Act
@@ -580,8 +587,8 @@ public sealed class EmailTests
 		BodyBuilder bodyBuilder = new();
 		IMailAttachment[] attachments = new IMailAttachment[]
 		{
-						new MailAttachment("test1.txt", new MemoryStream(new byte[] { 1, 2, 3 })),
-						new MailAttachmentBytes("test2.txt", new byte[] { 4, 5, 6 })
+			new MailAttachment("test1.txt", new MemoryStream(new byte[] { 1, 2, 3 })),
+			new MailAttachmentBytes("test2.txt", new byte[] { 4, 5, 6 })
 		};
 
 		// Act
@@ -599,8 +606,8 @@ public sealed class EmailTests
 		BodyBuilder bodyBuilder = new();
 		IMailAttachment[] attachments = new IMailAttachment[]
 		{
-						new MailAttachmentBytes("test1.txt", new byte[] { 1, 2, 3 }),
-						new MailAttachmentBytes("test2.txt", new byte[] { 4, 5, 6 })
+			new MailAttachmentBytes("test1.txt", new byte[] { 1, 2, 3 }),
+			new MailAttachmentBytes("test2.txt", new byte[] { 4, 5, 6 })
 		};
 
 		// Act
@@ -694,7 +701,7 @@ public sealed class EmailTests
 	private static async Task<byte[]> ReadZipEntryAsync(ZipArchive archive, string entryName)
 	{
 		ZipArchiveEntry entry = archive.GetEntry(entryName)!;
-#if NET10_0_OR_GREATER
+#if CORE_NATIVE_BUILD
 		await using Stream entryStream = await entry.OpenAsync(Current.CancellationToken);
 #else
 		await using Stream entryStream = entry.Open();
@@ -705,4 +712,192 @@ public sealed class EmailTests
 	}
 
 	#endregion
+}
+
+public sealed class EmailAttachmentBehaviorTests
+{
+	private sealed class ThrowingAttachment : IMailAttachment
+	{
+		public string? AttachmentName => throw new InvalidOperationException("Cannot serialize attachment name.");
+
+		string? IMailAttachment.AttachmentName
+		{
+			get => AttachmentName;
+			set { }
+		}
+
+		public Stream? GetStream() => null;
+	}
+
+	private sealed class StaticAttachment(string? name, Stream? stream) : IMailAttachment
+	{
+		public string? AttachmentName { get; set; } = name;
+
+		public Stream? GetStream() => stream;
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+	[Fact]
+	public async Task MailAttachment_DisposeAsyncDisposesOriginalAndCompressedStreams()
+	{
+		MemoryStream original = new([1, 2, 3]);
+		MailAttachment attachment = new("data.bin", original);
+		Stream compressed = attachment.AttachmentStream!;
+
+		await attachment.DisposeAsync();
+
+		Should.Throw<ObjectDisposedException>(() => original.ReadByte());
+		Should.Throw<ObjectDisposedException>(() => compressed.ReadByte());
+	}
+
+	[Fact]
+	public void MailAttachment_NullBytesLeaveStreamUnset()
+	{
+		MailAttachment attachment = new(AttachmentName: "empty", AttachmentBytes: null);
+
+		attachment.AttachmentStream.ShouldBeNull();
+		attachment.GetStream().ShouldBeNull();
+	}
+
+	[Fact]
+	public void GetConfigurationString_RedactsPasswordAndUsesSafeFallbackWhenSerializationFails()
+	{
+		MethodInfo method = typeof(CommonNetFuncs.Email.Email).GetMethod("GetConfigurationString", BindingFlags.NonPublic | BindingFlags.Static)
+			?? throw new InvalidOperationException("GetConfigurationString was not found.");
+
+		SendEmailConfig config = new(
+			new SmtpSettings("localhost", 2525, "user", "secret"),
+			new EmailAddresses(new MailAddress("Sender", "sender@example.com"), [new MailAddress("To", "to@example.com")]),
+			new EmailContent("Subject", "Body", attachments: [new ThrowingAttachment()]));
+
+		string result = (string)method.Invoke(null, [config])!;
+
+		result.ShouldContain("\"SmtpPassword\": \"REDACTED\"");
+		result.ShouldNotContain("secret");
+		result.ShouldContain("\"AttachmentsCount\": 1");
+		config.SmtpSettings.SmtpPassword.ShouldBe("REDACTED");
+	}
+
+	[Fact]
+	public void GetConfigurationString_SafeFallbackHandlesNullOptionalConfiguration()
+	{
+		MethodInfo method = typeof(CommonNetFuncs.Email.Email).GetMethod("GetConfigurationString", BindingFlags.NonPublic | BindingFlags.Static)!;
+		SendEmailConfig config = new(
+			new SmtpSettings(),
+			new EmailAddresses { ToAddresses = null!, CcAddresses = null!, BccAddresses = null! },
+			new EmailContent(attachments: [new ThrowingAttachment()]));
+
+		string result = (string)method.Invoke(null, [config])!;
+
+		result.ShouldContain("\"SmtpPassword\": null");
+		result.ShouldContain("\"LocalDomain\": null");
+		result.ShouldContain("\"AttachmentsCount\": 1");
+	}
+
+	[Fact]
+	public void GetConfigurationString_SafeFallbackCountsCertificatesAndFormatsEndpoint()
+	{
+		MethodInfo method = typeof(CommonNetFuncs.Email.Email).GetMethod("GetConfigurationString", BindingFlags.NonPublic | BindingFlags.Static)!;
+		using RSA rsa = RSA.Create();
+		CertificateRequest request = new("CN=Coverage", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+		using X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+		X509CertificateCollection certificates = [certificate];
+		SendEmailConfig config = new(
+			new SmtpSettings("localhost", 2525)
+			{
+				ClientCertificates = certificates,
+				LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 12345)
+			},
+			new EmailAddresses(new MailAddress("Sender", "sender@example.com")),
+			new EmailContent(attachments: [new ThrowingAttachment()]));
+
+		string result = (string)method.Invoke(null, [config])!;
+
+		result.ShouldContain("\"ClientCertificatesCount\": 1");
+		result.ShouldContain("\"LocalEndPoint\": \"127.0.0.1:12345\"");
+	}
+
+	[Fact]
+	public async Task AddAttachments_ZippedIgnoresAttachmentsWithoutNames()
+	{
+		BodyBuilder builder = new();
+		IMailAttachment[] attachments =
+		[
+			new StaticAttachment(null, new MemoryStream([1])),
+			new StaticAttachment("   ", new MemoryStream([2]))
+		];
+
+		await CommonNetFuncs.Email.Email.AddAttachments(attachments, builder, zipAttachments: true, Current.CancellationToken);
+
+		builder.Attachments.Count.ShouldBe(1);
+		((MimePart)builder.Attachments[0]).FileName.ShouldBe("Files.zip");
+	}
+
+	[Theory]
+	[InlineData(true, false)]
+	[InlineData(false, true)]
+	public async Task SendEmail_AllowsNullRecipientCollectionsWhenAnotherRecipientSetExists(bool useCc, bool useBcc)
+	{
+		SendEmailConfig config = new(
+			new SmtpSettings("127.0.0.1", 1, "user", "password"),
+			new EmailAddresses
+			{
+				FromAddress = new("Sender", "sender@example.com"),
+				ToAddresses = [null!],
+				CcAddresses = useCc ? [new MailAddress("Cc", "cc@example.com")] : null!,
+				BccAddresses = useBcc ? [new MailAddress("Bcc", "bcc@example.com")] : null!
+			},
+			new EmailContent("Subject", "Body"));
+
+		bool result = await CommonNetFuncs.Email.Email.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
+
+		result.ShouldBeFalse();
+	}
+
+	[Fact]
+	public async Task SendEmail_WithNullCcAndOnlyBccRecipient_ReachesConnectionWithoutLeakingRecipientError()
+	{
+		SendEmailConfig config = new SendEmailConfig
+		{
+			SmtpSettings = new SmtpSettings("127.0.0.1", 1),
+			EmailAddresses = new EmailAddresses
+			{
+				FromAddress = new MailAddress("Sender", "sender@example.com"),
+				ToAddresses = [],
+				CcAddresses = null!,
+				BccAddresses = [new MailAddress("Bcc", "bcc@example.com")]
+			},
+			EmailContent = new EmailContent("Subject", "Body")
+		}.WithFastSmtpFailure();
+
+		bool result = await CommonNetFuncs.Email.Email.SendEmail(config, Current.CancellationToken);
+
+		result.ShouldBeFalse();
+	}
+
+	[Fact]
+	public async Task SendEmail_NullAuthenticatedServerUsesEmptyHostAndFailsDeterministically()
+	{
+		SendEmailConfig config = new(
+			new SmtpSettings(null, 25, "user", "password"),
+			new EmailAddresses(new MailAddress("Sender", "sender@example.com"), [new MailAddress("To", "to@example.com")]),
+			new EmailContent("Subject", "Body"));
+		config.SmtpSettings.MaxAttempts = 1;
+		config.SmtpSettings.RetryDelay = TimeSpan.Zero;
+
+		bool result = await CommonNetFuncs.Email.Email.SendEmail(config, Current.CancellationToken);
+
+		result.ShouldBeFalse();
+	}
+
 }

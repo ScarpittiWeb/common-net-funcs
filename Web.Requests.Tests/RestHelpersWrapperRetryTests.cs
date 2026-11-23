@@ -1,8 +1,8 @@
-﻿using System.Net;
-using CommonNetFuncs.Web.Requests.Rest;
+﻿using CommonNetFuncs.Web.Requests.Rest;
 using CommonNetFuncs.Web.Requests.Rest.Options;
 using CommonNetFuncs.Web.Requests.Rest.RestHelperWrapper;
 using FakeItEasy;
+using System.Net;
 using static Xunit.TestContext;
 
 namespace Web.Requests.Tests;

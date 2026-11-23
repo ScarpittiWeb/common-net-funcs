@@ -12,7 +12,7 @@ public sealed class HangfireEmailService(IEmailService emailService) : IEmailSer
 	private const string HangfireJobExceptionMessage = "Failed to send email";
 	public async Task<bool> SendEmail(SmtpSettings smtpSettings, EmailAddresses emailAddresses, EmailContent emailContent, bool readReceipt, string readReceiptEmail, CancellationToken cancellationToken = default)
 	{
-		if (!await emailService.SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent, ReadReceipt = readReceipt, ReadReceiptEmail = readReceiptEmail }, cancellationToken).ConfigureAwait(false)	)
+		if (!await emailService.SendEmail(new SendEmailConfig() { SmtpSettings = smtpSettings, EmailAddresses = emailAddresses, EmailContent = emailContent, ReadReceipt = readReceipt, ReadReceiptEmail = readReceiptEmail }, cancellationToken).ConfigureAwait(false))
 		{
 			throw new HangfireJobException(HangfireJobExceptionMessage);
 		}

@@ -1,11 +1,11 @@
-﻿using System.Net;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
-using CommonNetFuncs.Web.Requests.Rest;
+﻿using CommonNetFuncs.Web.Requests.Rest;
 using CommonNetFuncs.Web.Requests.Rest.Options;
 using CommonNetFuncs.Web.Requests.Rest.RestHelperWrapper;
 using FakeItEasy;
 using MessagePack;
+using System.Net;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using xRetry.v3;
 using static CommonNetFuncs.Web.Common.ContentTypes;
 using static Xunit.TestContext;
@@ -1595,4 +1595,165 @@ public sealed class RestHelpersWrapperTests : IDisposable
 	}
 
 	#endregion
+}
+
+public sealed class RestHelpersWrapperBehaviorTests
+{
+
+
+
+
+
+	private static (IRestClientFactory Factory, IRestClient Client) CreateFakes()
+	{
+		IRestClientFactory factory = A.Fake<IRestClientFactory>();
+		IRestClient client = A.Fake<IRestClient>();
+		A.CallTo(() => factory.CreateClient(A<string>._)).Returns(client);
+		A.CallTo(() => client.BaseAddress).Returns(new Uri("https://api.unit/"));
+		return (factory, client);
+	}
+
+	private static RestHelperOptions OptionsWithZeroAttempts() =>
+		new("zero-attempts", "coverage-api",
+			ResilienceOptions: new ResilienceOptions(MaxRetry: 0, RetryDelay: 1, UseJitter: false));
+
+	private static async Task<List<T?>> Collect<T>(IAsyncEnumerable<T?> source)
+	{
+		List<T?> items = [];
+		await foreach (T? item in source)
+		{
+			items.Add(item);
+		}
+		return items;
+	}
+
+	private sealed class WrapperModel
+	{
+		public int Id { get; set; }
+		public string? Name { get; set; }
+	}
+
+	private sealed class WrapperResult
+	{
+		public bool Accepted { get; set; }
+		public string Reference { get; set; } = string.Empty;
+	}
+
+	[Fact]
+	public async Task WrapperZeroAttempts_ReturnsNullFromEveryBufferingMethodWithoutSending()
+	{
+		(IRestClientFactory factory, IRestClient client) = CreateFakes();
+		RestHelpersWrapper wrapper = new(factory);
+		RestHelperOptions options = OptionsWithZeroAttempts();
+		WrapperModel original = new() { Id = 1, Name = "original" };
+		WrapperModel changed = new() { Id = 1, Name = "changed" };
+
+		(await wrapper.Get<WrapperModel>(options, Current.CancellationToken)).ShouldBeNull();
+		(await wrapper.PostRequest(options, changed, Current.CancellationToken)).ShouldBeNull();
+		(await wrapper.GenericPostRequest<WrapperModel, WrapperModel>(options, changed, Current.CancellationToken)).ShouldBeNull();
+		(await wrapper.StringPostRequest(options, changed, Current.CancellationToken)).ShouldBeNull();
+		(await wrapper.PatchRequest(options, changed, original, Current.CancellationToken)).ShouldBeNull();
+		(await wrapper.PutRequest(options, changed, Current.CancellationToken)).ShouldBeNull();
+		(await wrapper.DeleteRequest<WrapperModel>(options, Current.CancellationToken)).ShouldBeNull();
+
+		A.CallTo(client).WithReturnType<Task<RestObject<WrapperModel>>>().MustNotHaveHappened();
+		A.CallTo(client).WithReturnType<Task<RestObject<string>>>().MustNotHaveHappened();
+		A.CallTo(() => factory.CreateClient("coverage-api")).MustHaveHappened(7, Times.Exactly);
+	}
+
+	[Fact]
+	public async Task WrapperZeroAttempts_ReturnsEmptyFromEveryStreamingMethodWithoutSending()
+	{
+		(IRestClientFactory factory, IRestClient client) = CreateFakes();
+		RestHelpersWrapper wrapper = new(factory);
+		RestHelperOptions options = OptionsWithZeroAttempts();
+		WrapperModel body = new() { Id = 2, Name = "stream" };
+
+		(await Collect(wrapper.GetStreaming<WrapperModel>(options, Current.CancellationToken))).ShouldBeEmpty();
+		(await Collect(wrapper.PostRequestStreaming(options, body, Current.CancellationToken))).ShouldBeEmpty();
+		(await Collect(wrapper.GenericPostRequestStreaming<WrapperModel, WrapperModel>(options, body, Current.CancellationToken))).ShouldBeEmpty();
+
+		A.CallTo(client).WithReturnType<Task<StreamingRestObject<WrapperModel>>>().MustNotHaveHappened();
+		A.CallTo(() => factory.CreateClient("coverage-api")).MustHaveHappened(3, Times.Exactly);
+	}
+
+	[Fact]
+	public async Task GenericPostRequest_DelegatesExactUriMethodBodyHeadersAndCancellation()
+	{
+		(IRestClientFactory factory, IRestClient client) = CreateFakes();
+		WrapperModel body = new() { Id = 31, Name = "request-body" };
+		WrapperResult expected = new() { Accepted = true, Reference = "unit-31" };
+		RestObject<WrapperResult> response = new()
+		{
+			Result = expected,
+			Response = new HttpResponseMessage(HttpStatusCode.OK)
+		};
+		A.CallTo(() => client.RestObjectRequest<WrapperResult, WrapperModel>(
+				A<RequestOptions<WrapperModel>>._, A<CancellationToken>._))
+			.Returns(response);
+		RestHelpersWrapper wrapper = new(factory);
+		using CancellationTokenSource source = new();
+		RestHelperOptions options = new(
+			"/v1/items?mode=exact",
+			"coverage-api",
+			HttpHeaders: new Dictionary<string, string> { ["X-Exact"] = "yes" },
+			ResilienceOptions: new ResilienceOptions(MaxRetry: 1, TimeoutValue: 17, RetryDelay: 1, UseJitter: false));
+
+		WrapperResult? result = await wrapper.GenericPostRequest<WrapperResult, WrapperModel>(options, body, source.Token);
+
+		result.ShouldBeEquivalentTo(expected);
+		A.CallTo(() => client.RestObjectRequest<WrapperResult, WrapperModel>(
+				A<RequestOptions<WrapperModel>>.That.Matches(request =>
+					request.Url == "https://api.unit/v1/items?mode=exact" &&
+					request.HttpMethod == HttpMethod.Post &&
+					ReferenceEquals(request.BodyObject, body) &&
+					request.HttpHeaders!["X-Exact"] == "yes" &&
+					request.Timeout == 17),
+				source.Token)).MustHaveHappenedOnceExactly();
+	}
+
+	[Fact]
+	public async Task StreamingMethods_PreserveNullResultAndNonSuccessResponseStates()
+	{
+		(IRestClientFactory factory, IRestClient client) = CreateFakes();
+		StreamingRestObject<WrapperModel> noStream = new()
+		{
+			Result = null,
+			Response = new HttpResponseMessage(HttpStatusCode.BadGateway)
+		};
+		A.CallTo(() => client.StreamingRestObjectRequest<WrapperModel, WrapperModel>(
+				A<RequestOptions<WrapperModel>>._, A<CancellationToken>._))
+			.Returns(noStream);
+		RestHelpersWrapper wrapper = new(factory);
+		RestHelperOptions options = new("stream", "coverage-api",
+			ResilienceOptions: new ResilienceOptions(MaxRetry: 1, RetryDelay: 1, UseJitter: false,
+				ShouldRetryByStatusFunc: _ => false));
+
+		(await Collect(wrapper.GetStreaming<WrapperModel>(options, Current.CancellationToken))).ShouldBeEmpty();
+		(await Collect(wrapper.PostRequestStreaming(options, new WrapperModel(), Current.CancellationToken))).ShouldBeEmpty();
+		(await Collect(wrapper.GenericPostRequestStreaming<WrapperModel, WrapperModel>(options, new WrapperModel(), Current.CancellationToken))).ShouldBeEmpty();
+
+		A.CallTo(() => client.StreamingRestObjectRequest<WrapperModel, WrapperModel>(
+				A<RequestOptions<WrapperModel>>._, A<CancellationToken>._))
+			.MustHaveHappened(3, Times.Exactly);
+	}
+
+	[Fact]
+	public async Task GenericPostRequestStreaming_LogsAndReturnsEmpty_WhenResultHasNoResponse()
+	{
+		(IRestClientFactory factory, IRestClient client) = CreateFakes();
+		StreamingRestObject<WrapperModel> noResponse = new() { Result = null, Response = null };
+		A.CallTo(() => client.StreamingRestObjectRequest<WrapperModel, WrapperModel>(
+				A<RequestOptions<WrapperModel>>._, A<CancellationToken>._))
+			.Returns(noResponse);
+		RestHelpersWrapper wrapper = new(factory);
+		RestHelperOptions options = new("stream", "coverage-api",
+			ResilienceOptions: new ResilienceOptions(MaxRetry: 1, RetryDelay: 1, UseJitter: false));
+
+		List<WrapperModel?> result = await Collect(wrapper.GenericPostRequestStreaming<WrapperModel, WrapperModel>(
+			options, new WrapperModel(), Current.CancellationToken));
+
+		result.ShouldBeEmpty();
+	}
+
 }

@@ -1,9 +1,14 @@
 ﻿using CommonNetFuncs.Web.Api.OpenApiTransformers;
 using FakeItEasy;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
+using static Xunit.TestContext;
 
 namespace Web.Api.Tests.OpenApiTransformers;
 
@@ -143,4 +148,59 @@ public sealed class OpenApiTransformerTests
 		// Assert
 		document.Components.ShouldBeNull();
 	}
+}
+
+public sealed class OpenApiBearerSchemeBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+	private static async Task<WebApplication> CreateApp(Action<WebApplication> configure)
+	{
+		WebApplicationBuilder builder = WebApplication.CreateBuilder();
+		builder.Logging.ClearProviders();
+		builder.WebHost.UseTestServer();
+		WebApplication app = builder.Build();
+		configure(app);
+		await app.StartAsync();
+		return app;
+	}
+
+	private static OpenApiDocumentTransformerContext CreateOpenApiContext() => new()
+	{
+		DocumentName = "coverage",
+		DescriptionGroups = [],
+		ApplicationServices = null!
+	};
+
+	private sealed class CoverageController : ControllerBase;
+
+	[Fact]
+	public async Task BearerTransformer_NullConfiguredSchemeAddsSchemeWithoutReplacingExistingComponents()
+	{
+		IAuthenticationSchemeProvider provider = A.Fake<IAuthenticationSchemeProvider>();
+		A.CallTo(() => provider.GetAllSchemesAsync()).Returns([]);
+		BearerSecuritySchemeTransformer transformer = new(
+			provider,
+			Options.Create(new BearerSecuritySchemeOptions { AuthenticationSchemeName = null! }));
+		OpenApiComponents components = new();
+		OpenApiDocument document = new() { Components = components };
+
+		await transformer.TransformAsync(document, CreateOpenApiContext(), Current.CancellationToken);
+
+		document.Components.ShouldBeSameAs(components);
+		components.SecuritySchemes.ShouldNotBeNull();
+		components.SecuritySchemes!.ShouldContainKey("Bearer");
+		components.SecuritySchemes["Bearer"].Description.ShouldBe("Jwt authentication");
+	}
+
 }

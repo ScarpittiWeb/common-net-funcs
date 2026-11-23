@@ -1,5 +1,5 @@
-﻿using System.Collections.ObjectModel;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
+using System.Collections.ObjectModel;
 
 namespace Core.Tests;
 

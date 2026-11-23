@@ -1,11 +1,11 @@
-﻿using System.Data;
+﻿using Microsoft.Data.SqlClient;
+using System.Data;
 using System.Data.Common;
 using System.Text;
-using Microsoft.Data.SqlClient;
 
 namespace CommonNetFuncs.Sql.SqlServer;
 
-#if NET5_0_OR_GREATER
+#if !NETSTANDARD2_1
 public static class Debug
 {
 	/// <summary>

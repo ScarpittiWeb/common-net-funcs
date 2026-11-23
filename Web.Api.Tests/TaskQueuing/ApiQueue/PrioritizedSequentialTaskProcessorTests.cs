@@ -1,8 +1,8 @@
-﻿using System.Reflection;
-using System.Threading.Channels;
-using CommonNetFuncs.Web.Api.TaskQueuing;
+﻿using CommonNetFuncs.Web.Api.TaskQueuing;
 using CommonNetFuncs.Web.Api.TaskQueuing.ApiQueue;
 using CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
+using System.Reflection;
+using System.Threading.Channels;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests.TaskQueuing.ApiQueue;
@@ -589,19 +589,23 @@ public class PrioritizedSequentialTaskProcessorTests
 		PrioritizedSequentialTaskProcessor processor = new(options);
 		await processor.StartAsync(CancellationToken.None);
 		bool taskCompleted = false;
+		TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+		TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
 		// Act
 
 		Task<int?> task = processor.EnqueueWithPriorityAsync(async ct =>
 		{
-			await Task.Delay(100, ct);
+			entered.SetResult();
+			await release.Task.WaitAsync(ct);
 			taskCompleted = true;
 			return (int?)42;
 		}, cancellationToken: Current.CancellationToken);
 
-		await Task.Delay(50, Current.CancellationToken); // Let it start processing
+		await entered.Task.WaitAsync(TimeSpan.FromSeconds(2), Current.CancellationToken);
 
 		processor.Dispose();
+		release.SetResult();
 
 		// Wait for the task to complete (it should finish even after dispose)
 		await task.WaitAsync(TimeSpan.FromSeconds(2), Current.CancellationToken);
@@ -1072,4 +1076,106 @@ public class PrioritizedSequentialTaskProcessorTests
 	}
 
 	#endregion
+}
+
+public sealed class PrioritizedSequentialTaskProcessorBehaviorTests
+{
+
+
+
+
+
+	private static TaskCompletionSource CreateSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+	[Fact]
+	public async Task ProcessLoop_DisposedTask_IsCanceledAndDelegateIsSkipped()
+	{
+		using ExposedPrioritizedProcessor processor = new();
+		PrioritizedQueuedTask queued = new(_ => throw new InvalidOperationException("must not run"));
+		processor.SetDisposed();
+		processor.Inject(queued);
+		processor.CompleteWriter();
+
+		await processor.RunLoopAsync(Current.CancellationToken);
+
+		queued.CompletionSource.Task.IsCanceled.ShouldBeTrue();
+	}
+
+	[Fact]
+	public async Task ProcessLoop_PreCancelledTask_IsSkipped()
+	{
+		using ExposedPrioritizedProcessor processor = new();
+		int invocations = 0;
+		PrioritizedQueuedTask queued = new(_ =>
+		{
+			Interlocked.Increment(ref invocations);
+			return Task.FromResult<object?>(1);
+		});
+		await queued.CancellationTokenSource.CancelAsync();
+		processor.Inject(queued);
+		processor.CompleteWriter();
+
+		await processor.RunLoopAsync(Current.CancellationToken);
+
+		invocations.ShouldBe(0);
+		queued.IsCancelled.ShouldBeTrue();
+	}
+
+	[Fact]
+	public async Task ProcessLoop_CancellationAfterStart_CatchesTaskCancellationWithoutFailureStat()
+	{
+		using ExposedPrioritizedProcessor processor = new();
+		TaskCompletionSource started = CreateSignal();
+		TaskCompletionSource release = CreateSignal();
+		PrioritizedQueuedTask queued = new(async _ =>
+		{
+			started.TrySetResult();
+			await release.Task;
+			throw new OperationCanceledException();
+		});
+		processor.Inject(queued);
+		processor.CompleteWriter();
+
+		Task loop = processor.RunLoopAsync(Current.CancellationToken);
+		await started.Task;
+		await queued.CancellationTokenSource.CancelAsync();
+		release.SetResult();
+		await loop;
+
+		(await processor.GetAllQueueStatsAsync()).TotalFailedTasks.ShouldBe(0);
+		queued.IsCancelled.ShouldBeTrue();
+	}
+
+	[Fact]
+	public async Task Enqueue_AfterDisposedFlagUsesShutdownErrorPath()
+	{
+		ExposedPrioritizedProcessor processor = new();
+		processor.SetDisposed();
+		processor.CompleteWriter();
+
+		await Should.ThrowAsync<TaskCanceledException>(async () =>
+			await processor.EnqueueWithPriorityAsync(_ => Task.FromResult((int?)1), cancellationToken: Current.CancellationToken));
+	}
+
+	[Fact]
+	public async Task PriorityWindow_RecordsExactQueueFailureAndProcessingStats()
+	{
+		PrioritizedSequentialTaskProcessor processor = new(new UnboundedChannelOptions());
+		try
+		{
+			await processor.StartAsync(Current.CancellationToken);
+			await processor.EnqueueWithPriorityAsync(_ => Task.FromResult((int?)1), 2, TaskPriority.High, cancellationToken: Current.CancellationToken);
+			await Should.ThrowAsync<InvalidOperationException>(async () =>
+				await processor.EnqueueWithPriorityAsync<int?>(_ => throw new InvalidOperationException("failure"), 3, TaskPriority.Critical, cancellationToken: Current.CancellationToken));
+
+			PrioritizedQueueStats stats = await processor.GetAllQueueStatsAsync();
+			stats.TotalQueuedTasks.ShouldBe(2);
+			stats.TotalProcessedTasks.ShouldBe(1);
+		}
+		finally
+		{
+			processor.Dispose();
+		}
+	}
+
 }

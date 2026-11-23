@@ -1,5 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
-using CommonNetFuncs.Web.Common.ValidationAttributes;
+﻿using CommonNetFuncs.Web.Common.ValidationAttributes;
+using System.ComponentModel.DataAnnotations;
 
 namespace Web.Common.Tests.ValidationAttributes;
 
@@ -183,5 +183,44 @@ public sealed class AllowedNullableValuesAttributeTests : ValidationTestBase
 		// Assert
 		result.ShouldNotBeNull();
 		result.ErrorMessage?.ShouldContain("must be one of the following values");
+	}
+
+	private enum EUnsignedTest : ulong
+	{
+		Small = 1,
+		Huge = ulong.MaxValue
+	}
+
+	[Fact]
+	public void IsValid_EnumWithNumericValues_RepeatedCallsOnSameInstance_ShouldValidateConsistently()
+	{
+		// Arrange
+		AllowedNullableValuesAttribute attribute = new(typeof(ETest));
+		ValidationContext context = CreateValidationContext("TestProperty");
+
+		// Act & Assert - later calls hit the cached numeric values
+		for (int i = 0; i < 3; i++)
+		{
+			attribute.GetValidationResult(2L, context).ShouldBe(ValidationResult.Success);
+			attribute.GetValidationResult((byte)3, context).ShouldBe(ValidationResult.Success);
+
+			ValidationResult? invalidResult = attribute.GetValidationResult(5, context);
+			invalidResult.ShouldNotBeNull();
+			invalidResult.ErrorMessage.ShouldNotBeNull();
+			invalidResult.ErrorMessage.ShouldEndWith("must be one of the following values: Value1 (1), Value2 (2), Value3 (3)");
+		}
+	}
+
+	[Fact]
+	public void IsValid_EnumWithValueOutsideInt64Range_ShouldFallBackToLazyEvaluation()
+	{
+		// Arrange - ulong.MaxValue cannot be converted to long, so the numeric values cannot be cached
+		AllowedNullableValuesAttribute attribute = new(typeof(EUnsignedTest));
+		ValidationContext context = CreateValidationContext("TestProperty");
+
+		// Act & Assert - a match found before the out-of-range value is still accepted on every call
+		attribute.GetValidationResult(1, context).ShouldBe(ValidationResult.Success);
+		attribute.GetValidationResult(1, context).ShouldBe(ValidationResult.Success);
+		attribute.GetValidationResult(EUnsignedTest.Huge, context).ShouldBe(ValidationResult.Success);
 	}
 }

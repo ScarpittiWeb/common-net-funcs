@@ -1,6 +1,4 @@
-﻿using System.Net;
-using System.Threading.Channels;
-using CommonNetFuncs.Web.Api.TaskQueuing;
+﻿using CommonNetFuncs.Web.Api.TaskQueuing;
 using CommonNetFuncs.Web.Api.TaskQueuing.ApiQueue;
 using FakeItEasy;
 using Microsoft.AspNetCore.Builder;
@@ -11,6 +9,8 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
+using System.Net;
+using System.Threading.Channels;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests.TaskQueuing.ApiQueue;

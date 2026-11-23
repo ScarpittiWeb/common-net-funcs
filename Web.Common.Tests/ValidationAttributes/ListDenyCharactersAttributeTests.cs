@@ -1,5 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
-using CommonNetFuncs.Web.Common.ValidationAttributes;
+﻿using CommonNetFuncs.Web.Common.ValidationAttributes;
+using System.ComponentModel.DataAnnotations;
 
 namespace Web.Common.Tests.ValidationAttributes;
 
@@ -30,6 +30,25 @@ public sealed class ListDenyCharactersAttributeTests : ValidationTestBase
 
 		// Assert
 		attribute.DenyCharacters.ShouldBe("<>\"'/");
+	}
+
+	[Fact]
+	public void IsValid_WithCharArrayConstructor_ShouldValidateCorrectly()
+	{
+		// Arrange
+		char[] denyCharacters = ['<', '>', '&', ';', '\'', '"', '%', '$'];
+		ListDenyCharactersAttribute attribute = new(denyCharacters);
+		ValidationContext context = CreateValidationContext("TestProperty");
+
+		// Act
+		ValidationResult? validResult = attribute.GetValidationResult(new List<string> { "safe", "also safe" }, context);
+		ValidationResult? invalidResult = attribute.GetValidationResult(new List<string> { "safe", "cost$" }, context);
+
+		// Assert
+		validResult.ShouldBe(ValidationResult.Success);
+		invalidResult.ShouldNotBeNull();
+		invalidResult.ErrorMessage.ShouldNotBeNull();
+		invalidResult.ErrorMessage.ShouldStartWith("Item at index 1 ");
 	}
 
 	[Fact]

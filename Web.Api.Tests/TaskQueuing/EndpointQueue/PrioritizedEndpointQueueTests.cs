@@ -3,7 +3,6 @@ using CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
 using System.Diagnostics;
 using xRetry.v3;
 using static Xunit.TestContext;
-
 namespace Web.Api.Tests.TaskQueuing.EndpointQueue;
 
 public sealed class PrioritizedEndpointQueueTests : IDisposable
@@ -2568,4 +2567,100 @@ public sealed class PrioritizedEndpointQueueTests : IDisposable
 		public string? Name { get; set; }
 		public List<string>? Items { get; set; }
 	}
+}
+
+public sealed class PrioritizedEndpointQueueBehaviorTests
+{
+
+
+
+	private static TaskCompletionSource CreateSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+	[Fact]
+	public async Task CancelTasks_CancelsOnlyMatchingPendingPriorityAndPreservesOtherOrder()
+	{
+		PrioritizedEndpointQueue queue = new("cancel-priority", processTimeWindow: 1);
+		TaskCompletionSource activeStarted = CreateSignal();
+		TaskCompletionSource releaseActive = CreateSignal();
+		Task<int> active = queue.EnqueueAsync(async _ =>
+		{
+			activeStarted.TrySetResult();
+			await releaseActive.Task;
+			return 0;
+		}, 1, TaskPriority.Normal, Current.CancellationToken);
+		await activeStarted.Task;
+
+		List<string> order = [];
+		Task<int> low = queue.EnqueueAsync(_ =>
+		{
+			order.Add("low");
+			return Task.FromResult(1);
+		}, 0, TaskPriority.Low, Current.CancellationToken);
+		Task<int> high1 = queue.EnqueueAsync(_ =>
+		{
+			order.Add("high1");
+			return Task.FromResult(2);
+		}, 5, TaskPriority.High, Current.CancellationToken);
+		Task<int> high2 = queue.EnqueueAsync(_ =>
+		{
+			order.Add("high2");
+			return Task.FromResult(3);
+		}, 6, TaskPriority.High, Current.CancellationToken);
+		Task<int> critical = queue.EnqueueAsync(_ =>
+		{
+			order.Add("critical");
+			return Task.FromResult(4);
+		}, 3, TaskPriority.Critical, Current.CancellationToken);
+
+		(await queue.CancelTasksByPriorityAsync(TaskPriority.High)).ShouldBeTrue();
+		await Should.ThrowAsync<TaskCanceledException>(async () => await high1);
+		await Should.ThrowAsync<TaskCanceledException>(async () => await high2);
+		(await queue.CancelTasksByPriorityAsync(TaskPriority.Emergency)).ShouldBeFalse();
+
+		releaseActive.SetResult();
+		(await active).ShouldBe(0);
+		(await critical).ShouldBe(4);
+		(await low).ShouldBe(1);
+		order.ShouldBe(["critical", "low"]);
+
+		PrioritizedQueueStats stats = queue.Stats;
+		stats.TotalCancelledTasks.ShouldBe(2);
+		stats.PriorityBreakdown[TaskPriority.High].CancelledTasks.ShouldBe(2);
+		stats.CurrentQueueDepth.ShouldBe(0);
+		queue.Dispose();
+	}
+
+	[Fact]
+	public async Task TaskFailure_UpdatesTotalAndPriorityFailureStats()
+	{
+		PrioritizedEndpointQueue queue = new("failure");
+		try
+		{
+			InvalidOperationException error = new("prioritized failure");
+			InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(async () =>
+				await queue.EnqueueAsync<int>(_ => throw error, 4, TaskPriority.Emergency, Current.CancellationToken));
+
+			thrown.ShouldBeSameAs(error);
+			PrioritizedQueueStats stats = queue.Stats;
+			stats.TotalQueuedTasks.ShouldBe(1);
+			stats.TotalFailedTasks.ShouldBe(1);
+			stats.PriorityBreakdown[TaskPriority.Emergency].FailedTasks.ShouldBe(1);
+		}
+		finally
+		{
+			queue.Dispose();
+		}
+	}
+
+	[Fact]
+	public async Task DisposeBeforeProcessingStart_PreventsEnqueueAndIsIdempotent()
+	{
+		PrioritizedEndpointQueue queue = new("never-started");
+		queue.Dispose();
+		queue.Dispose();
+
+		await Should.ThrowAsync<ObjectDisposedException>(async () =>
+			await queue.EnqueueAsync(_ => Task.FromResult(1), 1, TaskPriority.Normal, Current.CancellationToken));
+	}
+
 }

@@ -17,7 +17,13 @@ public static class ContentTypes
 		{
 			throw new ArgumentException("File name cannot be null or empty.", nameof(fileName));
 		}
-		return GetContentTypeByExtension(Path.GetExtension(fileName));
+		// Path.GetExtension never returns a value without the leading '.', so the "ensure dot" step of GetContentTypeByExtension is a no-op here
+		ReadOnlySpan<char> extension = Path.GetExtension(fileName.AsSpan());
+		if (extension.IsEmpty)
+		{
+			throw new ArgumentException("File extension cannot be null or empty.", "extension");
+		}
+		return LookupKnownExtension(extension) ?? MatchUnknownExtension(extension.ToString());
 	}
 
 	public static string GetContentTypeByExtension(string extension)
@@ -31,9 +37,24 @@ public static class ContentTypes
 		{
 			extension = $".{extension}";
 		}
+		return LookupKnownExtension(extension) ?? MatchUnknownExtension(extension);
+	}
 
-		// Use switch expression to return content type based on file extension
-		return extension.ToLowerInvariant() switch
+	// Longer than the longest constant case (".mszipupload" = 12 chars), so anything longer can never hit a constant arm
+	private const int MaxKnownExtensionLength = 16;
+
+	private static string? LookupKnownExtension(ReadOnlySpan<char> extension)
+	{
+		if (extension.Length > MaxKnownExtensionLength)
+		{
+			return null;
+		}
+
+		// Lower into a stack buffer instead of allocating a lowered string
+		Span<char> loweredBuffer = stackalloc char[MaxKnownExtensionLength];
+		int length = extension.ToLowerInvariant(loweredBuffer);
+		ReadOnlySpan<char> lowered = loweredBuffer[..length];
+		return lowered switch
 		{
 			".json" => Json,
 			".mempack" => MemPack,
@@ -61,15 +82,42 @@ public static class ContentTypes
 			".avi" => Avi,
 			".mp3" => Mp3,
 			".aac" => Aac,
-			_ when FormDataTypes.Contains(extension) => UrlEncodedFormData, // Default to form data types
-			_ when extension.StartsWith(".html") || extension.StartsWith(".htm") => Html, // Handle HTML files
-			_ when extension.StartsWith(".txt") || extension.StartsWith(".text") => Text, // Handle text files
-			_ when extension.StartsWith(".js") || extension.StartsWith(".javascript") => Js, // Handle JavaScript files
-			_ when extension.StartsWith(".css") || extension.StartsWith(".stylesheet") => Css, // Handle CSS files
-			_ when extension.StartsWith(".xml") || extension.StartsWith(".xhtml") => Xml, // Handle XML files
-			_ when extension.StartsWith(".binary") || extension.StartsWith(".octet-stream") => BinaryStream, // Handle binary streams
-			_ => "application/octet-stream", // Default content type for unknown extensions
+			_ => null,
 		};
+	}
+
+	// Fallback checks intentionally test the dotted, NON-lowered extension with culture-sensitive StartsWith (unchanged behavior)
+	private static string MatchUnknownExtension(string extension)
+	{
+		if (FormDataTypes.Contains(extension))
+		{
+			return UrlEncodedFormData; // Default to form data types
+		}
+		if (extension.StartsWith(".html") || extension.StartsWith(".htm"))
+		{
+			return Html;
+		}
+		if (extension.StartsWith(".txt") || extension.StartsWith(".text"))
+		{
+			return Text;
+		}
+		if (extension.StartsWith(".js") || extension.StartsWith(".javascript"))
+		{
+			return Js;
+		}
+		if (extension.StartsWith(".css") || extension.StartsWith(".stylesheet"))
+		{
+			return Css;
+		}
+		if (extension.StartsWith(".xml") || extension.StartsWith(".xhtml"))
+		{
+			return Xml;
+		}
+		if (extension.StartsWith(".binary") || extension.StartsWith(".octet-stream"))
+		{
+			return BinaryStream;
+		}
+		return "application/octet-stream"; // Default content type for unknown extensions
 	}
 
 	public const string Json = "application/json";

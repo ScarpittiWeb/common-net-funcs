@@ -54,6 +54,48 @@ public sealed class DataTableHelpersTests
 	}
 
 	[Fact]
+	public void GetDataTableRequest_ManyFieldsWithMixedCaseKeys_ParsesAllCorrectly()
+	{
+		HttpRequest request = A.Fake<HttpRequest>();
+
+		Dictionary<string, StringValues> formData = new()
+			{
+				{ "DRAW", new StringValues("7") },
+				{ "Start", new StringValues("40") },
+				{ "LENGTH", new StringValues("20") },
+				{ "Order[0][Column]", new StringValues("12") },
+				{ "order[0][DIR]", new StringValues("desc") },
+				{ "order[1][column]", new StringValues("3") },
+				{ "order[1][dir]", new StringValues("asc") },
+				{ "order[2][column]", new StringValues("99") }, // Column with no data key and no direction
+				{ "Search[Value]", new StringValues("a=1,b=") }
+			};
+		for (int i = 0; i < 30; i++)
+		{
+			formData.Add($"columns[{i}][data]", new StringValues($"col{i}"));
+			formData.Add($"columns[{i}][name]", new StringValues($"name{i}"));
+		}
+
+		A.CallTo(() => request.ContentType).Returns("multipart/form-data; boundary=xyz");
+		A.CallTo(() => request.Form).Returns(new FormCollection(formData));
+
+		DataTableRequest result = request.GetDataTableRequest();
+
+		result.Draw.ShouldBe("7");
+		result.Skip.ShouldBe(40);
+		result.PageSize.ShouldBe(20);
+		result.SortColumns.Count.ShouldBe(3);
+		result.SortColumns[0].ShouldBe("col12");
+		result.SortColumns[1].ShouldBe("col3");
+		result.SortColumns[2].ShouldBeNull();
+		result.SortColumnDir[0].ShouldBe("desc");
+		result.SortColumnDir[1].ShouldBe("asc");
+		result.SortColumnDir[2].ShouldBeNull();
+		result.SearchValues["a"].ShouldBe("1");
+		result.SearchValues["b"].ShouldBeNull();
+	}
+
+	[Fact]
 	public void GetSortAndLimitPostModel_CreatesCorrectModel()
 	{
 		DataTableRequest request = new()
@@ -282,4 +324,34 @@ public sealed class DataTableHelpersTests
 		result.ShouldNotBeNull();
 		result.SearchValues.Count.ShouldBe(0);
 	}
+}
+
+public sealed class DataTableHelpersBehaviorTests
+{
+
+	[Fact]
+	public void GetDataTableRequest_ExpandingAndShrinkingSnapshot_PreservesAllEnumeratedFields()
+	{
+		KeyValuePair<string, StringValues>[] fields =
+		[
+			new("draw", new StringValues("17")),
+			new("start", new StringValues("25"))
+		];
+		IFormCollection form = A.Fake<IFormCollection>();
+		A.CallTo(() => form.Count).Returns(1);
+		A.CallTo(() => ((IEnumerable<KeyValuePair<string, StringValues>>)form).GetEnumerator())
+			.ReturnsLazily(() => ((IEnumerable<KeyValuePair<string, StringValues>>)fields).GetEnumerator());
+
+		HttpRequest request = A.Fake<HttpRequest>();
+		A.CallTo(() => request.ContentType).Returns("application/x-www-form-urlencoded");
+		A.CallTo(() => request.Form).Returns(form);
+
+		DataTableRequest result = request.GetDataTableRequest();
+
+		result.Draw.ShouldBe("17");
+		result.Skip.ShouldBe(25);
+		result.PageSize.ShouldBe(0);
+		result.SearchValues.ShouldBeEmpty();
+	}
+
 }

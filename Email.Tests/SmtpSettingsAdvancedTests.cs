@@ -1,4 +1,6 @@
 ﻿using CommonNetFuncs.Email;
+using FakeItEasy;
+using MailKit.Net.Proxy;
 using MailKit.Security;
 using static CommonNetFuncs.Email.Email;
 using static Xunit.TestContext;
@@ -51,6 +53,70 @@ public sealed class SmtpSettingsAdvancedTests
 
 		// Assert
 		settings.ConnectionTimeout.ShouldBe(TimeSpan.FromMinutes(2));
+	}
+
+	[Fact]
+	public void SmtpSettings_Defaults_ShouldPreserveRetryBehavior()
+	{
+		SmtpSettings settings = new();
+
+		settings.MaxAttempts.ShouldBe(8);
+		settings.RetryDelay.ShouldBe(TimeSpan.FromMilliseconds(500));
+	}
+
+	[Fact]
+	public void SmtpSettings_ExtendedConstructor_ShouldSetRetryBehavior()
+	{
+		SmtpSettings settings = new("127.0.0.1", 1, null, null, TimeSpan.FromMilliseconds(100), 3, TimeSpan.FromMilliseconds(25));
+
+		settings.ConnectionTimeout.ShouldBe(TimeSpan.FromMilliseconds(100));
+		settings.MaxAttempts.ShouldBe(3);
+		settings.RetryDelay.ShouldBe(TimeSpan.FromMilliseconds(25));
+	}
+
+	[Fact]
+	public void SmtpSettings_MaxAttemptsLessThanOne_ShouldThrow()
+	{
+		ArgumentOutOfRangeException exception = Should.Throw<ArgumentOutOfRangeException>(() => new SmtpSettings { MaxAttempts = 0 });
+
+		exception.ParamName.ShouldBe("value");
+	}
+
+	[Fact]
+	public void SmtpSettings_NegativeRetryDelay_ShouldThrow()
+	{
+		ArgumentOutOfRangeException exception = Should.Throw<ArgumentOutOfRangeException>(() => new SmtpSettings { RetryDelay = TimeSpan.FromMilliseconds(-1) });
+
+		exception.ParamName.ShouldBe("value");
+	}
+
+	[Fact]
+	public async Task SendEmail_MaxAttempts_ShouldControlConnectionAttempts()
+	{
+		IProxyClient proxy = A.Fake<IProxyClient>();
+		A.CallTo(() => proxy.ConnectAsync(A<string>._, A<int>._, A<int>._, A<CancellationToken>._))
+			.ThrowsAsync(new IOException("Expected proxy failure"));
+		SendEmailConfig config = new()
+		{
+			SmtpSettings = new SmtpSettings("smtp.example.test", 25, connectionTimeout: TimeSpan.FromMilliseconds(100))
+			{
+				MaxAttempts = 3,
+				RetryDelay = TimeSpan.Zero,
+				ProxyClient = proxy
+			},
+			EmailAddresses = new EmailAddresses
+			{
+				FromAddress = new MailAddress("Sender", "sender@example.com"),
+				ToAddresses = [new MailAddress("To", "to@example.com")]
+			},
+			EmailContent = new EmailContent("Subject", "Body")
+		};
+
+		bool result = await SendEmail(config, Current.CancellationToken);
+
+		result.ShouldBeFalse();
+		A.CallTo(() => proxy.ConnectAsync("smtp.example.test", 25, 100, A<CancellationToken>._))
+			.MustHaveHappened(3, Times.Exactly);
 	}
 
 	[Fact]
@@ -134,7 +200,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server
@@ -163,7 +229,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server
@@ -193,7 +259,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server
@@ -222,7 +288,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server
@@ -252,7 +318,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server
@@ -281,7 +347,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server
@@ -310,7 +376,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server
@@ -339,7 +405,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server
@@ -368,7 +434,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server
@@ -397,7 +463,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server
@@ -426,7 +492,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server
@@ -455,7 +521,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server
@@ -491,7 +557,7 @@ public sealed class SmtpSettingsAdvancedTests
 		};
 
 		// Act
-		bool result = await SendEmail(config, Current.CancellationToken);
+		bool result = await SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeFalse(); // Will fail due to no server

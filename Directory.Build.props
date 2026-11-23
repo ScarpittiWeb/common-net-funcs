@@ -1,4 +1,16 @@
 <Project>
+	<!--
+		Test projects can't target netstandard2.1 directly; building with -p:UseNetStandardLibs=true (see Directory.Build.targets) makes the
+		libraries under test build only their netstandard2.1 target while the test project stays on net11.0. Outputs go to separate
+		folders so both flavors can be built side by side.
+	-->
+	<PropertyGroup Condition="'$(UseNetStandardLibs)' == 'true'">
+		<BaseIntermediateOutputPath>obj\netstandard\</BaseIntermediateOutputPath>
+		<BaseOutputPath>bin\netstandard\</BaseOutputPath>
+		<!-- The default obj\ and bin\ folders sit alongside the netstandard ones, so they must be excluded from the default globs explicitly -->
+		<DefaultItemExcludes>$(DefaultItemExcludes);obj/**;bin/**</DefaultItemExcludes>
+	</PropertyGroup>
+
 	<!-- Shared package icon for all NuGet packages -->
 	<PropertyGroup Condition="'$(IsPackable)' != 'false'">
 		<PackageIcon>NWeb_Logo.png</PackageIcon>

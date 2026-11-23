@@ -65,7 +65,7 @@ public sealed class HangfireEmailServiceTests
 		EmailContent emailContent = new("Subject", "Body");
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeTrue();
@@ -87,7 +87,7 @@ public sealed class HangfireEmailServiceTests
 
 		// Act & Assert
 		HangfireJobException exception = await Should.ThrowAsync<HangfireJobException>(async () =>
-			await service.SendEmail(smtpSettings, emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken));
+			await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken));
 
 		exception.Message.ShouldBe("Failed to send email");
 	}
@@ -111,7 +111,7 @@ public sealed class HangfireEmailServiceTests
 		EmailContent emailContent = new("Subject", "Body");
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeTrue();
@@ -133,7 +133,7 @@ public sealed class HangfireEmailServiceTests
 
 		// Act & Assert
 		HangfireJobException exception = await Should.ThrowAsync<HangfireJobException>(async () =>
-			await service.SendEmail(smtpSettings, emailAddresses, emailContent, Current.CancellationToken));
+			await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, Current.CancellationToken));
 
 		exception.Message.ShouldBe("Failed to send email");
 	}
@@ -157,7 +157,7 @@ public sealed class HangfireEmailServiceTests
 		EmailContentBytes emailContent = new("Subject", "Body");
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeTrue();
@@ -179,7 +179,7 @@ public sealed class HangfireEmailServiceTests
 
 		// Act & Assert
 		HangfireJobException exception = await Should.ThrowAsync<HangfireJobException>(async () =>
-			await service.SendEmail(smtpSettings, emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken));
+			await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, true, "receipt@example.com", Current.CancellationToken));
 
 		exception.Message.ShouldBe("Failed to send email");
 	}
@@ -203,7 +203,7 @@ public sealed class HangfireEmailServiceTests
 		EmailContentBytes emailContent = new("Subject", "Body");
 
 		// Act
-		bool result = await service.SendEmail(smtpSettings, emailAddresses, emailContent, Current.CancellationToken);
+		bool result = await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeTrue();
@@ -225,7 +225,7 @@ public sealed class HangfireEmailServiceTests
 
 		// Act & Assert
 		HangfireJobException exception = await Should.ThrowAsync<HangfireJobException>(async () =>
-			await service.SendEmail(smtpSettings, emailAddresses, emailContent, Current.CancellationToken));
+			await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, Current.CancellationToken));
 
 		exception.Message.ShouldBe("Failed to send email");
 	}
@@ -253,7 +253,7 @@ public sealed class HangfireEmailServiceTests
 		};
 
 		// Act
-		bool result = await service.SendEmail(config, Current.CancellationToken);
+		bool result = await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeTrue();
@@ -279,7 +279,7 @@ public sealed class HangfireEmailServiceTests
 
 		// Act & Assert
 		HangfireJobException exception = await Should.ThrowAsync<HangfireJobException>(async () =>
-			await service.SendEmail(config, Current.CancellationToken));
+			await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken));
 
 		exception.Message.ShouldBe("Failed to send email");
 	}
@@ -305,7 +305,7 @@ public sealed class HangfireEmailServiceTests
 		};
 
 		// Act
-		bool result = await service.SendEmail(config, Current.CancellationToken);
+		bool result = await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeTrue();
@@ -333,7 +333,7 @@ public sealed class HangfireEmailServiceTests
 
 		// Act & Assert
 		HangfireJobException exception = await Should.ThrowAsync<HangfireJobException>(async () =>
-			await service.SendEmail(config, Current.CancellationToken));
+			await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken));
 
 		exception.Message.ShouldBe("Failed to send email");
 	}
@@ -361,7 +361,7 @@ public sealed class HangfireEmailServiceTests
 		};
 
 		// Act
-		bool result = await service.SendEmail(config, Current.CancellationToken);
+		bool result = await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeTrue();
@@ -387,7 +387,7 @@ public sealed class HangfireEmailServiceTests
 
 		// Act & Assert
 		HangfireJobException exception = await Should.ThrowAsync<HangfireJobException>(async () =>
-			await service.SendEmail(config, Current.CancellationToken));
+			await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken));
 
 		exception.Message.ShouldBe("Failed to send email");
 	}
@@ -413,7 +413,7 @@ public sealed class HangfireEmailServiceTests
 		};
 
 		// Act
-		bool result = await service.SendEmail(config, Current.CancellationToken);
+		bool result = await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken);
 
 		// Assert
 		result.ShouldBeTrue();
@@ -441,7 +441,7 @@ public sealed class HangfireEmailServiceTests
 
 		// Act & Assert
 		HangfireJobException exception = await Should.ThrowAsync<HangfireJobException>(async () =>
-			await service.SendEmail(config, Current.CancellationToken));
+			await service.SendEmail(config.WithFastSmtpFailure(), Current.CancellationToken));
 
 		exception.Message.ShouldBe("Failed to send email");
 	}
@@ -466,7 +466,7 @@ public sealed class HangfireEmailServiceTests
 
 		// Act & Assert
 		HangfireJobException exception = await Should.ThrowAsync<HangfireJobException>(async () =>
-			await service.SendEmail(smtpSettings, emailAddresses, emailContent, Current.CancellationToken));
+			await service.SendEmail(smtpSettings.WithFastSmtpFailure(), emailAddresses, emailContent, Current.CancellationToken));
 
 		exception.Message.ShouldBe("Failed to send email");
 	}

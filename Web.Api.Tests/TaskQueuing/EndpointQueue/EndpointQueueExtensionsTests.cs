@@ -1,17 +1,19 @@
-﻿using System.Net;
-using System.Threading.Channels;
-using CommonNetFuncs.Web.Api.TaskQueuing;
+﻿using CommonNetFuncs.Web.Api.TaskQueuing;
 using CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Moq;
+using System.Net;
+using System.Threading.Channels;
 using static Xunit.TestContext;
 
 namespace Web.Api.Tests.TaskQueuing.EndpointQueue;
@@ -472,4 +474,74 @@ public class EndpointQueueExtensionsTests
 
 	// Test controller for endpoint key generation tests
 	public class TestController : ControllerBase;
+}
+
+public sealed class EndpointQueueExtensionsDefaultBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+	private static async Task<WebApplication> CreateApp(Action<WebApplication> configure)
+	{
+		WebApplicationBuilder builder = WebApplication.CreateBuilder();
+		builder.Logging.ClearProviders();
+		builder.WebHost.UseTestServer();
+		WebApplication app = builder.Build();
+		configure(app);
+		await app.StartAsync();
+		return app;
+	}
+
+	private static OpenApiDocumentTransformerContext CreateOpenApiContext() => new()
+	{
+		DocumentName = "coverage",
+		DescriptionGroups = [],
+		ApplicationServices = null!
+	};
+
+	private sealed class CoverageController : ControllerBase;
+
+	[Fact]
+	public async Task EndpointQueueExtensions_DefaultKeysAndTokensAreExactForEveryOverload()
+	{
+		ControllerBase controller = new CoverageController();
+		Mock<IEndpointQueueService> service = new();
+		using CancellationTokenSource requestAbort = new();
+		DefaultHttpContext httpContext = new();
+		httpContext.RequestAborted = requestAbort.Token;
+		controller.ControllerContext = new ControllerContext
+		{
+			HttpContext = httpContext,
+			ActionDescriptor = new ControllerActionDescriptor { ActionName = "Run" }
+		};
+		service.Setup(x => x.ExecuteAsync(
+				"Coverage.Run",
+				It.IsAny<Func<CancellationToken, Task<int>>>(),
+				It.IsAny<BoundedChannelOptions>(),
+				requestAbort.Token))
+			.ReturnsAsync(11);
+		service.Setup(x => x.ExecuteAsync(
+				"Coverage.Run",
+				It.IsAny<Func<CancellationToken, Task<int>>>(),
+				It.IsAny<UnboundedChannelOptions>(),
+				requestAbort.Token))
+			.ReturnsAsync(12);
+
+		int bounded = await controller.ExecuteQueuedAsync(service.Object, _ => Task.FromResult(0), new BoundedChannelOptions(1));
+		int unbounded = await controller.ExecuteQueuedAsync(service.Object, _ => Task.FromResult(0), new UnboundedChannelOptions());
+
+		bounded.ShouldBe(11);
+		unbounded.ShouldBe(12);
+		service.VerifyAll();
+	}
+
 }

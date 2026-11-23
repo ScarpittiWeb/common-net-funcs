@@ -1,5 +1,5 @@
-﻿using System.IO.Compression;
-using CommonNetFuncs.Compression;
+﻿using CommonNetFuncs.Compression;
+using System.IO.Compression;
 using static CommonNetFuncs.Compression.Streams;
 using static CommonNetFuncs.Core.Random;
 using static Xunit.TestContext;
@@ -358,6 +358,44 @@ public sealed class StreamsTests
 
 		// Act & Assert
 		Should.Throw<CompressionLimitExceededException>(() => compressedData.Decompress(ECompressionType.Gzip, maxCompressionRatio: 0));
+	}
+
+	[Theory]
+	[InlineData(ECompressionType.Brotli)]
+	[InlineData(ECompressionType.Gzip)]
+	[InlineData(ECompressionType.Deflate)]
+	[InlineData(ECompressionType.ZLib)]
+	public void Decompress_Should_Grow_Output_Buffer_For_Highly_Compressible_Data_Synchronously(ECompressionType compressionType)
+	{
+		// Arrange - expands far beyond both the 4x size estimate and the 1 MB read chunk
+		byte[] originalData = new byte[(9 * 1024 * 1024) + 321];
+		for (int i = 0; i < originalData.Length; i++)
+		{
+			originalData[i] = (byte)(i % 251);
+		}
+		byte[] compressedData = originalData.Compress(compressionType);
+
+		// Act
+		byte[] decompressedData = compressedData.Decompress(compressionType, maxCompressionRatio: int.MaxValue, cancellationToken: Current.CancellationToken);
+
+		// Assert
+		decompressedData.ShouldBe(originalData);
+	}
+
+	[Fact]
+	public void Decompress_Should_Throw_When_Limit_Exceeded_After_Buffer_Growth_Synchronously()
+	{
+		// Arrange
+		byte[] originalData = new byte[8 * 1024 * 1024];
+		for (int i = 0; i < originalData.Length; i++)
+		{
+			originalData[i] = (byte)(i % 251);
+		}
+		byte[] compressedData = originalData.Compress(ECompressionType.Gzip);
+		int maxCompressionRatio = (int)((3L * 1024 * 1024) / compressedData.Length); // ~3 MB limit
+
+		// Act & Assert
+		Should.Throw<CompressionLimitExceededException>(() => compressedData.Decompress(ECompressionType.Gzip, maxCompressionRatio: maxCompressionRatio));
 	}
 
 	[Theory]
@@ -918,6 +956,42 @@ public sealed class StreamsTests
 		isDeflate.ShouldBeFalse();
 	}
 
+	[Theory]
+	[InlineData(false, true)]
+	[InlineData(false, false)]
+	[InlineData(true, true)]
+	[InlineData(true, false)]
+	public async Task IsDeflateCompressed_Memory_Should_Handle_Array_Slices_And_Non_Array_Backed_Memory(bool nonArrayBacked, bool deflateData)
+	{
+		// Arrange - surround the payload with other bytes so a slice with a non-zero offset is checked
+		byte[] payload = deflateData ? smallData.Compress(ECompressionType.Deflate) : "Hello, World! This is not compressed data."u8.ToArray();
+		byte[] backing = new byte[payload.Length + 20];
+		backing.AsSpan(0, 10).Fill(0xFF);
+		backing.AsSpan(10 + payload.Length).Fill(0xFF);
+		payload.CopyTo(backing, 10);
+
+		using NonArrayMemoryManager manager = new(backing);
+		Memory<byte> memory = (nonArrayBacked ? manager.Memory : backing.AsMemory()).Slice(10, payload.Length);
+
+		// Act
+		bool isDeflate = await memory.IsDeflateCompressed();
+
+		// Assert
+		isDeflate.ShouldBe(deflateData);
+	}
+
+	/// <summary>Memory owner whose memory is not exposed as an array (MemoryMarshal.TryGetArray returns false).</summary>
+	private sealed class NonArrayMemoryManager(byte[] data) : System.Buffers.MemoryManager<byte>
+	{
+		public override Span<byte> GetSpan() => data;
+
+		public override System.Buffers.MemoryHandle Pin(int elementIndex = 0) => throw new NotSupportedException();
+
+		public override void Unpin() { }
+
+		protected override void Dispose(bool disposing) { }
+	}
+
 	// Tests for DetectCompressionTypeAndReset
 	[Theory]
 	[InlineData(ECompressionType.Gzip)]
@@ -1354,4 +1428,337 @@ internal class NonSeekableStream(byte[] data) : Stream
 		}
 		base.Dispose(disposing);
 	}
+}
+
+public sealed class StreamCompressionBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private sealed class CapabilityStream : Stream
+	{
+		private readonly MemoryStream inner = new();
+		private readonly bool canRead;
+		private readonly bool canSeek;
+		private readonly bool canWrite;
+
+		public CapabilityStream(byte[] data, bool canRead, bool canWrite, bool canSeek)
+		{
+			inner.Write(data);
+			inner.Position = 0;
+			this.canRead = canRead;
+			this.canWrite = canWrite;
+			this.canSeek = canSeek;
+		}
+
+		public override bool CanRead => canRead;
+		public override bool CanSeek => canSeek;
+		public override bool CanWrite => canWrite;
+		public override long Length => inner.Length;
+		public override long Position
+		{
+			get => canSeek ? inner.Position : throw new NotSupportedException();
+			set
+			{
+				if (!canSeek)
+				{
+					throw new NotSupportedException();
+				}
+
+				inner.Position = value;
+			}
+		}
+
+		public byte[] ToArray() => inner.ToArray();
+
+		public override void Flush() => inner.Flush();
+
+		public override Task FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+
+		public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+
+		public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+			inner.ReadAsync(buffer, cancellationToken);
+
+		public override long Seek(long offset, SeekOrigin origin) =>
+			canSeek ? inner.Seek(offset, origin) : throw new NotSupportedException();
+
+		public override void SetLength(long value) => inner.SetLength(value);
+
+		public override void Write(byte[] buffer, int offset, int count) => inner.Write(buffer, offset, count);
+
+		public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+			inner.WriteAsync(buffer, cancellationToken);
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+			{
+				inner.Dispose();
+			}
+
+			base.Dispose(disposing);
+		}
+	}
+
+	private sealed class GatedReadStream(byte[] data) : Stream
+	{
+		private readonly MemoryStream inner = new(data);
+		private readonly TaskCompletionSource readStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+		private readonly TaskCompletionSource releaseRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
+		private bool waitForRelease = true;
+
+		public Task ReadStarted => readStarted.Task;
+
+		public void ReleaseRead() => releaseRead.TrySetResult();
+
+		public override bool CanRead => true;
+		public override bool CanSeek => true;
+		public override bool CanWrite => false;
+		public override long Length => inner.Length;
+		public override long Position { get => inner.Position; set => inner.Position = value; }
+
+		public override void Flush() { }
+
+		public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+
+		public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+		{
+			if (waitForRelease)
+			{
+				waitForRelease = false;
+				readStarted.TrySetResult();
+				await releaseRead.Task.WaitAsync(cancellationToken);
+			}
+
+			return await inner.ReadAsync(buffer, cancellationToken);
+		}
+
+		public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+
+		public override void SetLength(long value) => throw new NotSupportedException();
+
+		public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+		protected override void Dispose(bool disposing)
+		{
+			if (disposing)
+			{
+				inner.Dispose();
+			}
+
+			base.Dispose(disposing);
+		}
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public async Task CompressStream_NonSeekableReadOnlySourceAndNonSeekableDestination_RoundTrips(bool asynchronous)
+	{
+		byte[] content = "non-seekable compression path"u8.ToArray();
+		await using CapabilityStream source = new(content, canRead: true, canWrite: false, canSeek: false);
+		await using CapabilityStream destination = new([], canRead: false, canWrite: true, canSeek: false);
+
+		if (asynchronous)
+		{
+			await source.CompressStreamAsync(destination, ECompressionType.Deflate, cancellationToken: Current.CancellationToken);
+		}
+		else
+		{
+			source.CompressStream(destination, ECompressionType.Deflate);
+		}
+
+		(destination.ToArray().Decompress(ECompressionType.Deflate, cancellationToken: Current.CancellationToken)).ShouldBe(content);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public async Task DecompressStream_NonSeekableReadOnlySourceAndNonSeekableDestination_RoundTrips(bool asynchronous)
+	{
+		byte[] content = "non-seekable decompression path"u8.ToArray();
+		byte[] compressed = content.Compress(ECompressionType.Gzip);
+		await using CapabilityStream source = new(compressed, canRead: true, canWrite: false, canSeek: false);
+		await using CapabilityStream destination = new([], canRead: false, canWrite: true, canSeek: false);
+
+		if (asynchronous)
+		{
+			await source.DecompressStreamAsync(destination, ECompressionType.Gzip, Current.CancellationToken);
+		}
+		else
+		{
+			source.DecompressStream(destination, ECompressionType.Gzip);
+		}
+
+		destination.ToArray().ShouldBe(content);
+	}
+
+	[Fact]
+	public async Task CompressAndDecompress_StreamFactories_SupportNonSeekableUnderlyingStreams()
+	{
+		byte[] content = "factory streams"u8.ToArray();
+		await using CapabilityStream compressedStorage = new([], canRead: true, canWrite: true, canSeek: false);
+
+		await using (Stream compressor = compressedStorage.Compress(ECompressionType.Brotli, leaveOpen: true))
+		{
+			compressor.Write(content);
+		}
+
+		byte[] compressed = compressedStorage.ToArray();
+		await using CapabilityStream compressedSource = new(compressed, canRead: true, canWrite: false, canSeek: false);
+		await using Stream decompressor = compressedSource.Decompress(ECompressionType.Brotli, leaveOpen: true);
+		await using MemoryStream result = new();
+		await decompressor.CopyToAsync(result, Current.CancellationToken);
+
+		result.ToArray().ShouldBe(content);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public async Task DecompressByteArray_CanceledToken_StopsBeforeReturningData(bool asynchronous)
+	{
+		byte[] compressed = "cancel this operation"u8.ToArray().Compress(ECompressionType.Gzip);
+		using CancellationTokenSource cancellation = new();
+		cancellation.Cancel();
+
+		if (asynchronous)
+		{
+			await Should.ThrowAsync<OperationCanceledException>(
+				() => compressed.DecompressAsync(ECompressionType.Gzip, cancellationToken: cancellation.Token));
+		}
+		else
+		{
+			Should.Throw<OperationCanceledException>(
+				() => compressed.Decompress(ECompressionType.Gzip, cancellationToken: cancellation.Token));
+		}
+	}
+
+	[Fact]
+	public async Task CompressByteArrayAsync_CanceledToken_DoesNotReturnCompressedData()
+	{
+		using CancellationTokenSource cancellation = new();
+		cancellation.Cancel();
+
+		await Should.ThrowAsync<OperationCanceledException>(
+			() => "cancel before compressing"u8.ToArray().CompressAsync(ECompressionType.Gzip, cancellationToken: cancellation.Token));
+	}
+
+	[Fact]
+	public async Task CopyWithLimitAsync_CanceledToken_DoesNotWriteData()
+	{
+		await using MemoryStream source = new("cancel before copy"u8.ToArray());
+		await using MemoryStream destination = new();
+		using CancellationTokenSource cancellation = new();
+		cancellation.Cancel();
+
+		await Should.ThrowAsync<OperationCanceledException>(
+			() => source.CopyWithLimitAsync(destination, long.MaxValue, cancellation.Token));
+
+		destination.Length.ShouldBe(0);
+	}
+
+	[Theory]
+	[InlineData(0)]
+	[InlineData(1)]
+	[InlineData(3)]
+	public void AnalyzeHeader_InsufficientLength_RejectsPartialMagicNumber(int bytesRead)
+	{
+		AnalyzeHeader([0xCE, 0xB2, 0xCF, 0x81], bytesRead).ShouldBe(ECompressionType.None);
+	}
+
+	[Theory]
+	[InlineData(0x01)]
+	[InlineData(0x9C)]
+	[InlineData(0xDA)]
+	public void IsZLibCompressed_Stream_RecognizesEachSupportedSecondHeaderByte(byte secondByte)
+	{
+		using MemoryStream stream = new([0x78, secondByte, 0]);
+
+		stream.IsZLibCompressed().ShouldBeTrue();
+		stream.Position.ShouldBe(0);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void ConcatenatedStream_ReadSpan_UsesSecondStreamOnlyWhenNeeded(bool firstStreamFillsRequest)
+	{
+		byte[] first = [1, 2, 3, 4, 5];
+		byte[] second = [6, 7, 8, 9, 10];
+		using ConcatenatedStream stream = new(new MemoryStream(first), new MemoryStream(second));
+		Span<byte> buffer = stackalloc byte[firstStreamFillsRequest ? first.Length : 10];
+
+		int bytesRead = stream.Read(buffer);
+
+		bytesRead.ShouldBe(buffer.Length);
+		buffer.ToArray().ShouldBe(firstStreamFillsRequest ? first : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public void ConcatenatedStream_ReadArray_UsesSecondStreamOnlyWhenNeeded(bool firstStreamFillsRequest)
+	{
+		byte[] first = [1, 2, 3, 4, 5];
+		byte[] second = [6, 7, 8, 9, 10];
+		using ConcatenatedStream stream = new(new MemoryStream(first), new MemoryStream(second));
+		byte[] buffer = new byte[firstStreamFillsRequest ? first.Length : 10];
+
+		int bytesRead = stream.Read(buffer, 0, buffer.Length);
+
+		bytesRead.ShouldBe(buffer.Length);
+		buffer.ShouldBe(firstStreamFillsRequest ? first : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public async Task ConcatenatedStream_ByteArrayReadAsync_UsesSecondStreamOnlyWhenNeeded(bool firstStreamFillsRequest)
+	{
+		byte[] first = [1, 2, 3, 4, 5];
+		byte[] second = [6, 7, 8, 9, 10];
+		await using ConcatenatedStream stream = new(new MemoryStream(first), new MemoryStream(second));
+		byte[] buffer = new byte[firstStreamFillsRequest ? first.Length : 10];
+
+		int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, Current.CancellationToken);
+
+		bytesRead.ShouldBe(buffer.Length);
+		buffer.ShouldBe(firstStreamFillsRequest ? first : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+	}
+
+	[Theory]
+	[InlineData(false)]
+	[InlineData(true)]
+	public async Task ConcatenatedStream_MemoryReadAsync_UsesSecondStreamOnlyWhenNeeded(bool firstStreamFillsRequest)
+	{
+		byte[] first = [1, 2, 3, 4, 5];
+		byte[] second = [6, 7, 8, 9, 10];
+		await using ConcatenatedStream stream = new(new MemoryStream(first), new MemoryStream(second));
+		byte[] buffer = new byte[firstStreamFillsRequest ? first.Length : 10];
+
+		int bytesRead = await stream.ReadAsync(buffer.AsMemory(), Current.CancellationToken);
+
+		bytesRead.ShouldBe(buffer.Length);
+		buffer.ShouldBe(firstStreamFillsRequest ? first : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+	}
+
 }

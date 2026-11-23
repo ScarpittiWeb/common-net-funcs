@@ -1,5 +1,7 @@
-﻿using System.Text.RegularExpressions;
+﻿using CommonNetFuncs.Word.OpenXml;
+using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
+using System.Text.RegularExpressions;
 using xRetry.v3;
 
 namespace Word.OpenXml.Tests;
@@ -115,6 +117,28 @@ public sealed class ChangeUrlTests : IDisposable
 		hyperlinks.ShouldContain(h => h.Uri.ToString().Contains("github.com"));
 	}
 
+	[RetryFact(3)]
+	public void ChangeUrlsInWordDoc_Dictionary_KeysDifferingOnlyByCase_FirstAddedKeyWins()
+	{
+		// Arrange
+		Dictionary<string, string> urlsToUpdate = new()
+			{
+				{ "http://TestUrl/1", "http://NewUrl/First" },
+				{ "HTTP://TESTURL/1", "http://NewUrl/Second" }
+			};
+
+		// Act
+		bool result = CommonNetFuncs.Word.OpenXml.ChangeUrls.ChangeUrlsInWordDoc(tempFileStream!, urlsToUpdate);
+		tempFileStream!.Position = 0;
+
+		// Assert
+		result.ShouldBeTrue();
+		List<HyperlinkRelationship> hyperlinks = GetHyperlinks(tempFileStream);
+		hyperlinks.ShouldNotContain(h => h.Uri.ToString().Equals("http://TestUrl/1", StringComparison.InvariantCultureIgnoreCase));
+		hyperlinks.ShouldContain(h => h.Uri.ToString().Equals("http://NewUrl/First", StringComparison.InvariantCultureIgnoreCase));
+		hyperlinks.ShouldNotContain(h => h.Uri.ToString().Equals("http://NewUrl/Second", StringComparison.InvariantCultureIgnoreCase));
+	}
+
 	[RetryTheory(3)]
 	[InlineData(@"(TestUrl/)(\d+)", "NewUrl/$2", true)]
 	[InlineData("TestUrl/1", "NewUrl/First", false)]
@@ -211,4 +235,123 @@ public sealed class ChangeUrlTests : IDisposable
 		// Assert
 		result.ShouldBeFalse();
 	}
+}
+
+public sealed class WordHyperlinkBehaviorTests
+{
+	private static readonly string TestDocument = Path.Combine(AppContext.BaseDirectory, "TestData", "TestDocument.docx");
+
+
+
+
+
+
+
+	private static MemoryStream CopyTestDocument()
+	{
+		MemoryStream stream = new(File.ReadAllBytes(TestDocument));
+		stream.Position = 0;
+		return stream;
+	}
+
+	private static MemoryStream CreatePackageWithoutMainPart()
+	{
+		MemoryStream stream = new();
+		using (WordprocessingDocument.Create(stream, WordprocessingDocumentType.Document))
+		{
+		}
+		stream.Position = 0;
+		return stream;
+	}
+
+	private static string[] ReadHyperlinks(Stream stream)
+	{
+		using WordprocessingDocument document = WordprocessingDocument.Open(stream, false);
+		return document.MainDocumentPart!.HyperlinkRelationships.Select(x => x.Uri.ToString()).ToArray();
+	}
+
+	[Fact]
+	public void ChangeUrlsInWordDoc_DictionaryWithNoLinksOrMainPart_ReturnsFalse()
+	{
+		using MemoryStream stream = CreatePackageWithoutMainPart();
+
+		bool result = ChangeUrls.ChangeUrlsInWordDoc(stream, new Dictionary<string, string>
+		{
+			["http://TestUrl/1"] = "http://NewUrl/1"
+		});
+
+		result.ShouldBeFalse();
+	}
+
+	[Fact]
+	public void ChangeUrlsInWordDoc_NullDictionary_IsHandledForDocumentWithHyperlinks()
+	{
+		using MemoryStream stream = CopyTestDocument();
+
+		bool result = ChangeUrls.ChangeUrlsInWordDoc(stream, null!);
+
+		result.ShouldBeFalse();
+	}
+
+	[Fact]
+	public void ChangeUrlsInWordDoc_InvalidReplacementUri_ReturnsFalse()
+	{
+		using MemoryStream stream = CopyTestDocument();
+
+		bool result = ChangeUrls.ChangeUrlsInWordDoc(stream, new Dictionary<string, string>
+		{
+			["http://TestUrl/1"] = "not a valid uri\0"
+		});
+
+		result.ShouldBeFalse();
+	}
+
+	[Fact]
+	public void ChangeUrlsInWordDocRegex_DictionaryReplaceFirst_LeavesLaterMatches()
+	{
+		using MemoryStream stream = CopyTestDocument();
+		Dictionary<string, string> replacements = new()
+		{
+			["TestUrl/1"] = "FirstReplacement"
+		};
+
+		bool result = ChangeUrls.ChangeUrlsInWordDocRegex(stream, replacements, replaceAll: false);
+		stream.Position = 0;
+		string[] uris = ReadHyperlinks(stream);
+
+		result.ShouldBeTrue();
+		uris.ShouldContain(x => x.Contains("FirstReplacement", StringComparison.OrdinalIgnoreCase));
+		uris.Count(x => x.Contains("TestUrl/1", StringComparison.OrdinalIgnoreCase)).ShouldBe(1);
+		uris.ShouldContain(x => x.Contains("TestUrl/2", StringComparison.OrdinalIgnoreCase));
+		uris.ShouldContain(x => x.Contains("TestUrl/3", StringComparison.OrdinalIgnoreCase));
+	}
+
+	[Fact]
+	public void ChangeUrlsInWordDocRegex_DictionaryInvalidPattern_ReturnsFalse()
+	{
+		using MemoryStream stream = CopyTestDocument();
+
+		bool result = ChangeUrls.ChangeUrlsInWordDocRegex(stream, new Dictionary<string, string>
+		{
+			["["] = "replacement"
+		});
+
+		result.ShouldBeFalse();
+	}
+
+	[Fact]
+	public void ChangeUrlsInWordDocRegex_DocumentWithoutMainPart_ReturnsFalse()
+	{
+		using MemoryStream stream = CreatePackageWithoutMainPart();
+
+		bool result = ChangeUrls.ChangeUrlsInWordDocRegex(
+			stream,
+			"TestUrl",
+			"NewUrl",
+			regexOptions: RegexOptions.None,
+			regexTimeout: TimeSpan.FromSeconds(1));
+
+		result.ShouldBeFalse();
+	}
+
 }

@@ -1,7 +1,7 @@
-﻿using System.Text.Json;
-using MessagePack;
+﻿using MessagePack;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace CommonNetFuncs.Web.Requests.MessagePack;
 
@@ -26,15 +26,15 @@ public static class MessagePackStreamingExtensions
 	/// <param name="successStatusCode">Status code to return when data is present (default: 200 OK)</param>
 	/// <param name="emptyStatusCode">Status code to return when no data is present (default: 204 No Content)</param>
 	/// <returns>MessagePackStreamingResult that can be returned from a controller action</returns>
-#pragma warning disable IDE0060 // Remove unused parameter
 	public static MessagePackStreamingResult<T> StreamMessagePack<T>(
+#pragma warning disable IDE0060 // Remove unused parameter
 		this ControllerBase controller,
+#pragma warning restore IDE0060 // Remove unused parameter
 		IAsyncEnumerable<T> data,
 		MessagePackSerializerOptions? messagePackOptions = null,
 		JsonSerializerOptions? jsonOptions = null,
 		int successStatusCode = StatusCodes.Status200OK,
 		int emptyStatusCode = StatusCodes.Status204NoContent)
-#pragma warning restore IDE0060 // Remove unused parameter
 	{
 		return new MessagePackStreamingResult<T>(data, messagePackOptions, jsonOptions, successStatusCode, emptyStatusCode);
 	}

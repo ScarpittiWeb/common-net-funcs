@@ -1,10 +1,17 @@
-﻿using System.Buffers;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
+﻿using CommonNetFuncs.Web.Requests;
 using CommonNetFuncs.Web.Requests.MessagePack;
 using MessagePack;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Formatters;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json.Linq;
+using System.Buffers;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using static Xunit.TestContext;
 
 namespace Web.Requests.Tests;
@@ -834,4 +841,180 @@ public static class AsyncEnumerableExtensions
 			yield return item;
 		}
 	}
+}
+
+public sealed class MessagePackStreamingResultBehaviorTests
+{
+	private static readonly FieldInfo JValueTypeField = typeof(JValue).GetField("_valueType", BindingFlags.Instance | BindingFlags.NonPublic)!;
+	private static readonly FieldInfo JValueValueField = typeof(JValue).GetField("_value", BindingFlags.Instance | BindingFlags.NonPublic)!;
+	private static readonly MethodInfo FillPatchForObjectMethod = typeof(PatchCreator).GetMethod("FillPatchForObject", BindingFlags.Static | BindingFlags.NonPublic)!;
+
+
+
+
+
+
+
+
+	private static ServiceProvider CreateServices(MessagePackSerializerOptions options, bool addSupportedFormatter)
+	{
+		ServiceCollection services = new();
+		MvcOptions mvcOptions = new();
+		mvcOptions.OutputFormatters.Add(addSupportedFormatter
+			? new FormatterWithOptions(options)
+			: new FormatterWithOptions(options, supportsMessagePack: false));
+		services.AddSingleton<IOptions<MvcOptions>>(Options.Create(mvcOptions));
+		return services.BuildServiceProvider();
+	}
+
+	private static DefaultHttpContext CreateContext(string accept)
+	{
+		DefaultHttpContext context = new();
+		context.Response.Body = new MemoryStream();
+		context.Request.Headers.Accept = accept;
+		context.Features.Set<IServiceProvidersFeature>(new RequestServicesFeature());
+		return context;
+	}
+
+	private static JValue CreateArtificialDateValue(object value)
+	{
+		JValue result = new("seed");
+		JValueTypeField.SetValue(result, JTokenType.Date);
+		JValueValueField.SetValue(result, value);
+		return result;
+	}
+
+	private static async IAsyncEnumerable<StreamingModel> AsyncItems(params StreamingModel[] items)
+	{
+		foreach (StreamingModel item in items)
+		{
+			await Task.Yield();
+			yield return item;
+		}
+	}
+
+	[MessagePackObject(AllowPrivate = true)]
+	internal sealed class StreamingModel
+	{
+		[Key(0)]
+		public int Id { get; set; }
+
+		[Key(1)]
+		public string Name { get; set; } = string.Empty;
+	}
+
+	private sealed class FormatterWithOptions : OutputFormatter
+	{
+		private readonly MessagePackSerializerOptions options;
+
+		public FormatterWithOptions(MessagePackSerializerOptions options, bool supportsMessagePack = true)
+		{
+			this.options = options;
+			SupportedMediaTypes.Add(supportsMessagePack ? "application/x-msgpack" : "application/xml");
+		}
+
+		public override Task WriteResponseBodyAsync(OutputFormatterWriteContext context) => Task.CompletedTask;
+	}
+
+	private sealed class FormatterWithoutOptions : OutputFormatter
+	{
+		public FormatterWithoutOptions()
+		{
+			SupportedMediaTypes.Add("application/x-msgpack");
+		}
+
+		public override Task WriteResponseBodyAsync(OutputFormatterWriteContext context) => Task.CompletedTask;
+	}
+
+	private sealed class RequestServicesFeature : IServiceProvidersFeature
+	{
+		public IServiceProvider RequestServices { get; set; } = null!;
+	}
+
+	private sealed class ConvertibleDateValue(DateTime value) : IConvertible
+	{
+		public TypeCode GetTypeCode() => TypeCode.Object;
+		public bool ToBoolean(IFormatProvider? provider) => Convert.ToBoolean(value, provider);
+		public byte ToByte(IFormatProvider? provider) => Convert.ToByte(value, provider);
+		public char ToChar(IFormatProvider? provider) => Convert.ToChar(value, provider);
+		public DateTime ToDateTime(IFormatProvider? provider) => value;
+		public decimal ToDecimal(IFormatProvider? provider) => Convert.ToDecimal(value, provider);
+		public double ToDouble(IFormatProvider? provider) => Convert.ToDouble(value, provider);
+		public short ToInt16(IFormatProvider? provider) => Convert.ToInt16(value, provider);
+		public int ToInt32(IFormatProvider? provider) => Convert.ToInt32(value, provider);
+		public long ToInt64(IFormatProvider? provider) => Convert.ToInt64(value, provider);
+		public sbyte ToSByte(IFormatProvider? provider) => Convert.ToSByte(value, provider);
+		public float ToSingle(IFormatProvider? provider) => Convert.ToSingle(value, provider);
+		public string ToString(IFormatProvider? provider) => value.ToString(provider);
+		public object ToType(Type conversionType, IFormatProvider? provider) => Convert.ChangeType(value, conversionType, provider);
+		public ushort ToUInt16(IFormatProvider? provider) => Convert.ToUInt16(value, provider);
+		public uint ToUInt32(IFormatProvider? provider) => Convert.ToUInt32(value, provider);
+		public ulong ToUInt64(IFormatProvider? provider) => Convert.ToUInt64(value, provider);
+	}
+
+	[Fact]
+	public async Task MessagePackStreamingResult_UsesMvcFormatterOptions_ForExactPayload()
+	{
+		StreamingModel expected = new() { Id = 7, Name = "configured" };
+		MessagePackSerializerOptions formatterOptions = MessagePackSerializerOptions.Standard
+			.WithCompression(MessagePackCompression.Lz4Block);
+		DefaultHttpContext context = CreateContext("application/x-msgpack");
+		context.RequestServices = CreateServices(formatterOptions, addSupportedFormatter: true);
+		MessagePackStreamingResult<StreamingModel> result = new(AsyncItems(expected));
+
+		await result.ExecuteAsync(context);
+
+		context.Response.StatusCode.ShouldBe(StatusCodes.Status200OK);
+		context.Response.ContentType.ShouldBe("application/x-msgpack");
+		byte[] payload = ((MemoryStream)context.Response.Body).ToArray();
+		payload.ShouldBe(MessagePackSerializer.Serialize(expected, formatterOptions, Current.CancellationToken));
+		MessagePackSerializer.Deserialize<StreamingModel>(payload, formatterOptions, Current.CancellationToken).ShouldBeEquivalentTo(expected);
+	}
+
+	[Fact]
+	public async Task MessagePackStreamingResult_FallsBackToStandardOptions_WhenMvcOptionsAreAbsent()
+	{
+		StreamingModel expected = new() { Id = 3, Name = "standard" };
+		DefaultHttpContext context = CreateContext("application/x-msgpack");
+		context.RequestServices = new ServiceCollection().BuildServiceProvider();
+		MessagePackStreamingResult<StreamingModel> result = new(AsyncItems(expected));
+
+		await result.ExecuteAsync(context);
+
+		((MemoryStream)context.Response.Body).ToArray()
+			.ShouldBe(MessagePackSerializer.Serialize(expected, MessagePackSerializerOptions.Standard, Current.CancellationToken));
+	}
+
+	[Fact]
+	public async Task MessagePackStreamingResult_FallsBackToStandardOptions_WhenFormatterIsUnsupported()
+	{
+		StreamingModel expected = new() { Id = 4, Name = "unsupported-formatter" };
+		DefaultHttpContext context = CreateContext("application/msgpack");
+		context.RequestServices = CreateServices(MessagePackSerializerOptions.Standard, addSupportedFormatter: false);
+		MessagePackStreamingResult<StreamingModel> result = new(AsyncItems(expected));
+
+		await result.ExecuteAsync(context);
+
+		((MemoryStream)context.Response.Body).ToArray()
+			.ShouldBe(MessagePackSerializer.Serialize(expected, MessagePackSerializerOptions.Standard, Current.CancellationToken));
+	}
+
+	[Fact]
+	public async Task MessagePackStreamingResult_FallsBackToStandardOptions_WhenFormatterHasNoOptionsField()
+	{
+		StreamingModel expected = new() { Id = 5, Name = "no-options-field" };
+		DefaultHttpContext context = CreateContext("application/x-msgpack");
+		ServiceCollection services = new();
+		MvcOptions mvcOptions = new();
+		mvcOptions.OutputFormatters.Add(new FormatterWithoutOptions());
+		services.AddSingleton<IOptions<MvcOptions>>(Options.Create(mvcOptions));
+		context.RequestServices = services.BuildServiceProvider();
+		MessagePackStreamingResult<StreamingModel> result = new(AsyncItems(expected));
+
+		await result.ExecuteAsync(context);
+
+		((MemoryStream)context.Response.Body).ToArray()
+			.ShouldBe(MessagePackSerializer.Serialize(expected, MessagePackSerializerOptions.Standard, Current.CancellationToken));
+	}
+
 }

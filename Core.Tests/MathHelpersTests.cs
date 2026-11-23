@@ -1,5 +1,7 @@
-﻿using System.Globalization;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
+using System.ComponentModel.DataAnnotations;
+using System.Data;
+using System.Globalization;
 using static CommonNetFuncs.Core.MathHelpers;
 
 namespace Core.Tests;
@@ -86,7 +88,7 @@ public sealed class MathHelpersTests
 	[InlineData(0.0, 0)]
 	public void GetPrecision_Decimal_Works(double? value, int expected)
 	{
-		int precision = ((decimal?)value).GetPrecision();
+		int precision = value.ToShortestDecimal().GetPrecision();
 		precision.ShouldBe(expected);
 	}
 
@@ -107,7 +109,7 @@ public sealed class MathHelpersTests
 		Should.Throw<ArgumentException>(() => GenerateRange(5, 1));
 	}
 
-	// On net10.0+ these resolve to the same generic GenerateRange<TNumber>, but on netstandard2.1 they resolve to the separate long/float/double/decimal overloads, which otherwise go untested.
+	// On net11.0 these resolve to the same generic GenerateRange<TNumber>, but on netstandard2.1 they resolve to the separate long/float/double/decimal overloads, which otherwise go untested.
 	[Theory]
 	[InlineData(1L, 5L, new long[] { 1, 2, 3, 4, 5 })]
 	[InlineData(-2L, 2L, new long[] { -2, -1, 0, 1, 2 })]
@@ -217,14 +219,14 @@ public sealed class MathHelpersTests
 	[InlineData(123456.6, 9123456.6, 1.8, 68587, 5068587)]  // large numbers with decimals
 	public void GreatestCommonDenominatorDecimal_Works(double initialNum, double initialDen, double expectedGcd, double expectedNum, double expectedDen)
 	{
-		decimal numerator = (decimal)initialNum;
-		decimal denominator = (decimal)initialDen;
+		decimal numerator = initialNum.ToShortestDecimal();
+		decimal denominator = initialDen.ToShortestDecimal();
 
 		GreatestCommonDenominator(ref numerator, ref denominator, out decimal gcd);
 
-		gcd.ShouldBe((decimal)expectedGcd);
-		numerator.ShouldBe((decimal)expectedNum);
-		denominator.ShouldBe((decimal)expectedDen);
+		gcd.ShouldBe(expectedGcd.ToShortestDecimal());
+		numerator.ShouldBe(expectedNum.ToShortestDecimal());
+		denominator.ShouldBe(expectedDen.ToShortestDecimal());
 	}
 #endif
 
@@ -265,7 +267,7 @@ public sealed class MathHelpersTests
 	[InlineData(0.0, 0)]
 	public void GetPrecision_NonNullable_Decimal_Works(double value, int expected)
 	{
-		decimal decimalValue = (decimal)value;
+		decimal decimalValue = value.ToShortestDecimal();
 		int precision = decimalValue.GetPrecision();
 		precision.ShouldBe(expected);
 	}
@@ -428,7 +430,7 @@ public sealed class MathHelpersTests
 		numbers.GetMedian().ShouldBe(expected);
 	}
 
-	// On net10.0+ these resolve to the same generic GetMedian<TNumber>, but on netstandard2.1 they resolve to the separate long/float overloads, which otherwise go untested.
+	// On net11.0 these resolve to the same generic GetMedian<TNumber>, but on netstandard2.1 they resolve to the separate long/float overloads, which otherwise go untested.
 	[Theory]
 	[InlineData(new long[] { 1, 2, 3 }, 2L)]                // sorted odd count
 	[InlineData(new long[] { 3, 1, 2 }, 2L)]                // unsorted odd count
@@ -590,4 +592,156 @@ public sealed class MathHelpersTests
 		IEnumerable<int> numbers = [3, 1, 2];
 		numbers.GetMedian().ShouldBe(2);
 	}
+}
+
+public sealed class MathHelpersBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static DataTable CreateOneRowTable()
+	{
+		DataTable table = new();
+		table.Columns.Add("Value", typeof(int));
+		table.Rows.Add(9);
+		return table;
+	}
+
+	[GapNullTypeId]
+	private sealed class GapNullTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNullTypeIdAttribute : Attribute
+	{
+		public override object TypeId => null!;
+	}
+
+	[GapNamelessTypeId]
+	private sealed class GapNamelessTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNamelessTypeIdAttribute : Attribute
+	{
+		public override object TypeId { get; } = new object();
+	}
+
+	private sealed class GapNestedEquality
+	{
+		public GapNestedValue? Child { get; set; }
+	}
+
+	private sealed class GapNestedValue
+	{
+		public int Value { get; set; }
+	}
+
+	private sealed class GapHashHolder
+	{
+		public List<GapNestedValue?> Values { get; set; } = [];
+	}
+
+	private sealed class GapNonSeekableReadStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public bool AllowRead { get; set; } = true;
+
+		public override bool CanRead => AllowRead;
+
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonWritableTargetStream : MemoryStream
+	{
+		public override bool CanWrite => false;
+	}
+
+	private sealed class GapUnseekableSourceStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonSeekableWriteStream : MemoryStream
+	{
+		public override bool CanSeek => false;
+
+		public byte[] Data => ToArray();
+	}
+
+	private sealed class GapValidated
+	{
+		[Required]
+		public string? Required { get; set; }
+
+		[Range(1, 10)]
+		public int Count { get; set; }
+
+		public string? Optional { get; set; }
+	}
+
+	[Fact]
+	public void GetPrecision_NullAndIntegralValuesReturnZero()
+	{
+		((double?)null).GetPrecision().ShouldBe(0);
+		1d.GetPrecision().ShouldBe(0);
+		((double?)1.25d).GetPrecision(",").ShouldBe(0);
+	}
+
+	[Fact]
+	public void GetMedian_GenericOverloadRejectsNullAndEmpty()
+	{
+#if CORE_NATIVE_BUILD
+		Should.Throw<ArgumentException>(() => ((IEnumerable<short>?)null).GetMedian());
+		Should.Throw<ArgumentException>(() => Array.Empty<short>().GetMedian());
+#endif
+	}
+
+	[Fact]
+	public void GreatestCommonDenominator_ZeroInputsLeaveValuesUnscaled()
+	{
+#if CORE_NATIVE_BUILD
+		long numerator = 0;
+		long denominator = 0;
+
+		MathHelpers.GreatestCommonDenominator(ref numerator, ref denominator, out long gcd);
+
+		gcd.ShouldBe(0);
+		numerator.ShouldBe(0);
+		denominator.ShouldBe(0);
+#endif
+	}
+
+	[Fact]
+	public void GenerateRangeAndMedian_GenericOverloadsCoverOddAndEvenLengths()
+	{
+#if CORE_NATIVE_BUILD
+		MathHelpers.GenerateRange<short>(2, 4).ShouldBe(new short[] { 2, 3, 4 });
+		new short[] { 8, 2, 4 }.GetMedian().ShouldBe((short)4);
+		new short[] { 9, 1, 3, 7 }.GetMedian().ShouldBe((short)5);
+		Should.Throw<ArgumentException>(() => MathHelpers.GenerateRange<short>(2, 1));
+#endif
+	}
+
 }

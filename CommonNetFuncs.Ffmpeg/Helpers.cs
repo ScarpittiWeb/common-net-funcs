@@ -3,15 +3,17 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
-using CommonNetFuncs.Ffmpeg.Internal;
 using Xabe.FFmpeg;
 using ZLinq;
 using static CommonNetFuncs.Core.Collections;
 using static CommonNetFuncs.Core.ExceptionLocation;
 using static CommonNetFuncs.Core.Strings;
 using static CommonNetFuncs.Ffmpeg.Constants;
-#if NET7_0_OR_GREATER
+
+#if !NETSTANDARD2_1
+
 using static CommonNetFuncs.Core.UnitConversion;
+
 #endif
 
 namespace CommonNetFuncs.Ffmpeg;

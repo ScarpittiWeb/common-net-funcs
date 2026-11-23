@@ -1,7 +1,7 @@
-﻿using System.Text;
-using System.Text.Json;
-using FakeItEasy;
+﻿using FakeItEasy;
 using Microsoft.Extensions.Caching.Distributed;
+using System.Text;
+using System.Text.Json;
 using static CommonNetFuncs.Web.Requests.DistributedCacheExtensions;
 
 namespace Web.Requests.Tests;
@@ -133,5 +133,24 @@ public class DistributedCacheExtensionsTests
 		// Assert
 
 		result.ShouldBe(default);
+	}
+
+	[Fact]
+	public async Task TryGetValueAsync_WithUtf8BomPrefixedPayload_ReturnsDeserializedValue()
+	{
+		// Arrange
+
+		IDistributedCache cache = A.Fake<IDistributedCache>();
+		const string key = "bom-key";
+		byte[] bytes = [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes(JsonSerializer.Serialize("bom-value", SerializerOptions))];
+		A.CallTo(() => cache.GetAsync(key, default)).Returns(bytes);
+
+		// Act
+
+		string? result = await cache.TryGetValueAsync<string>(key);
+
+		// Assert
+
+		result.ShouldBe("bom-value");
 	}
 }

@@ -1,5 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
-using AutoFixture;
+﻿using AutoFixture;
+using System.ComponentModel.DataAnnotations;
 
 namespace Web.Common.Tests.ValidationAttributes;
 

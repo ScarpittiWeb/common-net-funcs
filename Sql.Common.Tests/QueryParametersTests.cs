@@ -74,6 +74,56 @@ public sealed class QueryParametersTests
 	}
 
 	[Theory]
+	[InlineData("   ", true)]
+	[InlineData(";text", false)]
+	[InlineData("--text", false)]
+	[InlineData("/*", false)]
+	[InlineData("*/", false)]
+	[InlineData("xp_", false)]
+	[InlineData("a xp_cmdshell b", false)]
+	[InlineData("a--b", false)]
+	[InlineData("-", true)]
+	[InlineData("a-b-c", true)]
+	[InlineData("/", true)]
+	[InlineData("*", true)]
+	[InlineData("a/b*c", true)]
+	[InlineData("*a/", true)]
+	[InlineData("x", true)]
+	[InlineData("xp", true)]
+	[InlineData("text-", true)]
+	[InlineData("textx", true)]
+	[InlineData("textxp", true)]
+	[InlineData("x_p", true)]
+	[InlineData("XP_", true)]
+	[InlineData("xP_", true)]
+	public void IsClean_WithTokenBoundaries_ShouldMatchOnlyCompleteTokens(string input, bool expectedResult)
+	{
+		// Act
+		bool result = input.IsClean();
+
+		// Assert
+		result.ShouldBe(expectedResult);
+	}
+
+	[Theory]
+	[InlineData("plain value", "plain value")]
+	[InlineData("*", "")]
+	[InlineData("%", "")]
+	[InlineData("'", "''")]
+	[InlineData("a*b%c'd", "abc''d")]
+	[InlineData("a/b-c", "a/b-c")]
+	[InlineData("x*/", "")]
+	[InlineData("xp_cmdshell", "")]
+	public void SanitizeSqlParameter_WithEdgeStrings_ShouldEscapeOrReject(string input, string expected)
+	{
+		// Act
+		string result = input.SanitizeSqlParameter();
+
+		// Assert
+		result.ShouldBe(expected);
+	}
+
+	[Theory]
 	[InlineData("test'name", false, false, false, null, null, "test''name")]
 	[InlineData("Test%Name*", false, false, false, null, null, "TestName")]
 	[InlineData("test;name", false, false, false, null, null, "")]
@@ -360,4 +410,45 @@ public sealed class QueryParametersTests
 		// Assert - whitespace is considered clean by IsClean, so it passes through
 		result.ShouldBe("   ");
 	}
+}
+
+public sealed class QueryParametersBehaviorTests
+{
+
+	[Theory]
+	[InlineData(true, false, false, "abc123", "abc123")]
+	[InlineData(false, true, false, "abc", "abc")]
+	[InlineData(false, false, true, "123", "123")]
+	[InlineData(false, true, true, "abc", "abc")]
+	[InlineData(false, true, true, "123", "123")]
+	[InlineData(true, false, false, "abc-123", "fallback")]
+	[InlineData(false, true, false, "123", "fallback")]
+	[InlineData(false, false, true, "abc", "fallback")]
+	[InlineData(true, true, true, "abc123", "abc123")]
+	public void SanitizeSqlParameter_WithCharacterModes_ShouldSelectExpectedResult(
+		bool onlyAlphanumeric,
+		bool onlyAlphaChars,
+		bool onlyNumberChars,
+		string input,
+		string expected)
+	{
+		input.SanitizeSqlParameter(onlyAlphanumeric, onlyAlphaChars, onlyNumberChars, defaultValue: "fallback").ShouldBe(expected);
+	}
+
+	[Theory]
+	[InlineData(null, null, null, null, null)]
+	[InlineData("value", 4, null, "fallback", "fallback")]
+	[InlineData("value", 5, 5, "bad", "value")]
+	[InlineData("value", 5, 6, "bad", "bad")]
+	[InlineData("value", null, 5, "bad", "value")]
+	public void SanitizeSqlParameter_WithNullableLengths_ShouldRespectBoundaries(
+		string? input,
+		int? maxLength,
+		int? minLength,
+		string? defaultValue,
+		string? expected)
+	{
+		input.SanitizeSqlParameter(maxLength: maxLength, minLength: minLength, defaultValue: defaultValue).ShouldBe(expected);
+	}
+
 }

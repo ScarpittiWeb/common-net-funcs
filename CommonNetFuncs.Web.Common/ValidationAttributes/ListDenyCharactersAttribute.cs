@@ -1,8 +1,7 @@
-﻿using System.Collections;
+﻿using System.Buffers;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using static CommonNetFuncs.Core.Strings;
-using static CommonNetFuncs.Core.TypeChecks;
 
 namespace CommonNetFuncs.Web.Common.ValidationAttributes;
 
@@ -14,6 +13,9 @@ namespace CommonNetFuncs.Web.Common.ValidationAttributes;
 /// </summary>
 public sealed class ListDenyCharactersAttribute : ValidationAttribute
 {
+	private readonly SearchValues<char> denySearchValues;
+	private readonly Func<IEnumerable<string?>, string, ValidationResult?> validateEnumerable;
+
 	/// <summary>
 	/// Gets the deny characters
 	/// </summary>
@@ -33,6 +35,8 @@ public sealed class ListDenyCharactersAttribute : ValidationAttribute
 		}
 
 		DenyCharacters = denyCharacters;
+		denySearchValues = SearchValues.Create(denyCharacters.AsSpan());
+		validateEnumerable = ValidateEnumerable; // Cached once instead of a new delegate per IsValid call
 		ErrorMessage = "Item at index {0} '{1}' must not contain any of the following characters: '{2}'.";
 	}
 
@@ -50,22 +54,22 @@ public sealed class ListDenyCharactersAttribute : ValidationAttribute
 		}
 
 		DenyCharacters = new string(denyCharacters);
+		denySearchValues = SearchValues.Create(DenyCharacters.AsSpan());
+		validateEnumerable = ValidateEnumerable;
 		ErrorMessage = "Item at index {0} '{1}' must not contain any of the following characters: '{2}'.";
 	}
 
 	protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
 	{
-		return ValidationAttributeHelpers.ValidateStringList(value, validationContext, nameof(ListDenyCharactersAttribute), ValidateEnumerable);
+		return ValidationAttributeHelpers.ValidateStringList(value, validationContext, nameof(ListDenyCharactersAttribute), validateEnumerable);
 	}
 
 	private ValidationResult? ValidateEnumerable(IEnumerable<string?> values, string memberName)
 	{
 		int index = 0;
-		ReadOnlySpan<char> denyCharactersSpan = DenyCharacters.AsSpan();
-
 		foreach (string? item in values)
 		{
-			if (!string.IsNullOrEmpty(item) && item.ContainsAnyCharacter(denyCharactersSpan)) // Null / empty passes automatically
+			if (!string.IsNullOrEmpty(item) && item.AsSpan().ContainsAny(denySearchValues)) // Null / empty passes automatically
 			{
 				return new ValidationResult(
 					string.Format(CultureInfo.CurrentCulture, ErrorMessageString, index, item.UrlEncodeReadable(), DenyCharacters),

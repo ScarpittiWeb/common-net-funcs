@@ -1,9 +1,16 @@
-﻿using System.Diagnostics;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
+using System.Diagnostics;
 using ZLinq;
 
 namespace CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
 
+/// <summary>
+/// Processes queued endpoint tasks in priority order.
+/// </summary>
+/// <remarks>
+/// Disposal is non-blocking. Active and pending tasks receive cancellation, and synchronization
+/// resources are released after the processing loop has stopped.
+/// </remarks>
 public class PrioritizedEndpointQueue : IDisposable
 {
 	private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
@@ -13,7 +20,7 @@ public class PrioritizedEndpointQueue : IDisposable
 	private readonly CancellationTokenSource cancellationTokenSource;
 	private Task? processingTask;
 	private readonly PrioritizedQueueStats stats;
-	private readonly Dictionary<TaskPriority, List<TimeSpan>> processingTimesByPriority = new();
+	private readonly Dictionary<TaskPriority, Queue<TimeSpan>> processingTimesByPriority = new();
 	private readonly Lock statsLock = new();
 	private readonly ManualResetEventSlim newTaskEvent = new(false);
 	private readonly int processTimeWindow;
@@ -37,7 +44,7 @@ public class PrioritizedEndpointQueue : IDisposable
 		foreach (TaskPriority priority in Enum.GetValues<TaskPriority>())
 		{
 			stats.PriorityBreakdown[priority] = new PriorityStats();
-			processingTimesByPriority[priority] = new List<TimeSpan>();
+			processingTimesByPriority[priority] = new Queue<TimeSpan>();
 		}
 
 		// Don't start processing task yet - it will be started lazily on first enqueue
@@ -46,6 +53,8 @@ public class PrioritizedEndpointQueue : IDisposable
 
 	public async Task<T?> EnqueueAsync<T>(Func<CancellationToken, Task<T>> taskFunction, int priority, TaskPriority priorityLevel, CancellationToken cancellationToken = default)
 	{
+		ObjectDisposedException.ThrowIf(isShuttingDown, this);
+
 		// Ensure processing task is started
 
 		EnsureProcessingTaskStarted();
@@ -56,9 +65,11 @@ public class PrioritizedEndpointQueue : IDisposable
 			PriorityLevel = priorityLevel,
 		};
 
-		await queueSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+		using CancellationTokenSource enqueueCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, cancellationTokenSource.Token);
+		await queueSemaphore.WaitAsync(enqueueCts.Token).ConfigureAwait(false);
 		try
 		{
+			ObjectDisposedException.ThrowIf(isShuttingDown, this);
 			priorityQueue.Enqueue(queuedTask, queuedTask);
 
 			lock (statsLock)
@@ -250,6 +261,10 @@ public class PrioritizedEndpointQueue : IDisposable
 
 					currentTask.CompletionSource.TrySetCanceled(currentTask.CancellationTokenSource.Token);
 				}
+				catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+				{
+					currentTask.CompletionSource.TrySetCanceled(cancellationToken);
+				}
 				catch (Exception ex)
 				{
 					stopwatch.Stop();
@@ -322,8 +337,8 @@ public class PrioritizedEndpointQueue : IDisposable
 					LastProcessedAt = kvp.Value.LastProcessedAt
 				};
 
-				List<TimeSpan> processingTimes = processingTimesByPriority[kvp.Key];
-				if (processingTimes.AnyFast())
+				Queue<TimeSpan> processingTimes = processingTimesByPriority[kvp.Key];
+				if (processingTimes.Count > 0)
 				{
 					priorityStats.AverageProcessingTime = TimeSpan.FromMilliseconds(processingTimes.Average(t => t.TotalMilliseconds));
 				}
@@ -335,8 +350,12 @@ public class PrioritizedEndpointQueue : IDisposable
 		}
 	}
 
-	private bool disposed;
+	private int disposed;
+	private Task? disposalTask;
 
+	/// <summary>
+	/// Initiates a non-blocking shutdown and cancels active and pending tasks.
+	/// </summary>
 	public void Dispose()
 	{
 		Dispose(true);
@@ -345,45 +364,73 @@ public class PrioritizedEndpointQueue : IDisposable
 
 	protected virtual void Dispose(bool disposing)
 	{
-		if (!disposed)
+		if (Interlocked.Exchange(ref disposed, 1) != 0)
 		{
-			if (disposing)
+			return;
+		}
+
+		if (disposing)
+		{
+			// Signal shutdown
+
+			isShuttingDown = true;
+
+			// Cancel and wake up the processing task
+
+			try
 			{
-				// Signal shutdown
-
-				isShuttingDown = true;
-
-				// Cancel and wake up the processing task
-
-				try
-				{
-					cancellationTokenSource.Cancel();
-					newTaskEvent.Set();
-				}
-				catch (ObjectDisposedException)
-				{
-					// Already disposed
-				}
-
-				// Wait briefly for processing task to complete
-
-				try
-				{
-					// Must not pass cancellationTokenSource.Token here: it was cancelled above, so Wait would throw immediately.
-					processingTask?.Wait(TimeSpan.FromSeconds(5), CancellationToken.None);
-				}
-				catch (AggregateException)
-				{
-					// Task may have been cancelled or faulted
-				}
-
-				// Dispose of resources
-
-				cancellationTokenSource.Dispose();
-				newTaskEvent.Dispose();
-				queueSemaphore.Dispose();
+				cancellationTokenSource.Cancel();
+				newTaskEvent.Set();
 			}
-			disposed = true;
+			catch (ObjectDisposedException)
+			{
+				// Already disposed.
+			}
+
+			disposalTask = CompleteDisposeAsync();
+		}
+	}
+
+	private async Task CompleteDisposeAsync()
+	{
+		try
+		{
+			await queueSemaphore.WaitAsync().ConfigureAwait(false);
+			try
+			{
+				while (priorityQueue.TryDequeue(out PrioritizedQueuedTask? pendingTask, out _))
+				{
+					pendingTask.CancellationTokenSource.Cancel();
+					pendingTask.CompletionSource.TrySetCanceled();
+					pendingTask.CancellationTokenSource.Dispose();
+				}
+			}
+			finally
+			{
+				queueSemaphore.Release();
+			}
+
+			if (processingTask != null)
+			{
+				try
+				{
+					await processingTask.ConfigureAwait(false);
+				}
+				catch (OperationCanceledException)
+				{
+					// Expected during shutdown.
+				}
+				catch (Exception ex)
+				{
+					logger.Warn(ex, "Error waiting for prioritized endpoint processing task to stop for endpoint {EndpointKey}", EndpointKey);
+				}
+			}
+		}
+		finally
+		{
+			cancellationTokenSource.Dispose();
+			newTaskEvent.Dispose();
+			queueSemaphore.Dispose();
 		}
 	}
 

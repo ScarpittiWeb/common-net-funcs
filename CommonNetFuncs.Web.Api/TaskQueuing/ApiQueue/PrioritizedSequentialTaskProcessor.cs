@@ -1,10 +1,17 @@
-﻿using System.Diagnostics;
-using System.Threading.Channels;
-using CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
+﻿using CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
 using Microsoft.Extensions.Hosting;
+using System.Diagnostics;
+using System.Threading.Channels;
 
 namespace CommonNetFuncs.Web.Api.TaskQueuing.ApiQueue;
 
+/// <summary>
+/// Processes sequential work submitted with an ordering priority.
+/// </summary>
+/// <remarks>
+/// Disposal stops accepting work and is non-blocking. Work already executing is allowed to finish,
+/// while work still waiting to run is canceled.
+/// </remarks>
 public class PrioritizedSequentialTaskProcessor : BackgroundService
 {
 	private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
@@ -15,9 +22,10 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 	private readonly SemaphoreSlim semaphore = new(1, 1);
 	private readonly Lock statsLock = new();
 	private readonly PrioritizedQueueStats stats;
-	private readonly Dictionary<TaskPriority, List<TimeSpan>> processingTimesByPriority = new();
+	private readonly Dictionary<TaskPriority, Queue<TimeSpan>> processingTimesByPriority = new();
 	private readonly int processTimeWindow = 1000;
-	private bool disposed;
+	private volatile bool disposed;
+	private Task? disposalTask;
 
 	public PrioritizedSequentialTaskProcessor(BoundedChannelOptions boundedChannelOptions, int processTimeWindow = 1000)
 	{
@@ -29,7 +37,7 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 		foreach (TaskPriority priority in Enum.GetValues<TaskPriority>())
 		{
 			stats.PriorityBreakdown[priority] = new PriorityStats();
-			processingTimesByPriority[priority] = new List<TimeSpan>();
+			processingTimesByPriority[priority] = new Queue<TimeSpan>();
 		}
 
 		writer = queue.Writer;
@@ -44,7 +52,7 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 		foreach (TaskPriority priority in Enum.GetValues<TaskPriority>())
 		{
 			stats.PriorityBreakdown[priority] = new PriorityStats();
-			processingTimesByPriority[priority] = new List<TimeSpan>();
+			processingTimesByPriority[priority] = new Queue<TimeSpan>();
 		}
 
 		writer = queue.Writer;
@@ -77,7 +85,16 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 
 			if (priorityQueue.TryDequeue(out PrioritizedQueuedTask? highestPriorityTask, out _))
 			{
-				await writer.WriteAsync(highestPriorityTask, cancellationToken).ConfigureAwait(false);
+				try
+				{
+					await writer.WriteAsync(highestPriorityTask, cancellationToken).ConfigureAwait(false);
+				}
+				catch (ChannelClosedException) when (disposed)
+				{
+					highestPriorityTask.CompletionSource.TrySetCanceled();
+					queuedTask.CompletionSource.TrySetCanceled();
+					throw new TaskCanceledException("The task processor is shutting down.");
+				}
 			}
 		}
 		finally
@@ -93,6 +110,12 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 	{
 		await foreach (PrioritizedQueuedTask currentTask in reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
 		{
+			if (disposed)
+			{
+				currentTask.CompletionSource.TrySetCanceled();
+				continue;
+			}
+
 			try
 			{
 				if (currentTask.IsCancelled)
@@ -148,6 +171,9 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 		return Task.FromResult(stats);
 	}
 
+	/// <summary>
+	/// Initiates a non-blocking shutdown. The active task is allowed to complete and pending tasks are canceled.
+	/// </summary>
 	public override void Dispose()
 	{
 		if (disposed)
@@ -159,7 +185,7 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 
 		try
 		{
-			writer.Complete();
+			writer.TryComplete();
 		}
 		catch (Exception ex)
 		{
@@ -168,32 +194,68 @@ public class PrioritizedSequentialTaskProcessor : BackgroundService
 
 		try
 		{
-			// Wait for ExecuteAsync to finish processing
-			StopAsync(CancellationToken.None).Wait(TimeSpan.FromSeconds(10));
+			Task stopTask = StopAsync(CancellationToken.None);
+			CancelPendingTasks();
+			disposalTask = CompleteDisposeAsync(stopTask);
 		}
 		catch (Exception ex)
 		{
 			logger.Warn(ex, "Error stopping background service");
+			CompleteDispose();
 		}
 
+		GC.SuppressFinalize(this);
+	}
+
+	private void CancelPendingTasks()
+	{
+		while (reader.TryRead(out PrioritizedQueuedTask? pendingTask))
+		{
+			pendingTask.CompletionSource.TrySetCanceled();
+			pendingTask.CancellationTokenSource.Cancel();
+			pendingTask.CancellationTokenSource.Dispose();
+		}
+	}
+
+	private async Task CompleteDisposeAsync(Task stopTask)
+	{
 		try
 		{
-			while (reader.Count > 0)
-			{
-				if (!reader.TryRead(out PrioritizedQueuedTask? processingTask))
-				{
-					break;
-				}
-				// Wait for the processing task to complete
-
-				processingTask.CompletionSource.Task.Wait(TimeSpan.FromSeconds(5));
-			}
+			await stopTask.ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{
-			logger.Warn(ex, "Error waiting for processing queued task to complete");
+			logger.Warn(ex, "Error waiting for background service shutdown");
 		}
+		finally
+		{
+			CancelPendingTasks();
+			await CancelPriorityQueueAsync().ConfigureAwait(false);
+			CompleteDispose();
+		}
+	}
+
+	private async Task CancelPriorityQueueAsync()
+	{
+		await semaphore.WaitAsync().ConfigureAwait(false);
+		try
+		{
+			while (priorityQueue.TryDequeue(out PrioritizedQueuedTask? pendingTask, out _))
+			{
+				pendingTask.CompletionSource.TrySetCanceled();
+				pendingTask.CancellationTokenSource.Cancel();
+				pendingTask.CancellationTokenSource.Dispose();
+			}
+		}
+		finally
+		{
+			semaphore.Release();
+		}
+	}
+
+	private void CompleteDispose()
+	{
+		semaphore.Dispose();
 		base.Dispose();
-		GC.SuppressFinalize(this);
 	}
 }

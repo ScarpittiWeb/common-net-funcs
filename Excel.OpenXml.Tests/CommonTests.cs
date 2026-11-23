@@ -8,6 +8,7 @@ using System.Data;
 using System.Reflection;
 using xRetry.v3;
 using static CommonNetFuncs.Excel.OpenXml.Common;
+using Xdr = DocumentFormat.OpenXml.Drawing.Spreadsheet;
 
 namespace Excel.OpenXml.Tests;
 
@@ -252,6 +253,36 @@ public sealed class CommonTests : IDisposable
 	}
 
 	[RetryTheory(3)]
+	[InlineData("a1", 1u, 1u)]
+	[InlineData("ab12", 28u, 12u)]
+	[InlineData("XFD1048576", 16384u, 1048576u)]
+	[InlineData("xfd1048576", 16384u, 1048576u)]
+	[InlineData("$B3", 2u, 3u)] // Regex fallback
+	[InlineData("C4:D5", 3u, 4u)] // Regex fallback takes the first match
+	public void CellReference_ShouldParseFastPathAndFallbackInputs(string reference, uint expectedColumn, uint expectedRow)
+	{
+		// Act
+		CellReference cellRef = new(reference);
+
+		// Assert
+		cellRef.ColumnIndex.ShouldBe(expectedColumn);
+		cellRef.RowIndex.ShouldBe(expectedRow);
+	}
+
+	[RetryTheory(3)]
+	[InlineData("XFE1")] // Column 16385
+	[InlineData("A0")]
+	[InlineData("A1048577")]
+	[InlineData("A12345678")] // More than 7 digits
+	[InlineData("AAAA1")] // More than 3 letters
+	[InlineData("$B$3")]
+	public void CellReference_WithOutOfRangeOrUnparsableReference_ShouldThrow(string reference)
+	{
+		// Act & Assert
+		Should.Throw<ArgumentOutOfRangeException>(() => new CellReference(reference));
+	}
+
+	[RetryTheory(3)]
 	[InlineData(1u, "A")]
 	[InlineData(26u, "Z")]
 	[InlineData(27u, "AA")]
@@ -313,7 +344,7 @@ public sealed class CommonTests : IDisposable
 		else
 		{
 			style2Index.ShouldNotBe(styleIndex);
-			((uint)style2Index).ShouldBeGreaterThan(0u);
+			((uint)style2Index).ShouldBeGreaterThan(1u);
 		}
 	}
 
@@ -2040,6 +2071,38 @@ public sealed class CommonTests : IDisposable
 
 		// Assert
 		result.Rows.Count.ShouldBe(1); // Should stop at empty row 3
+	}
+
+	[RetryFact(3)]
+	public void ReadExcelFileToDataTable_WithMissingCells_ShouldReturnEmptyStringsForMissingCells()
+	{
+		// Arrange
+		using MemoryStream memoryStream = new();
+		using SpreadsheetDocument document = SpreadsheetDocument.Create(memoryStream, SpreadsheetDocumentType.Workbook);
+		document.CreateNewSheet("Test Sheet");
+		Worksheet worksheet = document.GetWorksheetByName("Test Sheet")!;
+		worksheet.InsertCellValue(1, 1, new CellValue("A"), CellValues.String);
+		worksheet.InsertCellValue(2, 1, new CellValue("B"), CellValues.String);
+		worksheet.InsertCellValue(3, 1, new CellValue("C"), CellValues.String);
+		worksheet.InsertCellValue(1, 2, new CellValue("a2"), CellValues.String); // B2 missing
+		worksheet.InsertCellValue(3, 2, new CellValue("c2"), CellValues.String);
+		worksheet.InsertCellValue(2, 3, new CellValue("b3"), CellValues.String); // A3 and C3 missing
+		document.Save();
+		memoryStream.Flush();
+		memoryStream.Position = 0;
+
+		// Act
+		DataTable result = memoryStream.ReadExcelFileToDataTable(true);
+
+		// Assert
+		result.Columns.Count.ShouldBe(3);
+		result.Rows.Count.ShouldBe(2);
+		result.Rows[0]["A"].ShouldBe("a2");
+		result.Rows[0]["B"].ShouldBe(string.Empty);
+		result.Rows[0]["C"].ShouldBe("c2");
+		result.Rows[1]["A"].ShouldBe(string.Empty);
+		result.Rows[1]["B"].ShouldBe("b3");
+		result.Rows[1]["C"].ShouldBe(string.Empty);
 	}
 
 	[RetryFact(3)]
@@ -3833,6 +3896,65 @@ public sealed class CommonTests : IDisposable
 		dataTable.Rows[0]["Age"].ShouldBe("30");
 		dataTable.Rows[1]["Name"].ShouldBe("Jane");
 		dataTable.Rows[1]["City"].ShouldBe("Seattle");
+	}
+
+	[RetryFact(3)]
+	public void ReadExcelTableToDataTable_WithMissingCellsAndRows_ShouldReturnEmptyStrings()
+	{
+		// Arrange
+		using MemoryStream memoryStream = new();
+		using (SpreadsheetDocument document = SpreadsheetDocument.Create(memoryStream, SpreadsheetDocumentType.Workbook))
+		{
+			uint sheetId = document.CreateNewSheet("Sheet1");
+			Worksheet worksheet = document.GetWorksheetById(sheetId)!;
+
+			worksheet.InsertCellValue(1, 1, new CellValue("Name"), CellValues.String);
+			worksheet.InsertCellValue(2, 1, new CellValue("Age"), CellValues.String);
+			worksheet.InsertCellValue(3, 1, new CellValue("City"), CellValues.String);
+
+			// Row 2 is missing B2, row 3 is missing entirely
+			worksheet.InsertCellValue(1, 2, new CellValue("John"), CellValues.String);
+			worksheet.InsertCellValue(3, 2, new CellValue("Boston"), CellValues.String);
+
+			worksheet.InsertCellValue(1, 4, new CellValue("Jane"), CellValues.String);
+			worksheet.InsertCellValue(2, 4, new CellValue("25"), CellValues.String);
+			worksheet.InsertCellValue(3, 4, new CellValue("Seattle"), CellValues.String);
+
+			Sheet? sheet = document.GetSheetByName("Sheet1");
+			WorksheetPart worksheetPart = (WorksheetPart)document.WorkbookPart!.GetPartById(sheet!.Id!);
+			TableDefinitionPart tableDefinitionPart = worksheetPart.AddNewPart<TableDefinitionPart>();
+			Table table = new() { Id = 1, Name = "SparseTable", DisplayName = "SparseTable", Reference = "A1:C4", TotalsRowShown = false };
+			TableColumns tableColumns = new() { Count = 3 };
+			tableColumns.AppendChild(new TableColumn { Id = 1, Name = "Name" });
+			tableColumns.AppendChild(new TableColumn { Id = 2, Name = "Age" });
+			tableColumns.AppendChild(new TableColumn { Id = 3, Name = "City" });
+			table.AppendChild(tableColumns);
+			table.AppendChild(new AutoFilter { Reference = "A1:C4" });
+			tableDefinitionPart.Table = table;
+
+			TableParts tableParts = new() { Count = 1 };
+			tableParts.AppendChild(new TablePart { Id = worksheetPart.GetIdOfPart(tableDefinitionPart) });
+			worksheet.AppendChild(tableParts);
+			document.Save();
+		}
+
+		memoryStream.Position = 0;
+
+		// Act
+		DataTable dataTable = memoryStream.ReadExcelTableToDataTable("SparseTable");
+
+		// Assert
+		dataTable.Columns.Count.ShouldBe(3);
+		dataTable.Rows.Count.ShouldBe(3);
+		dataTable.Rows[0]["Name"].ShouldBe("John");
+		dataTable.Rows[0]["Age"].ShouldBe(string.Empty);
+		dataTable.Rows[0]["City"].ShouldBe("Boston");
+		dataTable.Rows[1]["Name"].ShouldBe(string.Empty);
+		dataTable.Rows[1]["Age"].ShouldBe(string.Empty);
+		dataTable.Rows[1]["City"].ShouldBe(string.Empty);
+		dataTable.Rows[2]["Name"].ShouldBe("Jane");
+		dataTable.Rows[2]["Age"].ShouldBe("25");
+		dataTable.Rows[2]["City"].ShouldBe("Seattle");
 	}
 
 	[RetryFact(3)]
@@ -6832,4 +6954,277 @@ public sealed class CommonTests : IDisposable
 		// CalculateWidth("Hello") == CalculateWidth("Hello", null)
 		width.ShouldBe(CalculateWidth("Hello"));
 	}
+}
+
+public sealed class OpenXmlCommonBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static SpreadsheetDocument CreateDocument(MemoryStream stream, out WorksheetPart worksheetPart)
+	{
+		SpreadsheetDocument document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook);
+		uint sheetId = document.CreateNewSheet("Data");
+		worksheetPart = document.WorkbookPart!.GetPartById(
+			document.WorkbookPart.Workbook!.Descendants<Sheet>().Single(x => x.SheetId!.Value == sheetId).Id!) as WorksheetPart
+			?? throw new InvalidOperationException();
+		return document;
+	}
+
+	private static MemoryStream BuildOrphanedTableWorkbook()
+	{
+		MemoryStream result = new();
+		using SpreadsheetDocument document = SpreadsheetDocument.Create(result, SpreadsheetDocumentType.Workbook);
+		WorkbookPart workbookPart = document.AddWorkbookPart();
+		workbookPart.Workbook = new Workbook(new Sheets());
+		WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
+		worksheetPart.Worksheet = new Worksheet(new SheetData());
+		TableDefinitionPart tablePart = worksheetPart.AddNewPart<TableDefinitionPart>();
+		tablePart.Table = new Table
+		{
+			Id = 1,
+			Name = "Orphan",
+			DisplayName = "Orphan",
+			Reference = "A1:A1",
+			TableColumns = new TableColumns(new TableColumn { Id = 1, Name = "Value" }) { Count = 1 }
+		};
+		document.Save();
+		result.Position = 0;
+		return result;
+	}
+
+	private static MemoryStream BuildLookupDefectWorkbook(string defect)
+	{
+		MemoryStream result = new();
+		using SpreadsheetDocument document = SpreadsheetDocument.Create(result, SpreadsheetDocumentType.Workbook);
+		WorkbookPart workbookPart = document.AddWorkbookPart();
+		workbookPart.Workbook = new Workbook();
+		WorksheetPart worksheetPart = workbookPart.AddNewPart<WorksheetPart>();
+		Row row = new();
+		if (defect != "NoRowIndex")
+		{
+			row.RowIndex = 1;
+		}
+		Cell cell = new();
+		cell.CellReference = defect switch
+		{
+			"NoCellReference" => null,
+			"MalformedCellReference" => "INVALID",
+			_ => "A1"
+		};
+		cell.CellValue = new CellValue("Header");
+		row.AppendChild(cell);
+		worksheetPart.Worksheet = new Worksheet(new SheetData(row));
+		TableDefinitionPart tablePart = worksheetPart.AddNewPart<TableDefinitionPart>();
+		tablePart.Table = new Table
+		{
+			Id = 1,
+			Name = "Lookup",
+			DisplayName = "Lookup",
+			Reference = "A1:A1",
+			TableColumns = new TableColumns(new TableColumn { Id = 1, Name = "Header" }) { Count = 1 }
+		};
+		string partId = workbookPart.GetIdOfPart(worksheetPart);
+		workbookPart.Workbook.AppendChild(new Sheets(new Sheet { Id = partId, SheetId = 1, Name = "Data" }));
+		document.Save();
+		result.Position = 0;
+		return result;
+	}
+
+	private static async IAsyncEnumerable<OpenXmlExportRow> ThrowingAsyncRows()
+	{
+		yield return new OpenXmlExportRow { Value = "first" };
+		await Task.Yield();
+		throw new InvalidOperationException("async source failed");
+	}
+
+	private sealed class OpenXmlExportRow
+	{
+		public string? Value { get; set; }
+	}
+
+	private sealed class ThrowingExportRow
+	{
+		public string Value => throw new InvalidOperationException("getter failed");
+	}
+
+	private sealed class ThrowingValue
+	{
+		public override string ToString() => throw new InvalidOperationException("serialization failed");
+	}
+
+	[Fact]
+	public void NamedCellLookups_WithMalformedDefinition_ReturnNull()
+	{
+		using MemoryStream stream = new();
+		using SpreadsheetDocument document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook);
+		document.InitializeExcelFile();
+		document.WorkbookPart!.Workbook!.DefinedNames = new DefinedNames(
+			new DefinedName { Name = "Broken", Text = "not-a-reference" });
+
+		document.GetCellFromName("Broken").ShouldBeNull();
+		document.GetCellReferenceFromName("Broken").ShouldBeNull();
+	}
+
+	[Fact]
+	public void MathCompat_Round_TruncatesForNativeAndNetStandardImplementations()
+	{
+		Type compat = typeof(CommonNetFuncs.Excel.OpenXml.Common).Assembly
+			.GetType("CommonNetFuncs.Excel.OpenXml.Internal.MathCompat")!;
+		MethodInfo method = compat.GetMethod("Round", [typeof(double), typeof(int)])!;
+
+		method.Invoke(null, [-1.29, 1]).ShouldBe(-1.2);
+	}
+
+	[Fact]
+	public void RangeWidth_WithHiddenColumn_ReturnsZeroForThatColumn()
+	{
+		using MemoryStream stream = new();
+		using SpreadsheetDocument document = CreateDocument(stream, out WorksheetPart worksheetPart);
+		worksheetPart.Worksheet!.AppendChild(new Columns(
+			new Column { Min = 1, Max = 1, Hidden = true, Width = 12 }));
+
+		GetRangeWidthInPx(worksheetPart, (new CellReference("A1"), new CellReference("A1"))).ShouldBe(0);
+	}
+
+	[Theory]
+	[InlineData("Arial", 64)]
+	[InlineData("Helvetica", 64)]
+	[InlineData("Arial Narrow", 56)]
+	[InlineData("Times New Roman", 56)]
+	[InlineData("Verdana", 72)]
+	[InlineData("Tahoma", 64)]
+	[InlineData("Segoe UI", 64)]
+	[InlineData("Courier New", 72)]
+	[InlineData("Consolas", 72)]
+	[InlineData("Unknown Font", 56)]
+	public void RangeWidth_WithStoredColumnWidthsAndFontVariants_ReturnsDeterministicWidth(string fontName, int expectedWidth)
+	{
+		using MemoryStream stream = new();
+		using SpreadsheetDocument document = CreateDocument(stream, out WorksheetPart worksheetPart);
+		Stylesheet stylesheet = document.GetStylesheet()!;
+		Fonts fonts = stylesheet.GetFonts()!;
+		fonts.RemoveAllChildren<Font>();
+		fonts.AppendChild(new Font
+		{
+			FontName = new FontName { Val = fontName },
+			FontSize = new FontSize { Val = 11 }
+		});
+		worksheetPart.Worksheet!.AppendChild(new Columns(
+			new Column { Min = 1, Max = 1, Width = 8, CustomWidth = true }));
+
+		int width = GetRangeWidthInPx(worksheetPart, (new CellReference("A1"), new CellReference("A1")));
+
+		width.ShouldBe(expectedWidth);
+	}
+
+	[Fact]
+	public void AddImageToWorksheet_WhenMarginCrossesRows_AdvancesAnchorRow()
+	{
+		using MemoryStream stream = new();
+		using SpreadsheetDocument document = CreateDocument(stream, out WorksheetPart worksheetPart);
+		worksheetPart.Worksheet!.PrependChild(new SheetFormatProperties { DefaultRowHeight = 2 });
+		DrawingsPart drawingsPart = worksheetPart.AddNewPart<DrawingsPart>();
+		drawingsPart.WorksheetDrawing = new Xdr.WorksheetDrawing();
+
+		CommonNetFuncs.Excel.OpenXml.Common.AddImageToWorksheet(
+			drawingsPart, "rIdImage", new CellReference("A1"), 0, 100_000, 32, 32);
+
+		Xdr.OneCellAnchor anchor = drawingsPart.WorksheetDrawing.Elements<Xdr.OneCellAnchor>().Single();
+		anchor.FromMarker!.RowId!.Text.ShouldBe("5");
+		long.Parse(anchor.FromMarker.RowOffset!.Text).ShouldBe(4_750L);
+		anchor.Extent!.Cx!.Value.ShouldBe(32 * 9525L);
+		anchor.Extent.Cy!.Value.ShouldBe(32 * 9525L);
+	}
+
+	[Fact]
+	public void CellStringValues_WithUnattachedSharedStringCells_ReturnOriginalIndex()
+	{
+		using MemoryStream stream = new();
+		using SpreadsheetDocument document = CreateDocument(stream, out WorksheetPart worksheetPart);
+		Cell cell = worksheetPart.Worksheet!.InsertCell(1, 1)!;
+		cell.DataType = CellValues.SharedString;
+		cell.CellValue = new CellValue("4");
+
+		cell.GetCellValue().ShouldBe("4");
+		cell.GetStringValue().ShouldBe("4");
+	}
+
+	[Fact]
+	public void TableLookup_WithoutWorkbookPart_ReturnsNull()
+	{
+		using MemoryStream stream = new();
+		using SpreadsheetDocument document = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook);
+
+		document.GetSheetForTable(new Table()).ShouldBeNull();
+	}
+
+	[Fact]
+	public void ReadExcelTableToDataTable_TableWithoutRegisteredSheet_ReturnsEmptyTable()
+	{
+		MemoryStream stream = BuildOrphanedTableWorkbook();
+
+		using DataTable result = stream.ReadExcelTableToDataTable("Orphan", cancellationToken: TestContext.Current.CancellationToken);
+
+		result.Columns.Count.ShouldBe(0);
+		result.Rows.Count.ShouldBe(0);
+	}
+
+	[Fact]
+	public void CellReference_NullInput_FallsBackAndThrowsNullReference()
+	{
+		Should.Throw<NullReferenceException>(() => new CellReference(null!));
+	}
+
+	[Theory]
+	[InlineData("NoRowIndex")]
+	[InlineData("NoCellReference")]
+	[InlineData("MalformedCellReference")]
+	public void ReadExcelTableToDataTable_LookupDefects_ReturnsEmptyValuesWithoutCorruptingWorkbook(string defect)
+	{
+		using MemoryStream stream = BuildLookupDefectWorkbook(defect);
+
+		using DataTable table = stream.ReadExcelTableToDataTable("Lookup", cancellationToken: TestContext.Current.CancellationToken);
+
+		table.Columns.Count.ShouldBe(defect == "NoRowIndex" ? 1 : 0);
+		table.Rows.Count.ShouldBe(0);
+	}
+
+	[Fact]
+	public void LazyParsedCellLookup_CellWithoutReference_ReturnsNull()
+	{
+		Type lookupType = typeof(CommonNetFuncs.Excel.OpenXml.Common)
+			.GetNestedType("LazyParsedCellLookup", BindingFlags.NonPublic)!;
+		MethodInfo forRow = lookupType.GetMethod("ForRow", BindingFlags.Public | BindingFlags.Static)!;
+		object lookup = forRow.Invoke(null, [new Row(new Cell()), 1u])!;
+
+		lookupType.GetMethod("Find")!.Invoke(lookup, [1u]).ShouldBeNull();
+	}
+
+	[Fact]
+	public void ReadExcelTableToDataTable_WithInvalidStream_ReturnsEmptyTable()
+	{
+		using MemoryStream stream = new([1, 2, 3, 4]);
+
+		stream.ReadExcelTableToDataTable(cancellationToken: TestContext.Current.CancellationToken).Columns.Count.ShouldBe(0);
+	}
+
 }

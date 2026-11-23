@@ -1,5 +1,5 @@
-﻿using System.Reflection;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
+using System.Reflection;
 
 namespace Core.Tests;
 

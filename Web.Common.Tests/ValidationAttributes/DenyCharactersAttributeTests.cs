@@ -1,6 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
 using CommonNetFuncs.Web.Common.ValidationAttributes;
+using System.ComponentModel.DataAnnotations;
 
 namespace Web.Common.Tests.ValidationAttributes;
 
@@ -31,6 +31,32 @@ public sealed class DenyCharactersAttributeTests : ValidationTestBase
 
 		// Assert
 		attribute.DenyCharacters.ShouldBe("<>\"'/");
+	}
+
+	[Theory]
+	[InlineData("safe value", true)]
+	[InlineData("semi;colon", false)]
+	[InlineData("percent%", false)]
+	[InlineData("tag<", false)]
+	public void IsValid_WithCharArrayConstructor_ShouldValidateCorrectly(string value, bool shouldBeValid)
+	{
+		// Arrange
+		char[] denyCharacters = ['<', '>', '&', ';', '\'', '"', '%', '$'];
+		DenyCharactersAttribute attribute = new(denyCharacters);
+
+		// Act
+		ValidationResult? result = attribute.GetValidationResult(value, CreateValidationContext("TestProperty"));
+
+		// Assert
+		if (shouldBeValid)
+		{
+			result.ShouldBe(ValidationResult.Success);
+		}
+		else
+		{
+			result.ShouldNotBeNull();
+			result.MemberNames.ShouldContain("TestProperty");
+		}
 	}
 
 	[Fact]
@@ -390,4 +416,31 @@ public sealed class DenyCharactersAttributeTests : ValidationTestBase
 			result.ShouldNotBeNull();
 		}
 	}
+}
+
+public sealed class DenyCharactersAttributeBehaviorTests : ValidationTestBase
+{
+
+
+
+
+	[Fact]
+	public void DenyCharacters_FormatErrorMessage_WithoutConfiguredMessage_UsesFallback()
+	{
+		DenyCharactersAttribute attribute = new("<>")
+		{
+			ErrorMessage = null!,
+			ErrorMessageResourceName = nameof(EmptyValidationResource.Empty),
+			ErrorMessageResourceType = typeof(EmptyValidationResource),
+		};
+
+		attribute.FormatErrorMessage("FileName")
+			.ShouldBe("The field FileName must not contain any of the following characters: '<>'.");
+	}
+
+}
+
+public static class EmptyValidationResource
+{
+	public static string Empty => string.Empty;
 }

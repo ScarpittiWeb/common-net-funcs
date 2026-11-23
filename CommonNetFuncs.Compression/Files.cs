@@ -1,5 +1,4 @@
 ﻿using System.IO.Compression;
-
 using static CommonNetFuncs.Compression.Streams;
 
 namespace CommonNetFuncs.Compression;
@@ -51,12 +50,14 @@ public static class Files
 
 		if (files.Any())
 		{
-#if NET10_0_OR_GREATER
-			await using ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true);
+#if !NETSTANDARD2_1
+			await using (ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true))
 #else
-			using ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true);
+			using (ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true))
 #endif
-			await files.AddFilesToZip(archive, compressionLevel, cancellationToken).ConfigureAwait(false);
+			{
+				await files.AddFilesToZip(archive, compressionLevel, cancellationToken).ConfigureAwait(false);
+			}
 			zipFileStream.Position = 0;
 		}
 		return zipFileStream ?? new();
@@ -74,12 +75,14 @@ public static class Files
 		MemoryStream zipFileStream = new();
 		if (files.Any())
 		{
-#if NET10_0_OR_GREATER
-			await using ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true);
+#if !NETSTANDARD2_1
+			await using (ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true))
 #else
-			using ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true);
+			using (ZipArchive archive = new(zipFileStream, ZipArchiveMode.Create, true))
 #endif
-			await files.AddFilesToZip(archive, compressionLevel, cancellationToken).ConfigureAwait(false);
+			{
+				await files.AddFilesToZip(archive, compressionLevel, cancellationToken).ConfigureAwait(false);
+			}
 			zipFileStream.Position = 0;
 		}
 		return zipFileStream ?? new();
@@ -114,7 +117,7 @@ public static class Files
 		{
 			fileStream.Position = 0; //Must have this to prevent errors writing data to the attachment
 			ZipArchiveEntry entry = archive.CreateEntry(fileName ?? $"File {archive.Entries.Count}", compressionLevel);
-#if NET10_0_OR_GREATER
+#if !NETSTANDARD2_1
 			await using Stream entryStream = await entry.OpenAsync(cancellationToken);
 #else
 			using Stream entryStream = entry.Open();

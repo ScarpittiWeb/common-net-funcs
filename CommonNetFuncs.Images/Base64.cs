@@ -1,9 +1,9 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Text.RegularExpressions;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
 using SkiaSharp;
-using static System.Convert;
+using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
 using static CommonNetFuncs.Core.ExceptionLocation;
+using static System.Convert;
 
 namespace CommonNetFuncs.Images;
 
@@ -12,7 +12,7 @@ namespace CommonNetFuncs.Images;
 /// </summary>
 public static partial class Base64
 {
-#if NET7_0_OR_GREATER
+#if !NETSTANDARD2_1
 	//[GeneratedRegex(@"data:image\/([^;]+);base64,([^'"")\s]+)")]
 	[GeneratedRegex(@"data:image\/([^;]+);base64,([^'"")\s]+)|base64([^'"")\s]+)", RegexOptions.Compiled, 5000)]
 	private static partial Regex ExtractBase64Regex();
@@ -65,8 +65,10 @@ public static partial class Base64
 				SKImageInfo bounds = SKBitmap.DecodeBounds(ms);
 				if (bounds.Height > 0 && bounds.Width > 0)
 				{
-					ReadOnlySpan<byte> imageBytes = ms.ToArray();
-					return ToBase64String(imageBytes);
+					// TryGetBuffer exposes exactly the [origin, length) range ToArray would copy
+					return ms.TryGetBuffer(out ArraySegment<byte> segment)
+						? ToBase64String(segment.Array!, segment.Offset, segment.Count)
+						: ToBase64String(ms.ToArray());
 				}
 			}
 		}

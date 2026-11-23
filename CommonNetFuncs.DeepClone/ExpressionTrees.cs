@@ -1,8 +1,8 @@
-﻿using System.Collections.Concurrent;
+﻿using CommonNetFuncs.Core;
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Expressions;
 using System.Reflection;
-using CommonNetFuncs.Core;
 
 namespace CommonNetFuncs.DeepClone;
 
@@ -20,6 +20,17 @@ public static class ExpressionTrees
 
 	private static readonly CacheManager<Type, Func<object, Dictionary<object, object>, object>> DeepCloneCache = new();
 
+	private static readonly Func<Type, Func<object, Dictionary<object, object>, object>> CompileForCache = static t => CreateCompiledLambdaCopyFunctionForType(t, true).Compile();
+	private static readonly Func<Type, Func<object, Dictionary<object, object>, object>> FetchFromCache = GetOrAddPropertiesFromCompiledFunctionsCache;
+
+	// Call-scoped memo: repeated types within one top-level DeepClone call skip the shared CacheManager locks entirely.
+	// Scoped (and reset) per call so it never holds functions evicted from / cleared out of the shared cache beyond that call.
+	[ThreadStatic]
+	private static TypeMemo? reusableMemo;
+
+	[ThreadStatic]
+	private static TypeMemo? activeMemo;
+
 	public static ICacheManagerApi<Type, Func<object, Dictionary<object, object>, object>> CacheManager => DeepCloneCache;
 
 	/// <summary>
@@ -27,22 +38,43 @@ public static class ExpressionTrees
 	/// </summary>
 	private static Func<object, Dictionary<object, object>, object> GetOrAddPropertiesFromCompiledFunctionsCache(Type key)
 	{
-		bool isLimitedCache = CacheManager.IsUsingLimitedCache();
-		if (isLimitedCache ? CacheManager.GetLimitedCache().TryGetValue(key, out Func<object, Dictionary<object, object>, object>? compiledFunction) : CacheManager.GetCache().TryGetValue(key, out compiledFunction))
+		return CacheManager.IsUsingLimitedCache() ? CacheManager.GetOrAddLimitedCache(key, CompileForCache) : CacheManager.GetOrAddCache(key, CompileForCache);
+	}
+
+	/// <summary>
+	/// Small fixed-size round-robin Type -> compiled function memo, scoped to one top-level DeepClone call.
+	/// </summary>
+	private sealed class TypeMemo
+	{
+		private const int Size = 8;
+		private readonly Type?[] types = new Type?[Size];
+		private readonly Func<object, Dictionary<object, object>, object>?[] functions = new Func<object, Dictionary<object, object>, object>?[Size];
+		private int next;
+
+		public Func<object, Dictionary<object, object>, object> GetOrFetch(Type type, Func<Type, Func<object, Dictionary<object, object>, object>> fetch)
 		{
-			return compiledFunction!;
+			Type?[] localTypes = types;
+			for (int i = 0; i < localTypes.Length; i++)
+			{
+				if (ReferenceEquals(localTypes[i], type))
+				{
+					return functions[i]!;
+				}
+			}
+
+			Func<object, Dictionary<object, object>, object> function = fetch(type);
+			types[next] = type;
+			functions[next] = function;
+			next = (next + 1) & (Size - 1);
+			return function;
 		}
 
-		compiledFunction = CreateCompiledLambdaCopyFunctionForType(key, true).Compile();
-		if (isLimitedCache)
+		public void Reset()
 		{
-			CacheManager.TryAddLimitedCache(key, compiledFunction);
+			Array.Clear(types, 0, types.Length);
+			Array.Clear(functions, 0, functions.Length);
+			next = 0;
 		}
-		else
-		{
-			CacheManager.TryAddCache(key, compiledFunction);
-		}
-		return compiledFunction;
 	}
 
 	#endregion
@@ -58,7 +90,25 @@ public static class ExpressionTrees
 	[return: NotNullIfNotNull(nameof(original))]
 	public static T? DeepClone<T>(this T original, Dictionary<object, object>? copiedReferencesDict = null, bool useCache = true)
 	{
-		return (T?)DeepCopyByExpressionTreeObj(original, false, copiedReferencesDict ?? new Dictionary<object, object>(new ReferenceEqualityComparer()), useCache);
+		Dictionary<object, object> references = copiedReferencesDict ?? new Dictionary<object, object>(ReferenceEqualityComparer.Instance);
+		if (!useCache)
+		{
+			return (T?)DeepCopyByExpressionTreeObj(original, false, references, false);
+		}
+
+		// Re-entrant top-level calls (only possible via a user-supplied comparer) get their own memo
+		TypeMemo? outer = activeMemo;
+		TypeMemo memo = outer == null ? (reusableMemo ??= new TypeMemo()) : new TypeMemo();
+		activeMemo = memo;
+		try
+		{
+			return (T?)DeepCopyByExpressionTreeObj(original, false, references, true);
+		}
+		finally
+		{
+			memo.Reset();
+			activeMemo = outer;
+		}
 	}
 
 	/// <summary>
@@ -77,12 +127,13 @@ public static class ExpressionTrees
 			return null;
 		}
 
-		Type type = original.GetType();
-
-		if (typeof(Delegate).IsAssignableFrom(type))
+		// Equivalent to typeof(Delegate).IsAssignableFrom(original.GetType()) but a single type check
+		if (original is Delegate)
 		{
-			throw new ArgumentException($"Type {type.FullName} is a delegate type which is unsupported.", nameof(original));
+			throw new ArgumentException($"Type {original.GetType().FullName} is a delegate type which is unsupported.", nameof(original));
 		}
+
+		Type type = original.GetType();
 
 		if (!forceDeepCopy && !type.IsTypeToDeepCopy())
 		{
@@ -99,9 +150,16 @@ public static class ExpressionTrees
 			return new();
 		}
 
-		Func<object, Dictionary<object, object>, object> compiledCopyFunction = useCache ?
-						GetOrAddPropertiesFromCompiledFunctionsCache(type) :
-						CreateCompiledLambdaCopyFunctionForType(type, useCache).Compile();
+		Func<object, Dictionary<object, object>, object> compiledCopyFunction;
+		if (useCache)
+		{
+			TypeMemo? memo = activeMemo;
+			compiledCopyFunction = memo != null ? memo.GetOrFetch(type, FetchFromCache) : GetOrAddPropertiesFromCompiledFunctionsCache(type);
+		}
+		else
+		{
+			compiledCopyFunction = CreateCompiledLambdaCopyFunctionForType(type, useCache).Compile();
+		}
 		return compiledCopyFunction(original, copiedReferencesDict);
 	}
 

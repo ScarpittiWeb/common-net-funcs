@@ -1,6 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using CommonNetFuncs.Core;
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
-using CommonNetFuncs.Core;
 
 namespace CommonNetFuncs.Web.Common.ValidationAttributes;
 

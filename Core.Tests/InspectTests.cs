@@ -1,5 +1,7 @@
-﻿using System.ComponentModel;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.Data;
 
 namespace Core.Tests;
 
@@ -818,3 +820,139 @@ public sealed class InspectTests
 }
 #pragma warning restore IDE0079 // Remove unnecessary suppression
 
+public sealed class InspectBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static DataTable CreateOneRowTable()
+	{
+		DataTable table = new();
+		table.Columns.Add("Value", typeof(int));
+		table.Rows.Add(9);
+		return table;
+	}
+
+	[GapNullTypeId]
+	private sealed class GapNullTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNullTypeIdAttribute : Attribute
+	{
+		public override object TypeId => null!;
+	}
+
+	[GapNamelessTypeId]
+	private sealed class GapNamelessTypeIdHolder
+	{
+	}
+
+	[AttributeUsage(AttributeTargets.Class)]
+	private sealed class GapNamelessTypeIdAttribute : Attribute
+	{
+		public override object TypeId { get; } = new object();
+	}
+
+	private sealed class GapNestedEquality
+	{
+		public GapNestedValue? Child { get; set; }
+	}
+
+	private sealed class GapNestedValue
+	{
+		public int Value { get; set; }
+	}
+
+	private sealed class GapHashHolder
+	{
+		public List<GapNestedValue?> Values { get; set; } = [];
+	}
+
+	private sealed class GapNonSeekableReadStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public bool AllowRead { get; set; } = true;
+
+		public override bool CanRead => AllowRead;
+
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonWritableTargetStream : MemoryStream
+	{
+		public override bool CanWrite => false;
+	}
+
+	private sealed class GapUnseekableSourceStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public override bool CanSeek => false;
+	}
+
+	private sealed class GapNonSeekableWriteStream : MemoryStream
+	{
+		public override bool CanSeek => false;
+
+		public byte[] Data => ToArray();
+	}
+
+	private sealed class GapValidated
+	{
+		[Required]
+		public string? Required { get; set; }
+
+		[Range(1, 10)]
+		public int Count { get; set; }
+
+		public string? Optional { get; set; }
+	}
+
+	[Fact]
+	public void ObjectHasAttribute_HandlesNullAndNamelessTypeIds()
+	{
+		typeof(GapNullTypeIdHolder).ObjectHasAttribute(nameof(GapNullTypeIdAttribute)).ShouldBeFalse();
+		typeof(GapNamelessTypeIdHolder).ObjectHasAttribute("GapAttribute").ShouldBeFalse();
+	}
+
+	[Fact]
+	public void IsEqual_NonRecursiveTreatsComplexPropertyValuesAsEqual()
+	{
+		GapNestedEquality left = new() { Child = new() { Value = 1 } };
+		GapNestedEquality right = new() { Child = new() { Value = 9 } };
+
+		left.IsEqual(right, recursive: false).ShouldBeTrue();
+		left.IsEqual(right, recursive: true).ShouldBeFalse();
+	}
+
+	[Fact]
+	public async Task GetHashForObjectAsync_HandlesNullCollectionItemsAndAllAlgorithms()
+	{
+		GapHashHolder value = new() { Values = [new() { Value = 1 }, null] };
+
+		foreach (EHashAlgorithm algorithm in Enum.GetValues<EHashAlgorithm>())
+		{
+			(await value.GetHashForObjectAsync(algorithm)).ShouldNotBeNullOrEmpty();
+		}
+	}
+
+}

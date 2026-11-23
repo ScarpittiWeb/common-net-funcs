@@ -1,5 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
-using AutoFixture;
+﻿using AutoFixture;
 using AutoFixture.AutoFakeItEasy;
 using CommonNetFuncs.EFCore;
 using CommonNetFuncs.Web.Api;
@@ -7,6 +6,7 @@ using FakeItEasy;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
 namespace Web.Api.Tests;
 

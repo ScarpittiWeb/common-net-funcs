@@ -1,10 +1,16 @@
-﻿using System.Diagnostics;
+﻿using Microsoft.Extensions.Hosting;
+using System.Diagnostics;
 using System.Threading.Channels;
-using CommonNetFuncs.Core;
-using Microsoft.Extensions.Hosting;
 
 namespace CommonNetFuncs.Web.Api.TaskQueuing.ApiQueue;
 
+/// <summary>
+/// Processes queued work sequentially in the order supplied by the channel.
+/// </summary>
+/// <remarks>
+/// Disposal stops accepting work and is non-blocking. Work already executing is allowed to finish,
+/// while work still waiting in the channel is canceled. Enqueued callers are completed as shutdown progresses.
+/// </remarks>
 public class SequentialTaskProcessor : BackgroundService
 {
 	private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
@@ -12,10 +18,11 @@ public class SequentialTaskProcessor : BackgroundService
 	private readonly ChannelWriter<QueuedTask> writer;
 	private readonly ChannelReader<QueuedTask> reader;
 	private readonly QueueStats stats;
-	private readonly List<TimeSpan> processingTimes = new();
+	private readonly Queue<TimeSpan> processingTimes = new();
 	private readonly Lock statsLock = new();
 	private readonly int processTimeWindow;
-	private bool disposed;
+	private volatile bool disposed;
+	private Task? disposalTask;
 
 	public SequentialTaskProcessor(BoundedChannelOptions boundedChannelOptions, int processTimeWindow = 1000)
 	{
@@ -46,7 +53,15 @@ public class SequentialTaskProcessor : BackgroundService
 	public virtual async Task<T?> EnqueueAsync<T>(Func<CancellationToken, Task<T?>> taskFunction, CancellationToken cancellationToken = default)
 	{
 		QueuedTask queuedTask = new(async ct => await taskFunction(ct).ConfigureAwait(false));
-		await writer.WriteAsync(queuedTask, cancellationToken).ConfigureAwait(false);
+		try
+		{
+			await writer.WriteAsync(queuedTask, cancellationToken).ConfigureAwait(false);
+		}
+		catch (ChannelClosedException) when (disposed)
+		{
+			queuedTask.CompletionSource.TrySetCanceled();
+			throw new TaskCanceledException("The task processor is shutting down.");
+		}
 
 		lock (statsLock)
 		{
@@ -61,6 +76,12 @@ public class SequentialTaskProcessor : BackgroundService
 	{
 		await foreach (QueuedTask task in reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
 		{
+			if (disposed)
+			{
+				task.CompletionSource.TrySetCanceled();
+				continue;
+			}
+
 			Stopwatch stopwatch = Stopwatch.StartNew();
 
 			try
@@ -74,11 +95,11 @@ public class SequentialTaskProcessor : BackgroundService
 				{
 					stats.ProcessedTasks++;
 					stats.LastProcessedAt = DateTime.UtcNow;
-					processingTimes.Add(stopwatch.Elapsed);
+					processingTimes.Enqueue(stopwatch.Elapsed);
 
 					if (processingTimes.Count > processTimeWindow)
 					{
-						processingTimes.RemoveAt(0);
+						processingTimes.Dequeue();
 					}
 				}
 
@@ -111,7 +132,8 @@ public class SequentialTaskProcessor : BackgroundService
 				LastProcessedAt = stats.LastProcessedAt
 			};
 
-			if (processingTimes.AnyFast())
+			// Queue<T> enumerates oldest -> newest, so the average is summed in the same order as before
+			if (processingTimes.Count > 0)
 			{
 				currentStats.AverageProcessingTime = TimeSpan.FromMilliseconds(processingTimes.Average(t => t.TotalMilliseconds));
 			}
@@ -125,6 +147,9 @@ public class SequentialTaskProcessor : BackgroundService
 		return Task.FromResult(stats);
 	}
 
+	/// <summary>
+	/// Initiates a non-blocking shutdown. The active task is allowed to complete and pending tasks are canceled.
+	/// </summary>
 	public override void Dispose()
 	{
 		if (disposed)
@@ -136,7 +161,7 @@ public class SequentialTaskProcessor : BackgroundService
 
 		try
 		{
-			writer.Complete();
+			writer.TryComplete();
 		}
 		catch (Exception ex)
 		{
@@ -145,35 +170,56 @@ public class SequentialTaskProcessor : BackgroundService
 
 		try
 		{
-			// Wait for ExecuteAsync to finish processing
-			StopAsync(CancellationToken.None).Wait(TimeSpan.FromSeconds(10), cancellationTokenSource.Token);
+			Task stopTask = StopAsync(CancellationToken.None);
+			CancelPendingTasks();
+			disposalTask = CompleteDisposeAsync(stopTask);
 		}
 		catch (Exception ex)
 		{
 			logger.Warn(ex, "Error stopping background service");
+			CompleteDispose();
 		}
 
+		GC.SuppressFinalize(this);
+	}
+
+	private void CancelPendingTasks()
+	{
+		while (reader.TryRead(out QueuedTask? pendingTask))
+		{
+			pendingTask.CompletionSource.TrySetCanceled();
+		}
+	}
+
+	private async Task CompleteDisposeAsync(Task stopTask)
+	{
 		try
 		{
-			while (reader.Count > 0)
-			{
-				if (!reader.TryRead(out QueuedTask? processingTask))
-				{
-					break;
-				}
-
-				// Wait for the processing task to complete
-				processingTask.CompletionSource.Task.Wait(TimeSpan.FromSeconds(5), cancellationTokenSource.Token);
-			}
+			await stopTask.ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{
-			logger.Warn(ex, "Error waiting for processing queued task to complete");
+			logger.Warn(ex, "Error waiting for background service shutdown");
+		}
+		finally
+		{
+			CancelPendingTasks();
+			CompleteDispose();
+		}
+	}
+
+	private void CompleteDispose()
+	{
+		try
+		{
+			cancellationTokenSource.Cancel();
+		}
+		catch (ObjectDisposedException)
+		{
+			// Already disposed.
 		}
 
-		cancellationTokenSource.Cancel();
 		cancellationTokenSource.Dispose();
-		base.Dispose(); // Call the dispose method of the base class to ensure proper cleanup
-		GC.SuppressFinalize(this);
+		base.Dispose();
 	}
 }

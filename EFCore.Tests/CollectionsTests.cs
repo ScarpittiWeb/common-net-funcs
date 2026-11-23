@@ -1,11 +1,13 @@
-﻿using System.Reflection;
-using AutoFixture;
+﻿using AutoFixture;
 using CommonNetFuncs.EFCore;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using System.Collections.Concurrent;
+using System.Reflection;
 using static Xunit.TestContext;
 
 namespace EFCore.Tests;
@@ -1305,4 +1307,132 @@ public sealed class CollectionsTests : IDisposable
 		public DateTime CreatedDate { get; set; }
 	}
 #pragma warning restore S1144 // Unused private types or members should be removed
+}
+
+public sealed class EfCoreCollectionsBehaviorTests
+{
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	private static (IServiceProvider Provider, CoverageContext Context) CreateProvider()
+	{
+		ServiceCollection services = new();
+		services.AddDbContextPool<CoverageContext>(options => options.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+		ServiceProvider provider = services.BuildServiceProvider();
+		return (provider, provider.GetRequiredService<CoverageContext>());
+	}
+
+	private static CoverageContext CreateContext() =>
+		new(new DbContextOptionsBuilder<CoverageContext>().UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+
+	private static IServiceProvider CreateThrowingTrackingProvider()
+	{
+		ServiceCollection services = new();
+		services.AddDbContext<ThrowOnTrackingContext>(options => options.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+		return services.BuildServiceProvider();
+	}
+
+	private static IAsyncEnumerable<CoverageEntity> InvokeStreamingHelper(Func<Func<bool, IQueryable<CoverageEntity>>> builderFactory)
+	{
+		MethodInfo method = typeof(BaseDbContextActions<CoverageEntity, CoverageContext>)
+			.GetMethod("ExecuteStreamingWithCircularRefHandling", BindingFlags.Static | BindingFlags.NonPublic)!
+			.MakeGenericMethod(typeof(CoverageEntity));
+		return (IAsyncEnumerable<CoverageEntity>)method.Invoke(null, [builderFactory(), CancellationToken.None])!;
+	}
+
+	private static ConcurrentDictionary<Type, bool> GetCircularReferenceCache() =>
+		(ConcurrentDictionary<Type, bool>)typeof(BaseDbContextActions<CoverageEntity, CoverageContext>)
+			.GetField("circularReferencingEntities", BindingFlags.Static | BindingFlags.NonPublic)!
+			.GetValue(null)!;
+
+	private static (IProperty Property, IEntityType EntityType, DbContext Context) CreateDateTimeMetadata(
+		string? providerName, string? storeType)
+	{
+		IProperty property = Substitute.For<IProperty>();
+		property.GetColumnType().Returns(storeType);
+		IEntityType entityType = Substitute.For<IEntityType>();
+		entityType.FindProperty(nameof(CoverageDateEntity.CreatedDate)).Returns(property);
+		return (property, entityType, CreateMockContext(providerName));
+	}
+
+	private static DbContext CreateMockContext(string? providerName)
+	{
+		DatabaseFacade database = Substitute.For<DatabaseFacade>(CreateContext());
+		database.ProviderName.Returns(providerName);
+		DbContext context = Substitute.For<DbContext>();
+		context.Database.Returns(database);
+		return context;
+	}
+
+	private static DateTime InvokeNormalize(
+		DateTime value,
+		IProperty property,
+		IEntityType entityType,
+		DbContext context,
+		PropertyInfo? clrProperty = null)
+	{
+		MethodInfo method = typeof(Collections).GetMethod(
+			"NormalizeDateTimeForDatabase", BindingFlags.Static | BindingFlags.NonPublic)!;
+		return (DateTime)method.Invoke(null,
+		[
+			value,
+			clrProperty ?? typeof(CoverageDateEntity).GetProperty(nameof(CoverageDateEntity.CreatedDate))!,
+			entityType,
+			context
+		])!;
+	}
+
+	[Theory]
+	[InlineData("InMemory", true)]
+	[InlineData("Microsoft.EntityFrameworkCore.SqlServer", false)]
+	[InlineData("Npgsql.EntityFrameworkCore.PostgreSQL", true)]
+	[InlineData(null, true)]
+	public void NormalizeDateTimeForDatabase_ProviderKinds_ReturnExpectedKind(string? providerName, bool convertToUtc)
+	{
+		DateTime local = new(2024, 6, 15, 10, 30, 0, DateTimeKind.Local);
+		(IProperty property, IEntityType entityType, DbContext mockedContext) = CreateDateTimeMetadata(providerName, "datetime2");
+
+		DateTime result = InvokeNormalize(local, property, entityType, mockedContext);
+
+		convertToUtc
+			.ShouldBe(result.Kind == DateTimeKind.Utc);
+	}
+
+	[Fact]
+	public void NormalizeDateTimeForDatabase_GetColumnTypeInvalidCast_ReturnsUtc()
+	{
+		DateTime local = new(2024, 6, 15, 10, 30, 0, DateTimeKind.Local);
+		IProperty property = Substitute.For<IProperty>();
+		property.When(x => x.GetColumnType()).Do(_ => throw new InvalidCastException("not relational"));
+		IEntityType entityType = Substitute.For<IEntityType>();
+		PropertyInfo clrProperty = typeof(CoverageDateEntity).GetProperty(nameof(CoverageDateEntity.CreatedDate))!;
+		entityType.FindProperty(clrProperty.Name).Returns(property);
+		DbContext context = CreateMockContext("Some.Provider");
+
+		DateTime result = InvokeNormalize(local, property, entityType, context, clrProperty);
+
+		result.ShouldBe(local.ToUniversalTime());
+	}
+
 }

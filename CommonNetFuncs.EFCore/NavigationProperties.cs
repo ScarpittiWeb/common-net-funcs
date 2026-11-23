@@ -1,18 +1,17 @@
-﻿using System.Collections.Concurrent;
-using System.Linq.Expressions;
-using System.Reflection;
-using System.Text;
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
 using FastExpressionCompiler;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Newtonsoft.Json;
+using System.Collections.Concurrent;
+using System.Linq.Expressions;
+using System.Reflection;
+using System.Text;
 using ZLinq;
 using static CommonNetFuncs.Core.ReflectionCaches;
 using static CommonNetFuncs.Core.Strings;
 
 namespace CommonNetFuncs.EFCore;
-
 
 /// <summary>
 /// Optional configurations for methods in the NavigationProperties class.
@@ -105,7 +104,39 @@ public static class NavigationProperties
 
 		public HashSet<string> GetNavigationsToDepth(int depth)
 		{
-			return depth < 0 ? NavigationProperties : NavigationProperties.Where(x => x.HasNoMoreThanNumberOfChars('.', depth)).ToHashSet();
+			if (depth < 0)
+			{
+				return NavigationProperties;
+			}
+
+			HashSet<string> result = new(NavigationProperties.Count);
+			foreach (string navigation in NavigationProperties)
+			{
+				if (HasNoMoreThanDots(navigation, depth))
+				{
+					result.Add(navigation);
+				}
+			}
+			return result;
+		}
+
+		// Same predicate as HasNoMoreThanNumberOfChars('.', maxDots) without the closure / LINQ iterator
+		private static bool HasNoMoreThanDots(string? value, int maxDots)
+		{
+			if (string.IsNullOrEmpty(value))
+			{
+				return true;
+			}
+
+			int count = 0;
+			foreach (char c in value)
+			{
+				if (c == '.' && ++count > maxDots)
+				{
+					return false;
+				}
+			}
+			return true;
 		}
 
 		public static bool operator ==(NavigationPropertiesCacheValue left, NavigationPropertiesCacheValue right)
@@ -137,8 +168,8 @@ public static class NavigationProperties
 	private static HashSet<string> GetOrAddPropertiesFromEntityNavigationsCache<T>(NavigationPropertiesCacheKey key, DbContext context, NavigationPropertiesOptions navigationPropertiesOptions) where T : class
 	{
 		if ((NavigationCacheManager.IsUsingLimitedCache() ?
-					NavigationCacheManager.GetLimitedCache().TryGetValue(new(typeof(T), navigationPropertiesOptions.NavPropAttributesToIgnore.CreateNavPropsIgnoreString()), out NavigationPropertiesCacheValue cachedValue) :
-					NavigationCacheManager.GetCache().TryGetValue(new(typeof(T), navigationPropertiesOptions.NavPropAttributesToIgnore.CreateNavPropsIgnoreString()), out cachedValue)) &&
+					NavigationCacheManager.GetLimitedCache().TryGetValue(key, out NavigationPropertiesCacheValue cachedValue) :
+					NavigationCacheManager.GetCache().TryGetValue(key, out cachedValue)) &&
 				(cachedValue.MaxDepth < 0 || cachedValue.MaxDepth >= navigationPropertiesOptions.MaxNavigationDepth))
 		{
 			return cachedValue.GetNavigationsToDepth(navigationPropertiesOptions.MaxNavigationDepth);
@@ -382,55 +413,46 @@ public static class NavigationProperties
 			return;
 		}
 
-		// Get navigation property names
-
-		Action<T> setter = NavigationSetterCache.GetOrAdd(typeof(T), type =>
-		{
-			// Get navigation property names
-
-			List<string> navigations = GetTopLevelNavigations<T>(context);
-
-			// Parameter for the entity instance
-
-			ParameterExpression parameter = Expression.Parameter(typeof(object), "entity");
-			UnaryExpression convertedParameter = Expression.Convert(parameter, type);
-
-			// Create assignments for each navigation property
-
-			List<BinaryExpression> assignments = [];
-			foreach (string navProp in navigations)
-			{
-				PropertyInfo? property = type.GetProperty(navProp);
-				if (property?.CanWrite == true)
-				{
-					assignments.Add(Expression.Assign(Expression.Property(convertedParameter, property), Expression.Constant(null, property.PropertyType)));
-				}
-			}
-
-			// If no valid assignments, return empty action
-
-			if (!assignments.AnyFast())
-			{
-				return new Action<object>(_ => { });
-			}
-			// If no valid assignments, return empty action
-
-			if (!assignments.AnyFast())
-			{
-				return new Action<object>(_ => { });
-			}
-
-			// Create a block with all assignments
-
-			BlockExpression block = Expression.Block(assignments);
-
-			// Compile the expression tree into a delegate
-
-			return Expression.Lambda<Action<object>>(block, parameter).CompileFast();
-		});
+		// Static factory + context argument: no closure / delegate allocation per call
+		Action<T> setter = NavigationSetterCache.GetOrAdd(typeof(T), static (type, ctx) => CreateNavigationSetter<T>(type, ctx), context);
 
 		// Execute the cached setter
 
 		setter(obj);
+	}
+
+	private static Action<object> CreateNavigationSetter<T>(Type type, DbContext context) where T : class
+	{
+		// Get navigation property names
+
+		List<string> navigations = GetTopLevelNavigations<T>(context);
+
+		// Parameter for the entity instance
+
+		ParameterExpression parameter = Expression.Parameter(typeof(object), "entity");
+		UnaryExpression convertedParameter = Expression.Convert(parameter, type);
+
+		// Create assignments for each navigation property
+
+		List<BinaryExpression> assignments = [];
+		foreach (string navProp in navigations)
+		{
+			PropertyInfo? property = type.GetProperty(navProp);
+			if (property?.CanWrite == true)
+			{
+				assignments.Add(Expression.Assign(Expression.Property(convertedParameter, property), Expression.Constant(null, property.PropertyType)));
+			}
+		}
+
+		// If no valid assignments, return empty action
+
+		if (assignments.Count == 0)
+		{
+			return new Action<object>(_ => { });
+		}
+
+		// Create a block with all assignments and compile the expression tree into a delegate
+
+		return Expression.Lambda<Action<object>>(Expression.Block(assignments), parameter).CompileFast();
 	}
 }

@@ -1,6 +1,4 @@
-﻿using System.Security.Cryptography;
-using System.Text;
-using CommonNetFuncs.Web.Common.CachingSupportClasses;
+﻿using CommonNetFuncs.Web.Common.CachingSupportClasses;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -8,6 +6,9 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Primitives;
+using System.Buffers;
+using System.Security.Cryptography;
+using System.Text;
 using static CommonNetFuncs.Compression.Streams;
 using static CommonNetFuncs.Core.Strings;
 using static CommonNetFuncs.Core.UnitConversion;
@@ -17,6 +18,15 @@ namespace CommonNetFuncs.Web.Middleware.CachingMiddleware;
 internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, CacheOptions cacheOptions, CacheMetrics? cacheMetrics, CacheTracker cacheTracker) : IDisposable
 {
 	private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
+
+	// Culture-aware key order (same as OrderBy(x => x.Key)) with the original position as tie-breaker, which reproduces OrderBy's stability
+	private static readonly Comparison<QueryEntry> QueryEntryComparison = static (a, b) =>
+	{
+		int comparison = Comparer<string>.Default.Compare(a.Key, b.Key);
+		return comparison != 0 ? comparison : a.Index.CompareTo(b.Index);
+	};
+
+	private readonly record struct QueryEntry(string Key, StringValues Value, int Index);
 
 	private readonly RequestDelegate next = next;
 	private readonly IMemoryCache cache = cache;
@@ -374,14 +384,7 @@ internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, C
 		StringBuilder stringBuilder = new();
 		stringBuilder.Append(context.Request.Path.Value);
 
-		// Use StringValues directly instead of converting to string
-		IOrderedEnumerable<KeyValuePair<string, StringValues>> queryValues = context.Request.Query.Where(x => !x.Key.StrComp(cacheOptions.EvictionQueryParam)).OrderBy(x => x.Key);
-
-		if (queryValues.Any())
-		{
-			stringBuilder.Append('?');
-			stringBuilder.AppendJoin('&', queryValues.Select(q => $"{q.Key}={q.Value}"));
-		}
+		AppendSortedQuery(stringBuilder, context.Request.Query, cacheOptions.EvictionQueryParam);
 
 		if (context.Request.Method.Equals("POST", StringComparison.OrdinalIgnoreCase))
 		{
@@ -390,11 +393,89 @@ internal class MemoryCacheMiddleware(RequestDelegate next, IMemoryCache cache, C
 			string body = await reader.ReadToEndAsync(context.RequestAborted).ConfigureAwait(false);
 			context.Request.Body.Position = 0;
 
-			stringBuilder.Append('|').Append(Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(body))));
+			stringBuilder.Append('|');
+			AppendBodyHash(stringBuilder, body);
 		}
 
 		stringBuilder.Append('|').Append(context.Request.Headers.Accept);
 		return stringBuilder.ToString();
+	}
+
+	private static void AppendSortedQuery(StringBuilder stringBuilder, IQueryCollection query, string evictionQueryParam)
+	{
+		int queryCount = query.Count;
+		if (queryCount == 0)
+		{
+			return;
+		}
+
+		QueryEntry[] buffer = ArrayPool<QueryEntry>.Shared.Rent(queryCount);
+		int count = 0;
+		try
+		{
+			foreach (KeyValuePair<string, StringValues> kvp in query)
+			{
+				if (kvp.Key.StrComp(evictionQueryParam))
+				{
+					continue;
+				}
+
+				if (count == buffer.Length)
+				{
+					QueryEntry[] larger = ArrayPool<QueryEntry>.Shared.Rent(count * 2);
+					buffer.AsSpan(0, count).CopyTo(larger);
+					ArrayPool<QueryEntry>.Shared.Return(buffer, clearArray: true);
+					buffer = larger;
+				}
+
+				buffer[count] = new QueryEntry(kvp.Key, kvp.Value, count);
+				count++;
+			}
+
+			if (count == 0)
+			{
+				return;
+			}
+
+			Span<QueryEntry> entries = buffer.AsSpan(0, count);
+			if (count > 1)
+			{
+				entries.Sort(QueryEntryComparison);
+			}
+
+			stringBuilder.Append('?');
+			for (int i = 0; i < entries.Length; i++)
+			{
+				if (i > 0)
+				{
+					stringBuilder.Append('&');
+				}
+				stringBuilder.Append(entries[i].Key).Append('=').Append(entries[i].Value.ToString());
+			}
+		}
+		finally
+		{
+			ArrayPool<QueryEntry>.Shared.Return(buffer, clearArray: true);
+		}
+	}
+
+	private static void AppendBodyHash(StringBuilder stringBuilder, string body)
+	{
+		byte[] rented = ArrayPool<byte>.Shared.Rent(Encoding.UTF8.GetByteCount(body));
+		try
+		{
+			int written = Encoding.UTF8.GetBytes(body.AsSpan(), rented.AsSpan());
+			Span<byte> hash = stackalloc byte[SHA256.HashSizeInBytes];
+			SHA256.HashData(rented.AsSpan(0, written), hash);
+
+			Span<char> base64 = stackalloc char[44];
+			Convert.TryToBase64Chars(hash, base64, out int charsWritten);
+			stringBuilder.Append(base64[..charsWritten]);
+		}
+		finally
+		{
+			ArrayPool<byte>.Shared.Return(rented);
+		}
 	}
 
 	public void Dispose()

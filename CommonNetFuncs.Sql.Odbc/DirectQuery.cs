@@ -1,7 +1,7 @@
-﻿using System.Data;
+﻿using CommonNetFuncs.Sql.Common;
+using System.Data;
 using System.Data.Odbc;
 using System.Runtime.CompilerServices;
-using CommonNetFuncs.Sql.Common;
 using static CommonNetFuncs.Sql.Common.DirectQuery;
 
 namespace CommonNetFuncs.Sql.Odbc;

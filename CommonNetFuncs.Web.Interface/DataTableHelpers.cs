@@ -1,12 +1,11 @@
-﻿using System.Text.Json.Serialization;
-using MemoryPack;
+﻿using MemoryPack;
 using MessagePack;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
-using ZLinq;
-using static System.Convert;
+using System.Text.Json.Serialization;
 using static CommonNetFuncs.Sql.Common.QueryParameters;
 using static CommonNetFuncs.Web.Common.ContentTypes;
+using static System.Convert;
 
 namespace CommonNetFuncs.Web.Interface;
 
@@ -29,19 +28,20 @@ public static class DataTableHelpers
 		{
 			if (FormDataTypes.Any(x => request.ContentType?.Contains(x, StringComparison.InvariantCultureIgnoreCase) ?? false) && request.Form != null)
 			{
-				dataTableRequest.Draw = request.Form.AsValueEnumerable().Where(x => string.Equals(x.Key, "draw", StringComparison.InvariantCultureIgnoreCase)).Select(x => x.Value).FirstOrDefault();
+				// Snapshot the form once (preserving enumeration order) and resolve each key with a single first-match pass
+				KeyValuePair<string, StringValues>[] fields = SnapshotForm(request.Form);
 
-				for (int i = 0; request.Form.Any(y => string.Equals(y.Key, $"order[{i}][column]", StringComparison.InvariantCultureIgnoreCase)); i++)
+				dataTableRequest.Draw = FindFirst(fields, "draw");
+
+				for (int i = 0; TryFindFirst(fields, $"order[{i}][column]", out StringValues orderColumn); i++)
 				{
-					dataTableRequest.SortColumns.Add(i, request.Form.AsValueEnumerable().Where(x => string.Equals(x.Key, "columns[" + request.Form.AsValueEnumerable().Where(y => string.Equals(y.Key, $"order[{i}][column]", StringComparison.InvariantCultureIgnoreCase))
-						.Select(z => z.Value).FirstOrDefault() + "][data]", StringComparison.InvariantCultureIgnoreCase)).Select(x => x.Value).FirstOrDefault());
-
-					dataTableRequest.SortColumnDir.Add(i, request.Form.AsValueEnumerable().Where(x => string.Equals(x.Key, $"order[{i}][dir]", StringComparison.InvariantCultureIgnoreCase)).Select(x => x.Value).FirstOrDefault());
+					dataTableRequest.SortColumns.Add(i, FindFirst(fields, "columns[" + orderColumn + "][data]"));
+					dataTableRequest.SortColumnDir.Add(i, FindFirst(fields, $"order[{i}][dir]"));
 				}
 
-				string? start = request.Form.AsValueEnumerable().Where(x => string.Equals(x.Key, "start", StringComparison.InvariantCultureIgnoreCase)).Select(x => x.Value).FirstOrDefault();
-				string? length = request.Form.AsValueEnumerable().Where(x => string.Equals(x.Key, "length", StringComparison.InvariantCultureIgnoreCase)).Select(x => x.Value).FirstOrDefault();
-				string? searchValue = request.Form.AsValueEnumerable().Where(x => string.Equals(x.Key, "search[value]", StringComparison.InvariantCultureIgnoreCase)).Select(x => x.Value).FirstOrDefault();
+				string? start = FindFirst(fields, "start");
+				string? length = FindFirst(fields, "length");
+				string? searchValue = FindFirst(fields, "search[value]");
 
 				//Paging Size (10,20,50,100)
 				dataTableRequest.PageSize = length != StringValues.Empty ? ToInt32(length) : 0;
@@ -82,6 +82,46 @@ public static class DataTableHelpers
 			logger.Error(ex, "{Class}.{Method} Error", $"{nameof(DataTableHelpers)}.{nameof(GetDataTableRequest)}");
 		}
 		return dataTableRequest;
+	}
+
+	private static KeyValuePair<string, StringValues>[] SnapshotForm(IFormCollection form)
+	{
+		KeyValuePair<string, StringValues>[] fields = new KeyValuePair<string, StringValues>[form.Count];
+		int count = 0;
+		foreach (KeyValuePair<string, StringValues> field in form)
+		{
+			if (count == fields.Length)
+			{
+				Array.Resize(ref fields, (count * 2) + 1);
+			}
+			fields[count++] = field;
+		}
+
+		if (count != fields.Length)
+		{
+			Array.Resize(ref fields, count);
+		}
+		return fields;
+	}
+
+	private static StringValues FindFirst(KeyValuePair<string, StringValues>[] fields, string key)
+	{
+		TryFindFirst(fields, key, out StringValues value);
+		return value;
+	}
+
+	private static bool TryFindFirst(KeyValuePair<string, StringValues>[] fields, string key, out StringValues value)
+	{
+		foreach (KeyValuePair<string, StringValues> field in fields)
+		{
+			if (string.Equals(field.Key, key, StringComparison.InvariantCultureIgnoreCase))
+			{
+				value = field.Value;
+				return true;
+			}
+		}
+		value = default;
+		return false;
 	}
 
 	/// <summary>
@@ -160,4 +200,3 @@ public partial class SortAndLimitPostModel
 }
 
 #endregion Classes
-
