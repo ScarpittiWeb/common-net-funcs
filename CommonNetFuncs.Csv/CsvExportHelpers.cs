@@ -26,7 +26,8 @@ public static class CsvExportHelpers
 		await using StreamWriter streamWriter = new(memoryStream, new UTF8Encoding(false), 1024, true);
 		await using CsvWriter csvWriter = CsvWriter.Create(streamWriter, new()
 		{
-			FormatProvider = CultureInfo.InvariantCulture
+			FormatProvider = CultureInfo.InvariantCulture,
+			NewLine = streamWriter.NewLine
 		});
 
 		try
