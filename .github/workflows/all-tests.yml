@@ -157,7 +157,8 @@ jobs:
     if: needs.discover-tests.outputs.matrix != '[]'
     runs-on: ubuntu-latest
     container:
-      image: zeshue/aspnet9-jammy-ffmpeg:1.0.2
+      # image: zeshue/aspnet9-jammy-ffmpeg:1.0.2
+      image: zeshue/ubuntu-noble-ffmpeg:1.0.0
       credentials:
         username: zeshue
         password: ${{ secrets.docker_hub_password }}
