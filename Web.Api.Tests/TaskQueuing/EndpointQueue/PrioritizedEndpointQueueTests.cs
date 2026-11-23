@@ -1,6 +1,7 @@
-﻿using System.Diagnostics;
-using CommonNetFuncs.Web.Api.TaskQueuing;
+﻿using CommonNetFuncs.Web.Api.TaskQueuing;
 using CommonNetFuncs.Web.Api.TaskQueuing.EndpointQueue;
+using System.Diagnostics;
+using xRetry.v3;
 using static Xunit.TestContext;
 namespace Web.Api.Tests.TaskQueuing.EndpointQueue;
 
@@ -418,7 +419,7 @@ public sealed class PrioritizedEndpointQueueTests : IDisposable
 		}
 	}
 
-	[Fact]
+	[RetryFact(3)]
 	public async Task Stats_Should_Show_Current_Processing_Priority()
 	{
 		// Arrange

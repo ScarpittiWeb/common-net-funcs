@@ -1,4 +1,4 @@
-﻿using CommonNetFuncs.Web.Api.MsgPack;
+using CommonNetFuncs.Web.Api.MsgPack;
 using CommonNetFuncs.Web.Requests.MessagePack;
 using MessagePack;
 using MessagePack.AspNetCoreMvcFormatter;

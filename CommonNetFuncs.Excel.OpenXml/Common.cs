@@ -1160,6 +1160,7 @@ public static partial class Common
 		// GetStylesheet with default createIfMissing=true always returns non-null
 		Stylesheet stylesheet = document.GetStylesheet()!;
 
+		// Excel expects a complete baseline style table, even when the caller only supplies a font.
 		stylesheet.GetFonts();
 		stylesheet.GetFills();
 		stylesheet.GetBorders();

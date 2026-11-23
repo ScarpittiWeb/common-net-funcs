@@ -375,11 +375,11 @@ public static class RestHelpersStatic
 		}
 		finally
 		{
-			if(responseStream != null)
+			if (responseStream != null)
 			{
 				await responseStream.DisposeAsync().ConfigureAwait(false);
 			}
-			if(enumeratedReader != null)
+			if (enumeratedReader != null)
 			{
 				await enumeratedReader.DisposeAsync().ConfigureAwait(false);
 			}
