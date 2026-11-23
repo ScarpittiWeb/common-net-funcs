@@ -1,9 +1,9 @@
-﻿// UnitConversion.cs relies on generic math (INumber<T>/IBinaryInteger<T>) and is fully excluded from the netstandard2.1 build of CommonNetFuncs.Core.
-#if CORE_NATIVE_BUILD
-
-using CommonNetFuncs.Core;
+﻿using CommonNetFuncs.Core;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
+
+// UnitConversion.cs relies on generic math (INumber<T>/IBinaryInteger<T>) and is fully excluded from the netstandard2.1 build of CommonNetFuncs.Core.
+#if CORE_NATIVE_BUILD
 
 namespace Core.Tests;
 

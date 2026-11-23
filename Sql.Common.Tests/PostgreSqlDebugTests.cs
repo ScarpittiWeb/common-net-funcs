@@ -311,7 +311,6 @@ public sealed class PostgreSqlDebugTests
 		result.ShouldContain("a = '@b' AND b = 9");
 	}
 }
-#endif
 
 public sealed class PostgreSqlDebugBehaviorTests
 {
@@ -395,3 +394,4 @@ public sealed class PostgreSqlDebugBehaviorTests
 	}
 
 }
+#endif

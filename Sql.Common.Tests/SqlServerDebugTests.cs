@@ -213,7 +213,6 @@ public sealed class SqlServerDebugTests
 		result.ShouldContain("SELECT * FROM TestTable WHERE Id = @Id AND Name = @Name");
 	}
 }
-#endif
 
 public sealed class SqlServerDebugBehaviorTests
 {
@@ -286,3 +285,4 @@ public sealed class SqlServerDebugBehaviorTests
 	}
 
 }
+#endif

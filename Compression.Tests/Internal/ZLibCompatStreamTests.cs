@@ -5,6 +5,7 @@ namespace Compression.Tests.Internal;
 // ZLibCompatStream only exists in the netstandard2.1 build of CommonNetFuncs.Compression (guarded by #if NETSTANDARD2_1 in production);
 // the native net11.0 build uses the BCL ZLibStream instead, so these tests only run when the tests are built against the netstandard2.1 library.
 using CommonNetFuncs.Compression.Internal;
+using System.IO.Compression;
 
 public sealed class ZLibCompatStreamTests
 {

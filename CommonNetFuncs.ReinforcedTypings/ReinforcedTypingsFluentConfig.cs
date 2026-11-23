@@ -734,6 +734,11 @@ public static class ReinforcedTypingsFluentConfig
 			return $"./{to.Name}";
 		}
 
+		if (fromDir.Equals(toDir, StringComparison.OrdinalIgnoreCase))
+		{
+			return to.Name;
+		}
+
 		string rel = Path.GetRelativePath(
 			string.IsNullOrEmpty(fromDir) ? "." : fromDir,
 			string.IsNullOrEmpty(toDir) ? "." : toDir).Replace('\\', '/');

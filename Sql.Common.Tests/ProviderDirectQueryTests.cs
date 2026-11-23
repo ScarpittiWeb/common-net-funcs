@@ -2,7 +2,9 @@
 using System.Data;
 using static Xunit.TestContext;
 using OdbcDirectQuery = CommonNetFuncs.Sql.Odbc.DirectQuery;
+#if CORE_NATIVE_BUILD
 using PostgreSqlDirectQuery = CommonNetFuncs.Sql.PostgreSql.DirectQuery;
+#endif
 using SqlServerDirectQuery = CommonNetFuncs.Sql.SqlServer.DirectQuery;
 
 namespace Sql.Common.Tests;
